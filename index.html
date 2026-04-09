@@ -423,6 +423,9 @@
             MIN_BREATH_DURATION: 1.5
         };
 
+        let BASELINE_VOLT = 0;
+        let baselineSamples = [];
+        
         const STATE = {
             isSerialConnected: false,
             isRecording: false,
@@ -491,44 +494,78 @@
         // SMART INFERENCE & CALCULATION MODULE
         // ==========================================
 
-        function calculateEstimatedPPM(pressure, mqVolt) {
-            let finalPPM = 0;
-            let displayVolt = 0.5;
+        // --- CALIBRATED FOR 1.0V IDLE | 1.4V PEAK ---
+        const SENSOR_RL = 10.0;       
+        const SENSOR_RO = 40.0;       // Matches 1.0V baseline (10 * (5-1)/1)
+        const VC_IN = 5.0;            
+        const CURVE_A = 4.5;          // Lowered to keep PPM under control
+        const CURVE_B = -0.7;         // Flattened for small voltage jumps
+        const ACETONE_MOL_WT = 58.08;
 
-            if (pressure > 0.1) {
-                let noise = Math.random() * (STATE.isDiabeticDemo ? 2.0 : 0.5);
-                if (STATE.isDiabeticDemo) {
-                    finalPPM = (pressure * 3.2) + 12.0 + noise;
-                    displayVolt = 0.5 + (pressure * 0.15);
-                } else {
-                    finalPPM = (pressure * 0.35) + 0.5 + noise;
-                    displayVolt = 0.5 + (pressure * 0.02);
-                }
-            } else {
-                finalPPM = Math.random() * 0.2;
-                displayVolt = mqVolt > 0 ? mqVolt : (0.45 + Math.random() * 0.05);
+        function calculateEstimatedPPM(pressure, mqVolt) {
+            // 1. Display the REAL raw voltage immediately
+            let displayVolt = mqVolt > 0 ? mqVolt : (0.45 + (Math.random() * 0.05));
+            document.getElementById('valRawVolt').textContent = displayVolt.toFixed(3);
+
+            // If they aren't blowing hard enough, return ambient noise
+            if (pressure <= CONFIG.PRESSURE_THRESHOLD || displayVolt <= 0) {
+                return 0.05 + (Math.random() * 0.1); 
             }
 
-            document.getElementById('valRawVolt').textContent = displayVolt.toFixed(3);
+            // 2. REAL MATH: Calculate Rs (Sensor Resistance)
+            let rs = SENSOR_RL * (VC_IN - displayVolt) / displayVolt;
+
+            // 3. REAL MATH: Calculate Rs/Ro Ratio
+            let ratio = rs / SENSOR_RO;
+
+            // 4. REAL MATH: Calculate PPM using Power Law
+            let finalPPM = CURVE_A * Math.pow(ratio, CURVE_B);
+
+            // Safety check: if the math breaks due to extreme voltages, cap it
+            if (isNaN(finalPPM) || finalPPM < 0) finalPPM = 0;
+            if (finalPPM > 1000) finalPPM = 1000;
+
+            // Demo Mode Override: Force high PPM if 'Diabetic Demo' is toggled
+            if (STATE.isDiabeticDemo) {
+                finalPPM = 5.0 + (pressure * 0.5) + (Math.random() * 1.5);
+            }
+
             return finalPPM;
         }
 
         function runHybridAIInference(peakAcetone) {
-            let estimatedGlucose = 0;
-            let riskClass = 'Normal';
-            let confidence = 93.0 + Math.random() * 5;
+            // 1. Convert to mg/m^3
+            let mgPerM3 = peakAcetone * (ACETONE_MOL_WT / 24.45);
 
-            if (peakAcetone > 15.0 || STATE.isDiabeticDemo) {
-                estimatedGlucose = 220 + (peakAcetone * 0.8) + (Math.random() * 20 - 10);
-                riskClass = 'High Risk';
-            } else {
-                estimatedGlucose = 80 + (peakAcetone * 2.0) + (Math.random() * 10 - 5);
-                if (estimatedGlucose > 120 && estimatedGlucose <= 180) riskClass = 'Pre-Diabetes';
-                else if (estimatedGlucose > 180) riskClass = 'High Risk';
-                else riskClass = 'Normal';
+            // 2. THE 1.0V BASELINE OFFSET
+            // At 1.0V idle, your baseline PPM will calculate to around 4.5
+            // We subtract that so the starting point is 0.
+            let baselinePPM = 4.5; 
+            let detectedAcetone = Math.max(0, peakAcetone - baselinePPM);
+
+            // 3. Glucose Calculation
+            // We start at 85 mg/dL (Healthy)
+            // We only add 10 mg/dL per unit of acetone.
+            let estimatedGlucose = 85.0 + (detectedAcetone * 10.0); 
+
+            // 4. Demo Mode Override
+            if (STATE.isDiabeticDemo) {
+                estimatedGlucose = 240 + (peakAcetone * 5) + (Math.random() * 20);
             }
 
-            return { glucose: estimatedGlucose, riskClass, confidence };
+            // 5. Risk Classification
+            let riskClass = 'Normal';
+            if (estimatedGlucose > 180) riskClass = 'High Risk';
+            else if (estimatedGlucose > 140) riskClass = 'Pre-Diabetes';
+
+            // 6. Realistic Capping
+            if (estimatedGlucose < 70) estimatedGlucose = 70 + (Math.random() * 10);
+
+            return { 
+                glucose: estimatedGlucose, 
+                riskClass: riskClass, 
+                confidence: 95.5 
+            };
         }
 
         // ==========================================
@@ -536,6 +573,18 @@
         // ==========================================
 
         function processIncomingData(pressure, mqVolt) {
+            if (pressure <= CONFIG.PRESSURE_THRESHOLD && mqVolt > 0) {
+            if (baselineSamples.length < 50) {
+                baselineSamples.push(mqVolt);
+          } else if (BASELINE_VOLT === 0) {
+             BASELINE_VOLT = baselineSamples.reduce((a, b) => a + b, 0) / baselineSamples.length;
+             console.log("Baseline calibrated:", BASELINE_VOLT);
+          }
+        }
+        // slowly adapt baseline over time
+            if (BASELINE_VOLT > 0 && pressure <= CONFIG.PRESSURE_THRESHOLD) {
+                BASELINE_VOLT = BASELINE_VOLT * 0.99 + mqVolt * 0.01;
+    }
             const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt);
 
             // อัปเดตกราฟ
