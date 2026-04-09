@@ -573,90 +573,87 @@
         // ==========================================
 
         function processIncomingData(pressure, mqVolt) {
-            if (pressure <= CONFIG.PRESSURE_THRESHOLD && mqVolt > 0) {
-            if (baselineSamples.length < 50) {
-                baselineSamples.push(mqVolt);
-          } else if (BASELINE_VOLT === 0) {
-             BASELINE_VOLT = baselineSamples.reduce((a, b) => a + b, 0) / baselineSamples.length;
-             console.log("Baseline calibrated:", BASELINE_VOLT);
-          }
+    // 1. [KEEPING YOUR CALIBRATION] 
+    if (pressure <= CONFIG.PRESSURE_THRESHOLD && mqVolt > 0) {
+        if (baselineSamples.length < 50) {
+            baselineSamples.push(mqVolt);
+        } else if (BASELINE_VOLT === 0) {
+            BASELINE_VOLT = baselineSamples.reduce((a, b) => a + b, 0) / baselineSamples.length;
+            console.log("Baseline calibrated:", BASELINE_VOLT);
         }
-        // slowly adapt baseline over time
-            if (BASELINE_VOLT > 0 && pressure <= CONFIG.PRESSURE_THRESHOLD) {
-                BASELINE_VOLT = BASELINE_VOLT * 0.99 + mqVolt * 0.01;
     }
-            const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt);
+    
+    // Adapt baseline over time
+    if (BASELINE_VOLT > 0 && pressure <= CONFIG.PRESSURE_THRESHOLD) {
+        BASELINE_VOLT = BASELINE_VOLT * 0.99 + mqVolt * 0.01;
+    }
 
-            // อัปเดตกราฟ
-            signalChart.data.datasets[0].data.shift();
-            signalChart.data.datasets[0].data.push(normalizedVOC);
-            signalChart.data.datasets[1].data.shift();
-            signalChart.data.datasets[1].data.push(pressure);
-            signalChart.update();
+    // 2. ALWAYS Calculate and Display
+    const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt);
+    document.getElementById('valRawVolt').textContent = mqVolt.toFixed(3);
 
-            if (!STATE.isHoldingPeak) {
-                document.getElementById('valAcetone').textContent = normalizedVOC.toFixed(2);
-                document.getElementById('valPressure').textContent = pressure.toFixed(2);
-            }
+    // 3. ALWAYS Update Chart (Stops the freezing)
+    signalChart.data.datasets[0].data.shift();
+    signalChart.data.datasets[0].data.push(normalizedVOC);
+    signalChart.data.datasets[1].data.shift();
+    signalChart.data.datasets[1].data.push(pressure);
+    signalChart.update('none'); 
 
-            // บันทึกข้อมูล Raw Data สำหรับออกรายงาน CSV หากเปิดใช้งานอยู่
-            if (STATE.isCollectingRawData) {
-                STATE.rawTimeLog.push({
-                    timestamp: new Date().toISOString(),
-                    pressure: pressure.toFixed(4),
-                    rawVolt: mqVolt.toFixed(4), // <--- NOW IT SAVES THE REAL SENSOR VOLTAGE
-                    vocPpm: normalizedVOC.toFixed(4) // (Still fake, but at least your rawVolt is real now!)
-    });
+    // 4. ALWAYS Log to CSV
+    // 3. ALWAYS Log to CSV if collecting
+    if (STATE.isCollectingRawData) {
+        STATE.rawTimeLog.push({
+            timestamp: new Date().toISOString(),
+            pressure: pressure.toFixed(4),
+            rawVolt: mqVolt.toFixed(4),
+            vocPpm: normalizedVOC.toFixed(4),
+            // ADDED: Logical true/false or 1/0 for blowing state
+            isBlowing: pressure > CONFIG.PRESSURE_THRESHOLD ? 1 : 0 
+        });
+        document.getElementById('csvCount').textContent = STATE.rawTimeLog.length;
+    }
 
-             // อัปเดตตัวเลขจำนวน Data Point ใน UI
-             document.getElementById('csvCount').textContent = STATE.rawTimeLog.length;
-            }
+    // 5. Update UI numbers
+    if (!STATE.isHoldingPeak) {
+        document.getElementById('valAcetone').textContent = normalizedVOC.toFixed(2);
+        document.getElementById('valPressure').textContent = pressure.toFixed(2);
+    }
 
-            // การจัดการสถานะหายใจ
-            if (pressure > CONFIG.PRESSURE_THRESHOLD) {
-                STATE.isHoldingPeak = false;
+    // 6. Breath Detection Logic
+    if (pressure > CONFIG.PRESSURE_THRESHOLD) {
+        STATE.isHoldingPeak = false;
 
-                document.getElementById('valAcetone').textContent = normalizedVOC.toFixed(2);
-                document.getElementById('valPressure').textContent = pressure.toFixed(2);
-
-                if (!STATE.isBreathing) {
-                    STATE.isBreathing = true;
-                    STATE.breathStartTime = Date.now();
-                    STATE.currentExhale = { maxPpm: 0, maxPress: 0 };
-
-                    const riskBadge = document.getElementById('valRisk');
-                    riskBadge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-600 border border-blue-200';
-                    riskBadge.innerHTML = '<i class="fa-solid fa-wind animate-pulse mr-2"></i> Analyzing Breath...';
-                    document.getElementById('valGlucose').style.color = '#94a3b8';
-                }
-
-                if (normalizedVOC > STATE.currentExhale.maxPpm) STATE.currentExhale.maxPpm = normalizedVOC;
-                if (pressure > STATE.currentExhale.maxPress) STATE.currentExhale.maxPress = pressure;
-
-            } else {
-                if (STATE.isBreathing) {
-                    const duration = (Date.now() - STATE.breathStartTime) / 1000;
-                    STATE.isBreathing = false;
-
-                    STATE.isHoldingPeak = true;
-                    document.getElementById('valAcetone').textContent = STATE.currentExhale.maxPpm.toFixed(2);
-                    document.getElementById('valPressure').textContent = STATE.currentExhale.maxPress.toFixed(2);
-                    setTimeout(() => { STATE.isHoldingPeak = false; }, 3000);
-
-                    if (duration >= CONFIG.MIN_BREATH_DURATION) {
-                        const aiResult = runHybridAIInference(STATE.currentExhale.maxPpm);
-                        updateDiagnosticUI(aiResult.glucose, aiResult.riskClass, aiResult.confidence);
-
-                        if (STATE.isRecording) {
-                            addLogEntry(duration, STATE.currentExhale.maxPpm, aiResult.glucose, aiResult.riskClass);
-                        }
-                    } else {
-                        document.getElementById('valRisk').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> Exhale Too Short';
-                        document.getElementById('valRisk').className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-slate-100 text-slate-500 border border-slate-200';
-                    }
-                }
-            }
+        if (!STATE.isBreathing) {
+            STATE.isBreathing = true;
+            STATE.breathStartTime = Date.now();
+            STATE.currentExhale = { maxPpm: 0, maxPress: 0 };
+            
+            const riskBadge = document.getElementById('valRisk');
+            riskBadge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-600 border border-blue-200';
+            riskBadge.innerHTML = '<i class="fa-solid fa-wind animate-pulse mr-2"></i> Analyzing...';
         }
+
+        if (normalizedVOC > STATE.currentExhale.maxPpm) STATE.currentExhale.maxPpm = normalizedVOC;
+        if (pressure > STATE.currentExhale.maxPress) STATE.currentExhale.maxPress = pressure;
+
+    } else if (STATE.isBreathing) {
+        const duration = (Date.now() - STATE.breathStartTime) / 1000;
+        STATE.isBreathing = false;
+        STATE.isHoldingPeak = true;
+        
+        setTimeout(() => { STATE.isHoldingPeak = false; }, 3000);
+
+        if (duration >= CONFIG.MIN_BREATH_DURATION) {
+            const aiResult = runHybridAIInference(STATE.currentExhale.maxPpm);
+            updateDiagnosticUI(aiResult.glucose, aiResult.riskClass, aiResult.confidence);
+            if (STATE.isRecording) {
+                addLogEntry(duration, STATE.currentExhale.maxPpm, aiResult.glucose, aiResult.riskClass);
+            }
+        } else {
+            document.getElementById('valRisk').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> Too Short';
+        }
+    }
+}
 
         // ==========================================
         // AUTO DEMO SIMULATION
@@ -775,12 +772,13 @@
             }
 
             // สร้าง Header ของ CSV (เอา Glucose และ Risk ออก)
-            let csvContent = "Timestamp,Pressure_mmHg,Raw_Voltage_V,VOC_PPM\n";
+            // Update Header to include "Is_Blowing"
+    let csvContent = "Timestamp,Pressure_mmHg,Raw_Voltage_V,VOC_PPM,Is_Blowing\n";
 
-            // วนลูปนำข้อมูลใส่ในแต่ละ Row
-            STATE.rawTimeLog.forEach(row => {
-                csvContent += `${row.timestamp},${row.pressure},${row.rawVolt},${row.vocPpm}\n`;
-            });
+    // Update Row loop to include the new value
+    STATE.rawTimeLog.forEach(row => {
+        csvContent += `${row.timestamp},${row.pressure},${row.rawVolt},${row.vocPpm},${row.isBlowing}\n`;
+    });
 
             // สร้างไฟล์แล้วสั่งดาวน์โหลด
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -841,19 +839,25 @@
                             line = line.trim();
                             if (!line) continue;
 
-                            if (line.includes("BLOW")) {
-                                let match = line.match(/Pressure:\s*([\d\.]+)\s*mmHg\s*\|\s*MQ Volt:\s*([\d\.]+)/);
-                                if (match) {
-                                    let press = parseFloat(match[1]);
-                                    let mqVolt = parseFloat(match[2]);
-                                    processIncomingData(press, mqVolt);
-                                }
-                            } else if (line.includes("IDLE")) {
+            // 1. Look for numbers in the string
+                            let match = line.match(/Pressure:\s*(-?[\d\.]+).*?MQ Volt:\s*(-?[\d\.]+)/i);
+
+                            if (match) {
+                                let press = parseFloat(match[1]);
+                                let mqVolt = parseFloat(match[2]);
+                // 2. Send real data to the dashboard and CSV
+                                processIncomingData(press, mqVolt); 
+                            } 
+            // 3. Fallback only if the message is "IDLE" with no data
+                            else if (line.includes("IDLE") && !line.includes("Volt")) {
                                 processIncomingData(0.0, 0.0);
                             }
-                        }
-                    }
-                }
+                        } // end for
+                    } // end if value
+                } // end while
+                        
+                    
+                
             } catch (error) {
                 console.error("Serial Error:", error);
                 STATE.isSerialConnected = false;
