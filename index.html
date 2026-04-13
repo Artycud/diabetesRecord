@@ -877,9 +877,9 @@
             CHART_MAX_POINTS: 80,
             PRESSURE_THRESHOLD: 0.5,
             MIN_BREATH_DURATION: 1.5,
-            MQTT_BROKER: "broker.hivemq.com", // Change this from emqx.io
-            MQTT_PORT: 8000 // HiveMQ WebSockets usually use 8000 or 8884
-    };
+            MQTT_BROKER: "broker.hivemq.com",
+            MQTT_PORT: 8884 // WSS (secure WebSocket) — works on both HTTP and HTTPS
+        };
 
         let BASELINE_VOLT = 0;
 
@@ -1511,7 +1511,7 @@
 
     // 3. Connect using the parameters from your CONFIG
     STATE.mqttClient.connect({
-        useSSL: false, 
+        useSSL: true,
         timeout: 3,
         onSuccess: () => {
             console.log("Connected to Broker");
