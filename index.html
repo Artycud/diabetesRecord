@@ -96,12 +96,18 @@
         .tab-content {
             display: none;
             animation: fadeIn 0.3s ease-in-out;
+        }
+
+        /* Dashboard needs flex-column to fill available space */
+        #tab-dashboard.active {
+            display: flex;
+            flex-direction: column;
             flex: 1;
         }
 
-        .tab-content.active {
-            display: flex;
-            flex-direction: column;
+        /* All other tabs just scroll normally - NO overlay/flex stretch */
+        .tab-content.active:not(#tab-dashboard) {
+            display: block;
         }
 
         .auth-view {
@@ -141,6 +147,31 @@
         .bg-medical-pattern {
             background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
             background-size: 20px 20px;
+        }
+        /* All tabs live as normal flow children inside #mainContent.
+           #mainContent is flex-col, so each active tab just fills the remaining space. */
+        #mainContent {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        /* Dashboard: flex column so its inner panels stack vertically */
+        #tab-dashboard.active {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+            gap: 1.5rem;
+        }
+        /* All other tabs: plain block, scroll within themselves */
+        #tab-predictions.active,
+        #tab-logs.active,
+        #tab-settings.active {
+            display: block;
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
         }
     </style>
 </head>
@@ -423,7 +454,7 @@
                 </div>
             </aside>
 
-            <main class="flex-1 overflow-hidden bg-slate-50 relative flex flex-col">
+            <main class="flex-1 min-w-0 bg-slate-50" id="mainContent" style="overflow:hidden;">
                 <!-- Mobile menu toggle -->
                 <button onclick="toggleSidebar()" class="md:hidden fixed bottom-4 left-4 z-50 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center">
                     <i class="fa-solid fa-bars"></i>
@@ -431,7 +462,7 @@
                 <div id="alertContainer" class="absolute top-4 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
                 <!-- Tab: Dashboard -->
-                <div id="tab-dashboard" class="tab-content active h-full overflow-y-auto p-4 md:p-6 flex flex-col gap-6">
+                <div id="tab-dashboard" class="tab-content active p-4 md:p-6 gap-6">
                     <!-- Collapsible Live Dashboard header bar -->
                     <div id="dashboardTopBar" class="flex items-center justify-between shrink-0 -mb-2">
                         <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -571,8 +602,8 @@
                     </div>
                 </div>
 
-                <div id="tab-predictions" class="tab-content h-full overflow-y-auto p-4 md:p-6">
-                    <div class="glass-panel flex flex-col p-6 min-h-full">
+                <div id="tab-predictions" class="tab-content p-4 md:p-6">
+                    <div class="glass-panel flex flex-col p-6">
                         <div class="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
                             <div>
                                 <h2 class="text-lg font-bold text-slate-800">Long-Term Analytics & Predictions</h2>
@@ -643,8 +674,8 @@
                     </div>
                 </div>
 
-                <div id="tab-logs" class="tab-content h-full overflow-y-auto p-4 md:p-6">
-                    <div class="glass-panel flex flex-col p-6 min-h-full">
+                <div id="tab-logs" class="tab-content p-4 md:p-6">
+                    <div class="glass-panel flex flex-col p-6">
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-lg font-bold text-slate-800">Clinical Breath Logs</h2>
                             <button id="btnClearLogs"
@@ -676,7 +707,7 @@
                     </div>
                 </div>
 
-                <div id="tab-settings" class="tab-content h-full overflow-y-auto p-4 md:p-6">
+                <div id="tab-settings" class="tab-content p-4 md:p-6">
                     <div class="glass-panel flex flex-col p-6 max-w-5xl mx-auto">
                         <h2 class="text-xl font-bold text-slate-800 mb-6 border-b border-slate-200 pb-4">Configurations
                             & Calibration</h2>
@@ -697,7 +728,7 @@
                                         class="fa-solid fa-server text-slate-400"></i> MQTT Telemetry</h3>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">Broker Topic</label>
-                                    <input type="text" id="mqttTopic" value="siit/med/breath/patient"
+                                    <input type="text" id="mqttTopic" value="siit/med/breath/waranyu.arty"
                                         class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg block p-2.5">
                                 </div>
                             </div>
@@ -900,7 +931,9 @@
             document.getElementById('statFamily').textContent = patientData.familyHistory.toUpperCase();
             document.getElementById('statHbA1c').textContent = patientData.hba1c ? patientData.hba1c + '%' : 'N/A';
             document.getElementById('userProfileName').textContent = patientData.username.toUpperCase();
-            document.getElementById('mqttTopic').value = `siit/med/breath/${patientData.username}`;
+            // NOTE: Do NOT overwrite mqttTopic here — the ESP32 firmware hardcodes its topic.
+            // The default value in the HTML input (siit/med/breath/waranyu.arty) must match the ESP32.
+            // Users can change it manually in Settings & Calibrate if needed.
 
             document.getElementById('authScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
@@ -1185,30 +1218,27 @@
 
     // FIX: Change 'mqttClient.onMessageArrived' to 'STATE.mqttClient.onMessageArrived'
     STATE.mqttClient.onMessageArrived = (message) => {
-        const payload = message.payloadString;
-        console.log("MQTT Received:", payload);
+    try {
+        // 1. Convert the message back into a JavaScript Object
+        const data = JSON.parse(message.payloadString);
 
-        if (payload.includes("Pressure:")) {
-            const parts = payload.split('|');
-            // Safely parse the parts
-            const pressurePart = parts[1] ? parts[1].match(/[\d.]+/) : null;
-            const mqPart = parts[2] ? parts[2].match(/[\d.]+/) : null;
+        // 2. Extract sensor values (ESP32 sends: {status, pressure, volt, humidity})
+        const pressure = parseFloat(data.pressure) || 0;
+        const volt     = parseFloat(data.volt)     || 0;
+        const humidity = parseFloat(data.humidity) || 45.0;
 
-            if (pressurePart && mqPart) {
-                const pressure = parseFloat(pressurePart[0]);
-                const mqVolt = parseFloat(mqPart[0]);
+        // 3. Immediately update the raw sensor display elements (correct IDs)
+        document.getElementById('valPressure').textContent = pressure.toFixed(2);
+        document.getElementById('valRawVolt').textContent  = volt.toFixed(3);
+        document.getElementById('valHumidity').textContent = humidity.toFixed(1);
 
-                // Update UI elements
-                const presEl = document.getElementById('valPressure');
-                const voltEl = document.getElementById('valRawVolt');
-                
-                if(presEl) presEl.textContent = pressure.toFixed(2);
-                if(voltEl) voltEl.textContent = mqVolt.toFixed(3);
-                
-                STATE.isBreathing = payload.startsWith("BLOW");
-            }
-        }
-    };
+        // 4. Pipe into the main AI processing pipeline (same as serial)
+        processIncomingData(pressure, volt, humidity);
+
+    } catch (e) {
+        console.error("MQTT: Expected JSON but got something else:", message.payloadString, e);
+    }
+};
 
     // 3. Connect using the parameters from your CONFIG
     STATE.mqttClient.connect({
@@ -1221,15 +1251,22 @@
             setTimeout(() => {
                 if (STATE.mqttClient && STATE.mqttClient.isConnected()) {
                     // Make sure STATE.topic has a fallback value
-                    const topicToSubscribe = STATE.topic || "esp32/breath_data";
+                    const topicToSubscribe = STATE.topic || "siit/med/breath/waranyu.arty";
                     STATE.mqttClient.subscribe(topicToSubscribe);
                     console.log("Subscribed to: " + topicToSubscribe);
                     
-                    // Update UI Colors manually to be safe
+                    // Update UI status
                     const statusText = document.getElementById('mqttStatusText');
                     statusText.textContent = 'MQTT: Connected';
-                    statusText.style.color = "#10b981"; // Green
+                    statusText.style.color = "#10b981";
+                    document.getElementById('mqttStatusDot').classList.replace('status-idle','status-active');
                     document.getElementById('mqttStatusDot').style.backgroundColor = "#10b981";
+
+                    // Update wireless button to show Disconnect
+                    const btn = document.getElementById('btnWireless');
+                    btn.innerHTML = '<i class="fas fa-wifi"></i><span class="hidden sm:inline"> Disconnect Wi-Fi</span><span class="sm:hidden">Disc.</span>';
+                    btn.classList.replace('bg-emerald-500','bg-rose-500');
+                    btn.classList.replace('hover:bg-emerald-600','hover:bg-rose-600');
                 }
             }, 500);
         },
@@ -1444,7 +1481,23 @@
                         buffer = lines.pop();
                         for (let line of lines) {
                             line = line.trim(); if (!line) continue;
-                            let match = line.match(/Pressure:\s*(-?[\d\.]+).*?MQ Volt:\s*(-?[\d\.]+)(?:.*?Humidity:\s*(-?[\d\.]+))?/i);
+                            // Try JSON first (new ESP32 firmware: {"status":"BLOW","pressure":X,"volt":X,"humidity":X})
+                            try {
+                                const json = JSON.parse(line);
+                                if (typeof json.pressure !== 'undefined') {
+                                    const pressure = parseFloat(json.pressure) || 0;
+                                    const volt = parseFloat(json.volt) || 0;
+                                    const humidity = parseFloat(json.humidity) || 45.0;
+                                    // Immediately update raw volt display for instant feedback
+                                    document.getElementById('valRawVolt').textContent = volt.toFixed(3);
+                                    document.getElementById('valPressure').textContent = pressure.toFixed(2);
+                                    document.getElementById('valHumidity').textContent = humidity.toFixed(1);
+                                    processIncomingData(pressure, volt, humidity);
+                                    continue;
+                                }
+                            } catch(e) { /* not JSON, try legacy format */ }
+                            // Legacy text format: "Pressure: X MQ Volt: X Humidity: X"
+                            let match = line.match(/Pressure:\s*(-?[\d\.]+).*?(?:MQ\s*Volt|Volt):\s*(-?[\d\.]+)(?:.*?Humidity:\s*(-?[\d\.]+))?/i);
                             if (match) { processIncomingData(parseFloat(match[1]), parseFloat(match[2]), match[3] ? parseFloat(match[3]) : 45.0); }
                         }
                     }
@@ -1455,12 +1508,20 @@
         // Add this near document.getElementById('btnConnect').addEventListener(...)
 // In diabetes-v2-updated.html, find the btnWireless listener:
         document.getElementById('btnWireless').addEventListener('click', () => {
-    // Check if client exists AND is actually connected
-            if (!STATE.mqttClient || !STATE.mqttClient.isConnected()) {
+            if (STATE.mqttClient && STATE.mqttClient.isConnected()) {
+                // Disconnect
+                STATE.mqttClient.disconnect();
+                STATE.mqttClient = null;
+                document.getElementById('mqttStatusText').textContent = 'MQTT: Disconnected';
+                document.getElementById('mqttStatusText').style.color = '';
+                document.getElementById('mqttStatusDot').classList.replace('status-active', 'status-idle');
+                document.getElementById('mqttStatusDot').style.backgroundColor = '';
+                document.getElementById('btnWireless').innerHTML = '<i class="fas fa-wifi"></i><span class="hidden sm:inline"> Connect Wireless</span><span class="sm:hidden">Wi-Fi</span>';
+                document.getElementById('btnWireless').classList.replace('bg-rose-500','bg-emerald-500');
+                document.getElementById('btnWireless').classList.replace('hover:bg-rose-600','hover:bg-emerald-600');
+            } else {
                 console.log("Starting MQTT connection...");
                 initMQTT();
-            } else {
-                alert("You are already connected to the live stream.");
             }
         });
 
