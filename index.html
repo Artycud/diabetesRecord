@@ -178,6 +178,10 @@
                             placeholder="Enter password">
                     </div>
                 </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <input type="checkbox" id="rememberMe" class="w-4 h-4 accent-emerald-500 cursor-pointer">
+                    <label for="rememberMe" class="text-xs text-slate-500 cursor-pointer select-none">Remember me</label>
+                </div>
                 <button onclick="handleLogin()"
                     class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-lg mt-2 transition-all shadow-md">
                     Secure Login
@@ -829,24 +833,41 @@
         function handleLogin() {
             const userVal = document.getElementById('loginUser').value;
             const passVal = document.getElementById('loginPass').value;
+            const remember = document.getElementById('rememberMe').checked;
 
             if (!userVal || !passVal) return alert("Enter credentials.");
 
             const patient = LocalDB.select(userVal, passVal);
     
             if (patient) {
-        // Ensure patient object has the expected strings to prevent .toLowerCase() crashes
                 patient.name = patient.name || "Guest";
                 patient.role = patient.role || "Patient";
-        
-        // Save to localStorage so other parts of the app can find it safely
                 localStorage.setItem('currentUser', JSON.stringify(patient));
+
+                if (remember) {
+                    localStorage.setItem('savedCredentials', JSON.stringify({ user: userVal, pass: passVal }));
+                } else {
+                    localStorage.removeItem('savedCredentials');
+                }
         
                 loadApp(patient);
             } else {
                 alert("Invalid clinical ID or Password.");
             }
         }
+
+        // Auto-fill saved credentials on page load
+        (function restoreCredentials() {
+            const saved = localStorage.getItem('savedCredentials');
+            if (saved) {
+                try {
+                    const { user, pass } = JSON.parse(saved);
+                    document.getElementById('loginUser').value = user;
+                    document.getElementById('loginPass').value = pass;
+                    document.getElementById('rememberMe').checked = true;
+                } catch(e) { localStorage.removeItem('savedCredentials'); }
+            }
+        })();
 
         function loadApp(patientData) {
             STATE.patientProfile = patientData;
@@ -908,7 +929,9 @@
                 const targetId = e.currentTarget.getAttribute('data-target');
                 e.currentTarget.classList.add('bg-emerald-600', 'text-white');
                 e.currentTarget.classList.remove('hover:bg-slate-800', 'text-slate-300');
-                document.getElementById(targetId).classList.add('active');
+                const targetEl = document.getElementById(targetId);
+                targetEl.classList.add('active');
+                targetEl.scrollTop = 0;
 
                 if (targetId === 'tab-predictions') updatePredictionChart();
             });
