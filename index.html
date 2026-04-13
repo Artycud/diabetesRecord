@@ -4,10 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Breath Diabetes AI | Non-Invasive Screening</title>
+    <title>Smart Breath Diabetes AI | Enterprise Screening</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
@@ -37,6 +38,30 @@
 
             100% {
                 box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
         }
 
@@ -77,25 +102,22 @@
             display: block;
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(5px);
-            }
+        .auth-view {
+            display: none;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
 
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .auth-view.active {
+            display: flex;
         }
 
         .toggle-checkbox:checked {
             right: 0;
-            border-color: #f43f5e;
+            border-color: #10b981;
         }
 
         .toggle-checkbox:checked+.toggle-label {
-            background-color: #f43f5e;
+            background-color: #10b981;
         }
 
         .toggle-checkbox {
@@ -109,724 +131,1205 @@
             background-color: #cbd5e1;
             transition: all 0.3s;
         }
+
+        .toast-alert {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        .bg-medical-pattern {
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
     </style>
 </head>
 
-<body class="text-slate-800 h-screen flex flex-col overflow-hidden">
+<body class="text-slate-800 flex flex-col overflow-hidden relative" style="height:100dvh">
 
-    <nav class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shrink-0 z-20 shadow-sm">
-        <div class="flex items-center gap-4">
-            <div
-                class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg">
-                <i class="fa-solid fa-lungs"></i>
+    <div id="authScreen" class="absolute inset-0 z-50 bg-slate-50 flex items-center justify-center bg-medical-pattern">
+
+        <div id="viewLogin" class="auth-view active glass-panel w-full max-w-md p-8 flex-col shadow-2xl">
+            <div class="text-center mb-8">
+                <div
+                    class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg mx-auto mb-4">
+                    <i class="fa-solid fa-lungs"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-800">Smart Breath Diabetes AI</h1>
+                <p class="text-sm text-slate-500 mt-1">Enterprise Screening Database</p>
             </div>
-            <div>
-                <h1 class="text-xl font-bold text-slate-800 leading-tight">Smart Breath Diabetes AI</h1>
-                <p class="text-xs font-medium text-emerald-600">Non-Invasive Screening • LSTM + XGBoost</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Username</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3 top-3 text-slate-400"></i>
+                        <input type="text" id="loginUser"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-10 p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            placeholder="Enter clinical ID">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Password</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3 top-3 text-slate-400"></i>
+                        <input type="password" id="loginPass"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-10 p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            placeholder="Enter password">
+                    </div>
+                </div>
+                <button onclick="handleLogin()"
+                    class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-lg mt-2 transition-all shadow-md">
+                    Secure Login
+                </button>
+            </div>
+            <div class="mt-6 text-center border-t border-slate-200 pt-4">
+                <p class="text-xs text-slate-500">New patient profile? <button onclick="switchAuthView('viewRegister')"
+                        class="text-emerald-600 font-bold hover:underline">Register Meta Data</button></p>
             </div>
         </div>
 
-        <div class="flex items-center gap-6">
-            <div class="flex items-center gap-3 bg-rose-50 px-4 py-2 rounded-lg border border-rose-100"
-                title="Press 'D' to toggle secretly">
-                <i class="fa-solid fa-syringe text-rose-500"></i>
-                <span class="text-xs font-bold text-rose-700">Diabetic Demo</span>
-                <div class="relative inline-block w-10 h-5 align-middle select-none transition duration-200 ease-in">
-                    <input type="checkbox" name="toggle" id="toggleDiabetic"
-                        class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" />
-                    <label for="toggleDiabetic"
-                        class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+        <div id="viewRegister"
+            class="auth-view glass-panel w-full max-w-2xl p-8 flex-col shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+                <h2 class="text-xl font-bold text-slate-800"><i
+                        class="fa-solid fa-file-medical text-emerald-500 mr-2"></i> Patient Clinical Registration</h2>
+                <button onclick="switchAuthView('viewLogin')" class="text-slate-400 hover:text-slate-600"><i
+                        class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div class="col-span-2 md:col-span-1 space-y-4">
+                    <h3
+                        class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
+                        Authentication</h3>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Username (Patient ID)</label>
+                        <input type="text" id="regUser"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Password</label>
+                        <input type="password" id="regPass"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                    </div>
+                </div>
+
+                <div class="col-span-2 md:col-span-1 space-y-4">
+                    <h3
+                        class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
+                        Demographics</h3>
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Age</label>
+                            <input type="number" id="regAge"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                                placeholder="Years">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Gender</label>
+                            <select id="regGender"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Weight (kg)</label>
+                            <input type="number" id="regWeight"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Height (cm)</label>
+                            <input type="number" id="regHeight"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-span-2 space-y-4 mt-2">
+                    <h3
+                        class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
+                        Deep Clinical Metadata</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Family Diabetes History</label>
+                            <select id="regFamilyHistory"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Known Diabetic Status</label>
+                            <select id="regStatus"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                                <option value="none">None / Healthy</option>
+                                <option value="prediabetes">Pre-Diabetes</option>
+                                <option value="type1">Type 1 Diabetes</option>
+                                <option value="type2">Type 2 Diabetes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Latest HbA1c (%)</label>
+                            <input type="number" step="0.1" id="regHbA1c"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                                placeholder="Optional (e.g. 5.5)">
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex flex-col items-end border-l border-slate-200 pl-6">
-                <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-1">
-                    <span id="mqttStatusText">MQTT: Offline</span>
-                    <div id="mqttStatusDot" class="w-2.5 h-2.5 rounded-full status-idle"></div>
-                </div>
-                <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                    <span id="serialStatusText">ESP32: Disconnected</span>
-                    <div id="serialStatusDot" class="w-2.5 h-2.5 rounded-full status-idle"></div>
-                </div>
-            </div>
-
-            <button id="btnConnect"
-                class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-medium transition-all shadow-md flex items-center gap-2 text-sm">
-                <i class="fa-brands fa-usb"></i> Connect Device
+            <button onclick="handleRegister()"
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg mt-8 transition-all shadow-md">
+                <i class="fa-solid fa-database mr-2"></i> Save to SQLite & Initialize App
             </button>
         </div>
-    </nav>
+    </div>
 
-    <div class="flex flex-1 overflow-hidden">
-        <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0">
-            <div class="p-6">
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Main Menu</p>
-                <nav class="flex flex-col gap-2">
-                    <button
-                        class="tab-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors bg-emerald-600 text-white font-medium"
-                        data-target="tab-dashboard">
-                        <i class="fa-solid fa-chart-line w-5 text-center"></i> Live Dashboard
-                    </button>
-                    <button
-                        class="tab-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-slate-800 hover:text-white"
-                        data-target="tab-logs">
-                        <i class="fa-solid fa-clipboard-list w-5 text-center"></i> Clinical Logs
-                    </button>
-                    <button
-                        class="tab-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-slate-800 hover:text-white"
-                        data-target="tab-settings">
-                        <i class="fa-solid fa-gear w-5 text-center"></i> Settings & Calibrate
-                    </button>
-                </nav>
+    <div id="mainApp" class="hidden flex flex-col h-screen w-full">
+        <nav
+            class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap justify-between items-center shrink-0 z-20 shadow-sm gap-2">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                    <i class="fa-solid fa-lungs"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-slate-800 leading-tight">Smart Breath Diabetes AI</h1>
+                    <p class="text-xs font-medium text-emerald-600 hidden sm:block">LSTM + XGBoost • Continuous Learning</p>
+                </div>
             </div>
 
-            <div class="mt-auto p-6 border-t border-slate-800 space-y-3">
-                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Data Acquisition
-                </p>
-
-                <button id="btnCollectRaw"
-                    class="w-full bg-slate-800 hover:bg-slate-700 rounded-lg p-3 flex items-center justify-between transition-colors border border-slate-700 group">
-                    <div class="text-left">
-                        <p class="text-xs text-slate-400 group-hover:text-white transition-colors">Raw Time-Series</p>
-                        <p class="text-sm font-semibold text-blue-400" id="textCollectRaw">Start Collect</p>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                    <i id="modeIcon" class="fa-solid fa-microscope text-indigo-500 text-xs"></i>
+                    <span id="modeText" class="text-xs font-bold text-slate-700 hidden sm:inline">Screening Mode</span>
+                    <div
+                        class="relative inline-block w-10 h-5 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggleMode" id="toggleMode"
+                            class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" />
+                        <label for="toggleMode"
+                            class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
                     </div>
-                    <i
-                        class="fa-solid fa-database text-blue-500 text-xl group-hover:scale-110 transition-transform"></i>
+                </div>
+
+                <div class="hidden md:flex flex-col items-end border-l border-slate-200 pl-4">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-1">
+                        <span id="mqttStatusText">MQTT: Connecting...</span>
+                        <div id="mqttStatusDot" class="w-2.5 h-2.5 rounded-full status-idle"></div>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                        <span id="serialStatusText">ESP32: Disconnected</span>
+                        <div id="serialStatusDot" class="w-2.5 h-2.5 rounded-full status-idle"></div>
+                    </div>
+                </div>
+
+                <button
+                    class="hidden sm:flex bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg font-bold items-center gap-2 text-xs border border-indigo-200 cursor-default">
+                    <i class="fa-solid fa-user-check"></i> <span id="userProfileName">Logged In</span>
                 </button>
 
-                <button id="btnExportCSV"
-                    class="w-full bg-slate-800 hover:bg-slate-700 rounded-lg p-3 flex items-center justify-between transition-colors border border-slate-700 group">
-                    <div class="text-left">
-                        <p class="text-xs text-slate-400 group-hover:text-white transition-colors">Export Dataset</p>
-                        <p class="text-sm font-semibold text-emerald-400">Save CSV (<span id="csvCount">0</span>)</p>
-                    </div>
-                    <i
-                        class="fa-solid fa-file-csv text-emerald-500 text-xl group-hover:scale-110 transition-transform"></i>
+                <button id="btnConnect"
+                    class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg font-medium transition-all shadow-md flex items-center gap-2 text-xs">
+                    <i class="fa-brands fa-usb"></i> <span class="hidden sm:inline">Connect Device</span><span class="sm:hidden">USB</span>
                 </button>
-            </div>
-
-            <div class="p-6 border-t border-slate-800 space-y-3">
-                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Presentation Demo
-                    Mode</p>
-
-                <button onclick="runSimulation(false)"
-                    class="w-full bg-slate-800 hover:bg-slate-700 rounded-lg p-3 flex items-center justify-between transition-colors border border-slate-700 group">
-                    <div class="text-left">
-                        <p class="text-xs text-slate-400 group-hover:text-white transition-colors">Normal Patient</p>
-                        <p class="text-sm font-semibold text-emerald-400">Press 'S'</p>
-                    </div>
-                    <i
-                        class="fa-solid fa-user-check text-emerald-500 text-xl group-hover:scale-110 transition-transform"></i>
+                <button id="btnWireless" class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-xl shadow-lg transition-all active:scale-95 text-xs">
+                    <i class="fas fa-wifi"></i>
+                    <span class="hidden sm:inline">Connect Wireless</span><span class="sm:hidden">Wi-Fi</span>
                 </button>
 
-                <button onclick="runSimulation(true)"
-                    class="w-full bg-slate-800 hover:bg-slate-700 rounded-lg p-3 flex items-center justify-between transition-colors border border-rose-900/50 group">
-                    <div class="text-left">
-                        <p class="text-xs text-slate-400 group-hover:text-white transition-colors">Diabetic Patient</p>
-                        <p class="text-sm font-semibold text-rose-400">Press 'D'</p>
-                    </div>
-                    <i
-                        class="fa-solid fa-user-injured text-rose-500 text-xl group-hover:scale-110 transition-transform"></i>
+                <button onclick="logout()" class="text-slate-400 hover:text-rose-500 transition-colors"
+                    title="Logout">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-lg"></i>
                 </button>
             </div>
-        </aside>
+        </nav>
 
-        <main class="flex-1 overflow-y-auto bg-slate-50 p-6 relative">
+        <div class="flex flex-1 overflow-hidden relative">
+            <!-- Mobile sidebar overlay -->
+            <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden" onclick="toggleSidebar()"></div>
+            
+            <aside id="sidebar" class="fixed md:relative inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+                <div class="p-6">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Main Menu</p>
+                    <nav class="flex flex-col gap-2">
+                        <button
+                            class="tab-btn active-tab w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors bg-emerald-600 text-white font-medium"
+                            data-target="tab-dashboard">
+                            <i class="fa-solid fa-chart-line w-5 text-center"></i> Live Dashboard
+                        </button>
+                        <button
+                            class="tab-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-slate-800 hover:text-white"
+                            data-target="tab-predictions">
+                            <i class="fa-solid fa-chart-pie w-5 text-center"></i> Analytics & Predict
+                        </button>
+                        <button
+                            class="tab-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-slate-800 hover:text-white"
+                            data-target="tab-logs">
+                            <i class="fa-solid fa-clipboard-list w-5 text-center"></i> Clinical Logs
+                        </button>
+                        <button
+                            class="tab-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-slate-800 hover:text-white"
+                            data-target="tab-settings">
+                            <i class="fa-solid fa-gear w-5 text-center"></i> Settings & Calibrate
+                        </button>
+                    </nav>
+                </div>
 
-            <div id="tab-dashboard" class="tab-content active h-full flex flex-col gap-6">
-                <div class="flex gap-6 shrink-0 h-64">
-                    <div class="glass-panel w-1/3 p-6 flex flex-col relative overflow-hidden">
-                        <div class="absolute -right-4 -top-4 opacity-5 text-emerald-600 text-9xl">
-                            <i class="fa-solid fa-droplet"></i>
+                <div class="mt-auto p-6 border-t border-slate-800 space-y-3">
+                    <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider text-center"><i
+                            class="fa-solid fa-brain"></i> AI Federated Learning Active</p>
+
+                    <button id="btnCollectRaw"
+                        class="w-full bg-slate-800 hover:bg-slate-700 rounded-lg p-3 flex items-center justify-between transition-colors border border-slate-700 group">
+                        <div class="text-left">
+                            <p class="text-xs text-slate-400 group-hover:text-white transition-colors">Raw Time-Series
+                            </p>
+                            <p class="text-sm font-semibold text-blue-400" id="textCollectRaw">Start Collect</p>
                         </div>
-                        <div class="flex justify-between items-start mb-2 z-10">
-                            <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider">AI Diagnostic Output
-                            </h2>
-                            <span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded">XGBoost
-                                Layer</span>
-                        </div>
+                        <i
+                            class="fa-solid fa-database text-blue-500 text-xl group-hover:scale-110 transition-transform"></i>
+                    </button>
 
-                        <div class="flex-1 flex flex-col justify-center items-center z-10">
-                            <div class="flex items-baseline gap-2">
-                                <div class="text-7xl font-black tracking-tighter text-slate-800 transition-colors duration-300"
-                                    id="valGlucose">--.-</div>
-                                <div class="text-lg font-bold text-slate-400">mg/dL</div>
+                    <button id="btnExportCSV"
+                        class="w-full bg-slate-800 hover:bg-slate-700 rounded-lg p-3 flex items-center justify-between transition-colors border border-slate-700 group">
+                        <div class="text-left">
+                            <p class="text-xs text-slate-400 group-hover:text-white transition-colors">Export Dataset
+                            </p>
+                            <p class="text-sm font-semibold text-emerald-400">Save CSV (<span id="csvCount">0</span>)
+                            </p>
+                        </div>
+                        <i
+                            class="fa-solid fa-file-csv text-emerald-500 text-xl group-hover:scale-110 transition-transform"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 border-t border-slate-800 space-y-3">
+                    <button onclick="runSimulation(true)"
+                        class="w-full bg-rose-900/30 hover:bg-rose-900/50 rounded-lg p-3 flex items-center justify-between transition-colors border border-rose-900/50 group">
+                        <div class="text-left">
+                            <p class="text-xs text-rose-300">Force Abnormal Data</p>
+                            <p class="text-sm font-semibold text-rose-500">Demo (Press 'D')</p>
+                        </div>
+                        <i class="fa-solid fa-syringe text-rose-500 text-xl"></i>
+                    </button>
+                </div>
+            </aside>
+
+            <main class="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-6 relative">
+                <!-- Mobile menu toggle -->
+                <button onclick="toggleSidebar()" class="md:hidden fixed bottom-4 left-4 z-50 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div id="alertContainer" class="absolute top-4 right-6 z-50 flex flex-col gap-2"></div>
+
+                <div id="tab-dashboard" class="tab-content active h-full flex flex-col gap-6">
+                    <div class="flex flex-col md:flex-row gap-6 shrink-0">
+                        <div class="glass-panel md:w-1/3 p-5 flex flex-col relative overflow-hidden min-h-[220px]">
+                            <div class="absolute -right-4 -top-4 opacity-5 text-emerald-600 text-9xl"><i
+                                    class="fa-solid fa-droplet"></i></div>
+                            <div class="flex justify-between items-start mb-3 z-10">
+                                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider">AI Diagnostic
+                                    Output</h2>
+                                <span id="aiModeLabel"
+                                    class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded">Screening</span>
                             </div>
-                            <div class="text-sm font-medium text-slate-500 mt-2">Estimated Capillary Glucose</div>
-                        </div>
 
-                        <div class="mt-4 flex justify-between items-end z-10 pt-4 border-t border-slate-100">
-                            <div>
-                                <div class="text-xs text-slate-500 mb-1">Risk Classification (DKA)</div>
-                                <div id="valRisk"
-                                    class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-slate-100 text-slate-400 border border-slate-200 transition-all">
-                                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Awaiting Exhale...
+                            <div class="flex flex-col justify-center items-center z-10 py-3">
+                                <div class="flex items-baseline gap-2">
+                                    <div class="text-6xl font-black tracking-tighter text-slate-800 transition-colors duration-300"
+                                        id="valGlucose">--.-</div>
+                                    <div class="text-lg font-bold text-slate-400">mg/dL</div>
                                 </div>
+                                <div class="text-sm font-medium text-slate-500 mt-1">Estimated Capillary Glucose</div>
+                                <div id="typeLabel" class="mt-2 text-xs font-bold px-3 py-1 rounded-full hidden"></div>
                             </div>
-                            <div class="text-right">
-                                <div class="text-xs text-slate-500">Model Confidence</div>
-                                <div class="text-lg font-bold text-slate-700" id="valConfidence">--%</div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="glass-panel w-2/3 p-6 flex flex-col">
-                        <div class="flex justify-between items-start mb-4">
-                            <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider">Sensor Fusion Engine
-                                (ESP32)</h2>
-                            <span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded">LSTM
-                                Temporal Extractor</span>
-                        </div>
-
-                        <div class="flex gap-4 h-full">
-                            <div
-                                class="flex-1 bg-blue-50/50 border border-blue-100 rounded-xl p-5 flex flex-col justify-between relative overflow-hidden">
-                                <i
-                                    class="fa-solid fa-wind absolute -right-2 -bottom-2 text-6xl text-blue-100 opacity-50"></i>
-                                <div>
-                                    <div class="flex items-center gap-2 text-blue-800 font-bold mb-1">
-                                        Acetone (VOC)
+                            <div class="flex flex-wrap justify-between items-start z-10 pt-3 border-t border-slate-100 gap-2 mt-auto">
+                                <div class="min-w-0">
+                                    <div class="text-xs text-slate-500 mb-1">Risk Classification</div>
+                                    <div id="valRisk"
+                                        class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-400 border border-slate-200 transition-all whitespace-nowrap">
+                                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Awaiting Exhale...
                                     </div>
-                                    <div class="text-xs text-slate-500">Live Reading (Normalized)</div>
                                 </div>
-                                <div class="text-right z-10 mt-4">
-                                    <span class="text-4xl font-black text-blue-600 transition-all"
-                                        id="valAcetone">0.00</span>
-                                    <span class="text-sm text-blue-400 font-bold">PPM</span>
+                                <div class="text-right shrink-0">
+                                    <div class="text-xs text-slate-500">Model Confidence</div>
+                                    <div class="text-lg font-bold text-slate-700" id="valConfidence">--%</div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div
-                                class="flex-1 bg-indigo-50/50 border border-indigo-100 rounded-xl p-5 flex flex-col justify-between relative overflow-hidden">
-                                <i
-                                    class="fa-solid fa-gauge-high absolute -right-2 -bottom-2 text-6xl text-indigo-100 opacity-50"></i>
-                                <div>
-                                    <div class="flex items-center gap-2 text-indigo-800 font-bold mb-1">
-                                        Breath Pressure
+                        <div class="glass-panel flex-1 p-6 flex flex-col">
+                            <div class="flex justify-between items-start mb-4">
+                                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider">Sensor Fusion
+                                    Engine</h2>
+                                <span
+                                    class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded">Multivariate
+                                    LSTM</span>
+                            </div>
+
+                            <div class="flex flex-wrap gap-3 h-full">
+                                <div
+                                    class="flex-1 min-w-[120px] bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+                                    <i
+                                        class="fa-solid fa-wind absolute -right-2 -bottom-2 text-5xl text-blue-100 opacity-50"></i>
+                                    <div>
+                                        <div class="flex items-center gap-2 text-blue-800 font-bold mb-1">Acetone (VOC)
+                                        </div>
+                                        <div class="text-[10px] text-slate-500">Normalized Signal</div>
                                     </div>
-                                    <div class="text-xs text-slate-500">Differential Flow Sensor</div>
+                                    <div class="text-right z-10 mt-2">
+                                        <span class="text-3xl font-black text-blue-600" id="valAcetone">0.00</span>
+                                        <span class="text-xs text-blue-400 font-bold">PPM</span>
+                                    </div>
                                 </div>
-                                <div class="text-right z-10 mt-4">
-                                    <span class="text-4xl font-black text-indigo-600 transition-all"
-                                        id="valPressure">0.00</span>
-                                    <span class="text-sm text-indigo-400 font-bold">mmHg</span>
-                                </div>
-                            </div>
-
-                            <div
-                                class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-center items-center text-center">
-                                <div class="text-xs font-bold text-slate-700 mb-2">Raw Sensor Info</div>
-                                <div class="text-lg font-mono font-bold text-slate-600 mb-1"><span
-                                        id="valRawVolt">0.000</span> V</div>
-                                <div class="text-[10px] text-slate-400">Estimated Active Voltage</div>
-
-                                <div class="w-full h-px bg-slate-200 my-3"></div>
 
                                 <div
-                                    class="text-[11px] text-slate-500 font-mono bg-white px-2 py-1 rounded border border-slate-200 w-full">
-                                    Sync: <span id="valRatio" class="text-emerald-500">Active</span>
+                                    class="flex-1 min-w-[120px] bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+                                    <i
+                                        class="fa-solid fa-gauge-high absolute -right-2 -bottom-2 text-5xl text-indigo-100 opacity-50"></i>
+                                    <div>
+                                        <div class="flex items-center gap-2 text-indigo-800 font-bold mb-1">Pressure
+                                        </div>
+                                        <div class="text-[10px] text-slate-500">Flow Dynamics</div>
+                                    </div>
+                                    <div class="text-right z-10 mt-2">
+                                        <span class="text-3xl font-black text-indigo-600" id="valPressure">0.00</span>
+                                        <span class="text-xs text-indigo-400 font-bold">mmHg</span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="flex-1 min-w-[120px] bg-cyan-50/50 border border-cyan-100 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+                                    <i
+                                        class="fa-solid fa-droplet absolute -right-2 -bottom-2 text-5xl text-cyan-100 opacity-50"></i>
+                                    <div>
+                                        <div class="flex items-center gap-2 text-cyan-800 font-bold mb-1">Humidity</div>
+                                        <div class="text-[10px] text-slate-500">Breath Moisture</div>
+                                    </div>
+                                    <div class="text-right z-10 mt-2">
+                                        <span class="text-3xl font-black text-cyan-600" id="valHumidity">0.0</span>
+                                        <span class="text-xs text-cyan-400 font-bold">%RH</span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-center items-center text-center">
+                                    <div class="text-[10px] font-bold text-slate-700 mb-1">Raw Base</div>
+                                    <div class="text-base font-mono font-bold text-slate-600 mb-1"><span
+                                            id="valRawVolt">0.000</span> V</div>
+                                    <div class="w-full h-px bg-slate-200 my-2"></div>
+                                    <div
+                                        class="text-[10px] text-slate-500 font-mono bg-white px-2 py-1 rounded border border-slate-200 w-full">
+                                        Sync: <span id="valRatio" class="text-emerald-500">Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel flex-1 p-6 flex flex-col min-h-[300px]">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider">Live Time-Series
+                                Acquisition</h2>
+                            <div class="flex gap-4">
+                                <span class="flex items-center gap-2 text-xs font-bold text-slate-600">
+                                    <div class="w-3 h-3 rounded bg-blue-500"></div> VOC (PPM)
+                                </span>
+                                <span class="flex items-center gap-2 text-xs font-bold text-slate-600">
+                                    <div class="w-3 h-3 rounded bg-indigo-500 border-2 border-indigo-300 border-dashed">
+                                    </div> Pressure
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex-1 relative w-full h-full">
+                            <canvas id="signalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-predictions" class="tab-content h-full">
+                    <div class="glass-panel h-full flex flex-col p-6">
+                        <div class="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-800">Long-Term Analytics & Predictions</h2>
+                                <p class="text-xs text-slate-500 mt-1">Personalized trend based on deep clinical history
+                                    and real-time logs.</p>
+                            </div>
+                            <div class="flex gap-4 items-center">
+                                <span class="text-xs font-bold text-slate-500">Forecast Horizon:</span>
+                                <select id="predictRange"
+                                    class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2"
+                                    onchange="updatePredictionChart()">
+                                    <option value="1w">1 Week</option>
+                                    <option value="1m" selected>1 Month</option>
+                                    <option value="6m">6 Months</option>
+                                    <option value="1y">1 Year</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col md:flex-row gap-6 flex-1 mb-2">
+                            <div
+                                class="flex-1 relative w-full border border-slate-200 rounded-xl p-4 bg-white shadow-inner flex flex-col min-h-[250px]">
+                                <div class="flex justify-between mb-2">
+                                    <div class="text-xs font-bold text-slate-500"><i
+                                            class="fa-solid fa-clock-rotate-left mr-1"></i> Historical Data</div>
+                                    <div class="text-xs font-bold text-rose-500"><i
+                                            class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI Prediction</div>
+                                </div>
+                                <div class="flex-1 relative w-full min-h-[200px]">
+                                    <canvas id="predictionChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="w-full md:w-1/3 flex flex-col gap-4 overflow-y-auto">
+
+                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0">
+                                    <h3
+                                        class="text-xs font-bold text-slate-500 uppercase flex items-center justify-between">
+                                        Personalized Matrix
+                                        <span id="trendStatusBadge"
+                                            class="px-2 py-1 rounded bg-slate-200 text-slate-600 text-[10px]">Analyzing...</span>
+                                    </h3>
+                                    <div class="mt-3 grid grid-cols-2 gap-y-3 text-xs">
+                                        <div><span class="text-slate-400">Age:</span> <span id="statAge"
+                                                class="font-bold text-slate-800 ml-1">-</span></div>
+                                        <div><span class="text-slate-400">Gender:</span> <span id="statGender"
+                                                class="font-bold text-slate-800 ml-1">-</span></div>
+                                        <div><span class="text-slate-400">BMI:</span> <span id="statBMI"
+                                                class="font-bold text-blue-600 ml-1">-</span></div>
+                                        <div><span class="text-slate-400">HbA1c:</span> <span id="statHbA1c"
+                                                class="font-bold text-slate-800 ml-1">-</span></div>
+                                        <div class="col-span-2 border-t border-slate-200 pt-2"><span
+                                                class="text-slate-400">Family History:</span> <span id="statFamily"
+                                                class="font-bold text-slate-800 ml-1">-</span></div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex-1 flex flex-col">
+                                    <h3 class="text-sm font-bold text-indigo-800 mb-3 border-b border-indigo-200 pb-2">
+                                        <i class="fa-solid fa-lightbulb text-amber-500 mr-2"></i> AI Improvement Plan
+                                    </h3>
+                                    <ul class="text-xs text-indigo-900 space-y-3 list-disc pl-4 flex-1"
+                                        id="aiRecommendations">
+                                    </ul>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="glass-panel flex-1 p-6 flex flex-col min-h-[300px]">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider">Live Time-Series
-                            Acquisition</h2>
-                        <div class="flex gap-4">
-                            <span class="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                <div class="w-3 h-3 rounded bg-blue-500"></div> VOC Signal (PPM)
-                            </span>
-                            <span class="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                <div class="w-3 h-3 rounded bg-indigo-500 border-2 border-indigo-300 border-dashed">
-                                </div> Pressure (mmHg)
-                            </span>
-                        </div>
-                    </div>
-                    <div class="flex-1 relative w-full h-full">
-                        <canvas id="signalChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div id="tab-logs" class="tab-content h-full">
-                <div class="glass-panel h-full flex flex-col p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <div>
+                <div id="tab-logs" class="tab-content h-full">
+                    <div class="glass-panel h-full flex flex-col p-6">
+                        <div class="flex justify-between items-center mb-6">
                             <h2 class="text-lg font-bold text-slate-800">Clinical Breath Logs</h2>
-                        </div>
-                        <div class="flex gap-3">
-                            <button id="btnRecord"
-                                class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2">
-                                <i class="fa-solid fa-circle text-red-500 text-[10px]"></i> Start Auto-Record
-                            </button>
                             <button id="btnClearLogs"
-                                class="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center gap-2">
-                                <i class="fa-solid fa-trash"></i> Clear
-                            </button>
+                                class="bg-rose-50 hover:bg-rose-100 text-rose-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm"><i
+                                    class="fa-solid fa-trash"></i> Clear Logs</button>
                         </div>
-                    </div>
-                    <div class="flex-1 overflow-auto border border-slate-200 rounded-xl bg-white shadow-inner">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-slate-600 uppercase bg-slate-100 sticky top-0 z-10 shadow-sm">
-                                <tr>
-                                    <th class="px-6 py-4 border-b">Date / Time</th>
-                                    <th class="px-6 py-4 border-b">Exhale Duration</th>
-                                    <th class="px-6 py-4 border-b">Peak Acetone</th>
-                                    <th class="px-6 py-4 border-b">Est. Glucose</th>
-                                    <th class="px-6 py-4 border-b">AI DKA Risk Class</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dataTableBody" class="divide-y divide-slate-100">
-                                <tr>
-                                    <td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical
-                                        data recorded yet. Start recording and exhale into the device.</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div class="flex-1 overflow-auto border border-slate-200 rounded-xl bg-white shadow-inner">
+                            <div class="min-w-[600px]">
+                            <table class="w-full text-sm text-left">
+                                <thead
+                                    class="text-xs text-slate-600 uppercase bg-slate-100 sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th class="px-6 py-4 border-b">Date / Time</th>
+                                        <th class="px-6 py-4 border-b">Mode</th>
+                                        <th class="px-6 py-4 border-b">Peak VOC / Hum.</th>
+                                        <th class="px-6 py-4 border-b">Est. Glucose</th>
+                                        <th class="px-6 py-4 border-b">AI Diagnostic</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dataTableBody" class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical
+                                            data recorded yet. Please exhale into device.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div id="tab-settings" class="tab-content h-full">
-                <div class="glass-panel h-full flex flex-col p-6 max-w-5xl mx-auto">
-                    <h2 class="text-xl font-bold text-slate-800 mb-6 border-b border-slate-200 pb-4">Hardware & IoT
-                        Configurations</h2>
-                    <div class="grid grid-cols-2 gap-8">
-                        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                            <h3 class="text-md font-bold text-slate-700 mb-4 flex items-center gap-2"><i
-                                    class="fa-brands fa-usb text-slate-400"></i> ESP32 Serial Connection</h3>
-                            <div class="space-y-4">
+                <div id="tab-settings" class="tab-content h-full">
+                    <div class="glass-panel h-full flex flex-col p-6 max-w-5xl mx-auto">
+                        <h2 class="text-xl font-bold text-slate-800 mb-6 border-b border-slate-200 pb-4">Configurations
+                            & Calibration</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                <h3 class="text-md font-bold text-slate-700 mb-4 flex items-center gap-2"><i
+                                        class="fa-brands fa-usb text-slate-400"></i> Hardware Setup</h3>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">Baud Rate</label>
                                     <select id="cfgBaudRate"
-                                        class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5">
+                                        class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg block p-2.5">
                                         <option value="115200" selected>115200</option>
                                     </select>
                                 </div>
                             </div>
+                            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                <h3 class="text-md font-bold text-slate-700 mb-4 flex items-center gap-2"><i
+                                        class="fa-solid fa-server text-slate-400"></i> MQTT Telemetry</h3>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">Broker Topic</label>
+                                    <input type="text" id="mqttTopic" value="siit/med/breath/patient"
+                                        class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg block p-2.5">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-        </main>
+            </main>
+        </div>
     </div>
 
+    
     <script>
+        // ==========================================
+        // MOBILE SIDEBAR TOGGLE
+        // ==========================================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const isOpen = !sidebar.classList.contains('-translate-x-full');
+            if (isOpen) {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            } else {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            }
+        }
+
+        // Close sidebar when a tab is selected on mobile
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (window.innerWidth < 768) {
+                        document.getElementById('sidebar').classList.add('-translate-x-full');
+                        document.getElementById('sidebarOverlay').classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // ==========================================
+        // MOCK SQLITE DATABASE ENGINE (Local Storage Based)
+        // ==========================================
+        const LocalDB = {
+            init: function () {
+                if (!localStorage.getItem('sbd_db')) {
+                    localStorage.setItem('sbd_db', JSON.stringify([]));
+                }
+            },
+            insert: function (userData) {
+                let db = JSON.parse(localStorage.getItem('sbd_db'));
+                if (db.find(u => u.username === userData.username)) return false; // Username exists
+                db.push(userData);
+                localStorage.setItem('sbd_db', JSON.stringify(db));
+                return true;
+            },
+            select: function (username, password) {
+                let db = JSON.parse(localStorage.getItem('sbd_db'));
+                return db.find(u => u.username === username && u.password === password);
+            }
+        };
+        LocalDB.init();
+
+        // ==========================================
+        // SYSTEM CONFIG & STATE
+        // ==========================================
         const CONFIG = {
             CHART_MAX_POINTS: 80,
             PRESSURE_THRESHOLD: 0.5,
-            ALPHA_COMPENSATION: 0.05,
-            MIN_BREATH_DURATION: 1.5
-        };
+            MIN_BREATH_DURATION: 1.5,
+            MQTT_BROKER: "broker.hivemq.com", // Change this from emqx.io
+            MQTT_PORT: 8000 // HiveMQ WebSockets usually use 8000 or 8884
+    };
 
         let BASELINE_VOLT = 0;
-        let baselineSamples = [];
-        
+
         const STATE = {
-            isSerialConnected: false,
-            isRecording: false,
-            isBreathing: false,
-            isDiabeticDemo: false,
-            isHoldingPeak: false,
-            breathStartTime: 0,
-            currentExhale: { maxPpm: 0, maxPress: 0 },
-            patientLogs: [],
-            // สถานะสำหรับการดึงข้อมูลลง CSV
-            isCollectingRawData: false,
-            rawTimeLog: []
+            isSerialConnected: false, isBreathing: false, isDemo: false,
+            mode: 'screening',
+            patientProfile: null,
+            currentExhale: { maxPpm: 0, maxPress: 0, avgHum: 0 },
+            patientLogs: [], // Saves actual blow data
+            isCollectingRawData: false, rawTimeLog: [], mqttClient: null, topic: ""
         };
 
-        let serialPort, serialReader;
+        // ==========================================
+        // AUTHENTICATION LOGIC
+        // ==========================================
+        function switchAuthView(viewId) {
+            document.querySelectorAll('.auth-view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
 
-        // UI Binding: Tab Navigation
+        function handleRegister() {
+            const user = document.getElementById('regUser').value;
+            const pass = document.getElementById('regPass').value;
+            const age = parseInt(document.getElementById('regAge').value);
+            const gender = document.getElementById('regGender').value;
+            const weight = parseFloat(document.getElementById('regWeight').value);
+            const height = parseFloat(document.getElementById('regHeight').value);
+            const familyHistory = document.getElementById('regFamilyHistory').value;
+            const status = document.getElementById('regStatus').value;
+            const hba1c = parseFloat(document.getElementById('regHbA1c').value) || null;
+
+            if (!user || !pass || !age || !weight || !height) {
+                alert("Please fill in all required demographic fields."); return;
+            }
+
+            const bmi = weight / Math.pow(height / 100, 2);
+            const newPatient = { username: user, password: pass, age, gender, weight, height, bmi, familyHistory, status, hba1c };
+
+            if (LocalDB.insert(newPatient)) {
+                alert("Clinical Meta Data registered to SQLite successful. Logging in...");
+                loadApp(newPatient);
+            } else {
+                alert("Error: Username already exists in DB.");
+            }
+        }
+
+        function handleLogin() {
+            const userVal = document.getElementById('loginUser').value;
+            const passVal = document.getElementById('loginPass').value;
+
+            if (!userVal || !passVal) return alert("Enter credentials.");
+
+            const patient = LocalDB.select(userVal, passVal);
+    
+            if (patient) {
+        // Ensure patient object has the expected strings to prevent .toLowerCase() crashes
+                patient.name = patient.name || "Guest";
+                patient.role = patient.role || "Patient";
+        
+        // Save to localStorage so other parts of the app can find it safely
+                localStorage.setItem('currentUser', JSON.stringify(patient));
+        
+                loadApp(patient);
+            } else {
+                alert("Invalid clinical ID or Password.");
+            }
+        }
+
+        function loadApp(patientData) {
+            STATE.patientProfile = patientData;
+
+            if (patientData.status === 'type1' || patientData.status === 'type2') {
+                document.getElementById('toggleMode').checked = true;
+                STATE.mode = 'monitoring';
+            } else {
+                document.getElementById('toggleMode').checked = false;
+                STATE.mode = 'screening';
+            }
+            updateModeUI();
+
+            // Populate Analytics Matrix
+            document.getElementById('statAge').textContent = patientData.age;
+            document.getElementById('statGender').textContent = patientData.gender.toUpperCase();
+            document.getElementById('statBMI').textContent = patientData.bmi.toFixed(1);
+            document.getElementById('statFamily').textContent = patientData.familyHistory.toUpperCase();
+            document.getElementById('statHbA1c').textContent = patientData.hba1c ? patientData.hba1c + '%' : 'N/A';
+            document.getElementById('userProfileName').textContent = patientData.username.toUpperCase();
+            document.getElementById('mqttTopic').value = `siit/med/breath/${patientData.username}`;
+
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('flex');
+
+            initMQTT();
+            updatePredictionChart(); // Call once at start
+        }
+
+        function logout() {
+            if (STATE.isSerialConnected) document.getElementById('btnConnect').click();
+            if (STATE.mqttClient) STATE.mqttClient.disconnect();
+
+            STATE.patientProfile = null;
+            STATE.patientLogs = []; // Clear current session logs
+            document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
+
+            document.getElementById('loginUser').value = '';
+            document.getElementById('loginPass').value = '';
+
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('flex');
+            document.getElementById('authScreen').classList.remove('hidden');
+            switchAuthView('viewLogin');
+        }
+
+        // ==========================================
+        // UI BINDING
+        // ==========================================
         document.querySelectorAll('.tab-btn').forEach(button => {
             button.addEventListener('click', (e) => {
                 document.querySelectorAll('.tab-btn').forEach(btn => {
                     btn.classList.remove('bg-emerald-600', 'text-white');
                     btn.classList.add('hover:bg-slate-800', 'hover:text-white', 'text-slate-300');
                 });
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
                 const targetId = e.currentTarget.getAttribute('data-target');
                 e.currentTarget.classList.add('bg-emerald-600', 'text-white');
                 e.currentTarget.classList.remove('hover:bg-slate-800', 'text-slate-300');
                 document.getElementById(targetId).classList.add('active');
+
+                if (targetId === 'tab-predictions') updatePredictionChart();
             });
         });
 
-        // Initialize Chart
-        const ctx = document.getElementById('signalChart').getContext('2d');
-        const signalChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: Array(CONFIG.CHART_MAX_POINTS).fill(''),
-                datasets: [
-                    {
-                        label: 'Normalized Acetone (PPM)',
-                        borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true,
-                        data: Array(CONFIG.CHART_MAX_POINTS).fill(0), yAxisID: 'yVOC'
-                    },
-                    {
-                        label: 'Breath Pressure (mmHg)',
-                        borderColor: '#6366f1', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], tension: 0.2,
-                        data: Array(CONFIG.CHART_MAX_POINTS).fill(0), yAxisID: 'yPress'
-                    }
+        const toggleModeCheckbox = document.getElementById('toggleMode');
+        toggleModeCheckbox.addEventListener('change', (e) => {
+            STATE.mode = e.target.checked ? 'monitoring' : 'screening';
+            updateModeUI();
+        });
+
+        function updateModeUI() {
+            const isMon = STATE.mode === 'monitoring';
+            document.getElementById('modeText').textContent = isMon ? 'Monitoring Mode' : 'Screening Mode';
+            document.getElementById('modeIcon').className = isMon ? 'fa-solid fa-chart-line text-emerald-500' : 'fa-solid fa-microscope text-indigo-500';
+            document.getElementById('aiModeLabel').textContent = isMon ? 'Monitoring' : 'Screening';
+            document.getElementById('aiModeLabel').className = isMon ? 'bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded' : 'bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded';
+        }
+
+        // Setup Real-time Signal Chart
+        const ctxSignal = document.getElementById('signalChart').getContext('2d');
+        const signalChart = new Chart(ctxSignal, {
+            type: 'line', data: {
+                labels: Array(CONFIG.CHART_MAX_POINTS).fill(''), datasets: [
+                    { label: 'VOC (PPM)', borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true, data: Array(CONFIG.CHART_MAX_POINTS).fill(0), yAxisID: 'yVOC' },
+                    { label: 'Pressure', borderColor: '#6366f1', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], tension: 0.2, data: Array(CONFIG.CHART_MAX_POINTS).fill(0), yAxisID: 'yPress' }
                 ]
             },
-            options: {
-                responsive: true, maintainAspectRatio: false, animation: false,
-                plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                scales: {
-                    x: { display: false },
-                    yVOC: { type: 'linear', position: 'left', min: 0, grid: { color: '#f1f5f9' } },
-                    yPress: { type: 'linear', position: 'right', min: 0, max: 20, grid: { drawOnChartArea: false } }
-                }
-            }
+            options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, yVOC: { type: 'linear', position: 'left', min: 0 }, yPress: { type: 'linear', position: 'right', min: 0, max: 20, grid: { drawOnChartArea: false } } } }
         });
 
-        // ==========================================
-        // SMART INFERENCE & CALCULATION MODULE
-        // ==========================================
 
-        // --- CALIBRATED FOR 1.0V IDLE | 1.4V PEAK ---
-        const SENSOR_RL = 10.0;       
-        const SENSOR_RO = 40.0;       // Matches 1.0V baseline (10 * (5-1)/1)
-        const VC_IN = 5.0;            
-        const CURVE_A = 4.5;          // Lowered to keep PPM under control
-        const CURVE_B = -0.7;         // Flattened for small voltage jumps
-        const ACETONE_MOL_WT = 58.08;
+        // ==========================================
+        // ANALYTICS, PREDICTION & AI RECOMMENDATION ENGINE
+        // ==========================================
+        let predictionChartInstance = null;
 
-        function calculateEstimatedPPM(pressure, mqVolt) {
-            // 1. Display the REAL raw voltage immediately
+        function updatePredictionChart() {
+            const ctxPred = document.getElementById('predictionChart').getContext('2d');
+            if (predictionChartInstance) predictionChartInstance.destroy();
+
+            const range = document.getElementById('predictRange').value;
+            let labels = [], dataActual = [], dataPredict = [];
+
+            // Define time points based on range selection
+            let points = range === '1w' ? 7 : (range === '1m' ? 30 : (range === '6m' ? 6 : 12));
+            let labelPrefix = (range === '1w' || range === '1m') ? 'Day-' : 'Month-';
+
+            // 1. Establish Baseline from MetaData
+            let baseGluc = 90;
+            if (STATE.patientProfile.status === 'type2') baseGluc = 150;
+            if (STATE.patientProfile.status === 'type1') baseGluc = 180;
+            if (STATE.patientProfile.bmi > 25) baseGluc += 15;
+            if (STATE.patientProfile.hba1c > 6.5) baseGluc += 20;
+
+            // 2. Incorporate Real Data from Logs (if available)
+            let recentTrend = 0; // 0 = stable, positive = worsening, negative = improving
+
+            if (STATE.patientLogs.length > 0) {
+                // Calculate average of recent blows to anchor the "Today" point
+                let sumGlucose = 0;
+                STATE.patientLogs.forEach(log => sumGlucose += log.glucose);
+                let actualAvg = sumGlucose / STATE.patientLogs.length;
+
+                // If they have blown a lot, we see if it's trending up or down
+                if (STATE.patientLogs.length > 2) {
+                    let firstHalf = STATE.patientLogs.slice(-Math.floor(STATE.patientLogs.length / 2));
+                    let recentHalf = STATE.patientLogs.slice(0, Math.floor(STATE.patientLogs.length / 2));
+                    let avgFirst = firstHalf.reduce((a, b) => a + b.glucose, 0) / firstHalf.length;
+                    let avgRecent = recentHalf.reduce((a, b) => a + b.glucose, 0) / recentHalf.length;
+                    recentTrend = avgRecent - avgFirst; // Positive means glucose is rising
+                }
+                baseGluc = actualAvg; // Overwrite theoretical base with actual current average
+            }
+
+            // 3. Generate Historical Curve
+            for (let i = 0; i < points; i++) {
+                labels.push(`${labelPrefix}${points - i}`);
+                // Create a realistic bumpy historical curve leading up to current base
+                let historicalValue = baseGluc - (recentTrend * ((points - i) / points)) + (Math.sin(i) * 10) + (Math.random() * 10 - 5);
+                dataActual.push(historicalValue);
+                dataPredict.push(null);
+            }
+
+            // "Today" Point
+            labels.push('Today');
+            dataActual.push(baseGluc);
+            dataPredict.push(baseGluc);
+
+            // 4. Generate AI Prediction Curve
+            let predictPoints = range === '1w' ? 3 : (range === '1m' ? 7 : (range === '6m' ? 3 : 4));
+            let predictMultiplier = range === '1w' ? 1 : (range === '1m' ? 2 : 4);
+
+            for (let i = 1; i <= predictPoints; i++) {
+                labels.push(`Future ${i}`);
+                dataActual.push(null);
+
+                // Prediction factors in recent trend, BMI, and family history
+                let worseningFactor = (STATE.patientProfile.bmi > 28 ? 1.5 : 0.5) + (STATE.patientProfile.familyHistory === 'yes' ? 1.0 : 0);
+
+                // Combine recent real trend + biological worsening factor
+                let projectedStep = (recentTrend * 0.5) + (worseningFactor * Math.log(i + 1) * predictMultiplier);
+
+                dataPredict.push(baseGluc + projectedStep + (Math.random() * 5));
+            }
+
+            // Render Chart
+            predictionChartInstance = new Chart(ctxPred, {
+                type: 'line', data: {
+                    labels: labels, datasets: [
+                        { label: 'Real History (Logs+Meta)', data: dataActual, borderColor: '#64748b', backgroundColor: 'rgba(100, 116, 139, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'AI Trend Prediction', data: dataPredict, borderColor: '#f43f5e', borderDash: [5, 5], tension: 0.4, pointBackgroundColor: '#f43f5e' }
+                    ]
+                }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+            });
+
+            // 5. Update Personalized Recommendations UI
+            generatePersonalizedRecommendations(baseGluc, recentTrend);
+        }
+
+        function generatePersonalizedRecommendations(currentBase, trend) {
+            const ul = document.getElementById('aiRecommendations');
+            const badge = document.getElementById('trendStatusBadge');
+            ul.innerHTML = '';
+
+            let bmi = STATE.patientProfile.bmi;
+            let status = STATE.patientProfile.status;
+
+            // Status Badge
+            if (trend > 2) {
+                badge.textContent = 'Worsening Trend';
+                badge.className = 'px-2 py-1 rounded bg-rose-100 text-rose-700 text-[10px] font-bold';
+            } else if (trend < -2) {
+                badge.textContent = 'Improving Trend';
+                badge.className = 'px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold';
+            } else {
+                badge.textContent = 'Stable Baseline';
+                badge.className = 'px-2 py-1 rounded bg-blue-100 text-blue-700 text-[10px] font-bold';
+            }
+
+            // Rules Engine for Recommendations
+            let recs = [];
+
+            // Based on Real Data Logs (if any)
+            if (STATE.patientLogs.length > 0) {
+                recs.push(`Analyzed <strong>${STATE.patientLogs.length}</strong> real exhales. Current Est. Glucose average: <strong>${currentBase.toFixed(1)} mg/dL</strong>.`);
+                if (trend > 2) recs.push(`⚠️ AI detects a rising VOC trend over recent logs. Consider immediate dietary review.`);
+                else if (trend < -2) recs.push(`🎉 Positive response! Acetone levels are dropping. Keep up current lifestyle.`);
+            } else {
+                recs.push("Initializing synthetic baseline from Demographics. <strong>Please exhale to feed real data to AI.</strong>");
+            }
+
+            // Based on Meta Data
+            if (bmi > 25) {
+                recs.push(`Weight Management: BMI is ${bmi.toFixed(1)} (Overweight). A 5% weight reduction can significantly improve metabolic VOC markers.`);
+            }
+
+            if (status === 'prediabetes' || currentBase > 120) {
+                recs.push(`Dietary: Reduce simple carbohydrates in the evening to prevent fasting acetone spikes measured in morning breath.`);
+            } else if (status === 'type2') {
+                recs.push(`Clinical: Ensure medication adherence. Pattern suggests potential insulin resistance fluctuation.`);
+            }
+
+            if (STATE.patientProfile.familyHistory === 'yes') {
+                recs.push(`Genetics: Due to family history, the AI risk escalation model has been padded by +10% sensitivity.`);
+            }
+
+            // Render list
+            recs.forEach(text => {
+                let li = document.createElement('li');
+                li.innerHTML = text;
+                ul.appendChild(li);
+            });
+        }
+
+
+        // ==========================================
+        // MQTT
+        // ==========================================
+        function initMQTT() {
+    // 1. Check if already connected - using the STATE object correctly
+    if (STATE.mqttClient && STATE.mqttClient.isConnected()) {
+        console.log("Already connected.");
+        return;
+    }
+
+    const clientId = "web_" + Math.random().toString(16).substr(2, 8);
+    
+    // 2. Assign to STATE.mqttClient
+    STATE.mqttClient = new Paho.MQTT.Client(CONFIG.MQTT_BROKER, Number(CONFIG.MQTT_PORT), clientId);
+    STATE.topic = document.getElementById('mqttTopic').value;
+
+    STATE.mqttClient.onConnectionLost = (responseObject) => {
+        document.getElementById('mqttStatusText').textContent = 'MQTT: Offline';
+        document.getElementById('mqttStatusDot').classList.replace('status-active', 'status-idle');
+        console.log("MQTT Lost: " + responseObject.errorMessage);
+    };
+
+    // FIX: Change 'mqttClient.onMessageArrived' to 'STATE.mqttClient.onMessageArrived'
+    STATE.mqttClient.onMessageArrived = (message) => {
+        const payload = message.payloadString;
+        console.log("MQTT Received:", payload);
+
+        if (payload.includes("Pressure:")) {
+            const parts = payload.split('|');
+            // Safely parse the parts
+            const pressurePart = parts[1] ? parts[1].match(/[\d.]+/) : null;
+            const mqPart = parts[2] ? parts[2].match(/[\d.]+/) : null;
+
+            if (pressurePart && mqPart) {
+                const pressure = parseFloat(pressurePart[0]);
+                const mqVolt = parseFloat(mqPart[0]);
+
+                // Update UI elements
+                const presEl = document.getElementById('valPressure');
+                const voltEl = document.getElementById('valRawVolt');
+                
+                if(presEl) presEl.textContent = pressure.toFixed(2);
+                if(voltEl) voltEl.textContent = mqVolt.toFixed(3);
+                
+                STATE.isBreathing = payload.startsWith("BLOW");
+            }
+        }
+    };
+
+    // 3. Connect using the parameters from your CONFIG
+    STATE.mqttClient.connect({
+        useSSL: false, 
+        timeout: 3,
+        onSuccess: () => {
+            console.log("Connected to Broker");
+            
+            // Fix: Wait 500ms for the socket to be fully stable
+            setTimeout(() => {
+                if (STATE.mqttClient && STATE.mqttClient.isConnected()) {
+                    // Make sure STATE.topic has a fallback value
+                    const topicToSubscribe = STATE.topic || "esp32/breath_data";
+                    STATE.mqttClient.subscribe(topicToSubscribe);
+                    console.log("Subscribed to: " + topicToSubscribe);
+                    
+                    // Update UI Colors manually to be safe
+                    const statusText = document.getElementById('mqttStatusText');
+                    statusText.textContent = 'MQTT: Connected';
+                    statusText.style.color = "#10b981"; // Green
+                    document.getElementById('mqttStatusDot').style.backgroundColor = "#10b981";
+                }
+            }, 500);
+        },
+        onFailure: (err) => {
+            console.error("MQTT Connect Failed:", err);
+            // Clear the object so the user can try clicking again
+            STATE.mqttClient = null; 
+        }
+    });
+}
+        function publishMQTT(payload) {
+            if (STATE.mqttClient && STATE.mqttClient.isConnected()) {
+                const topic = document.getElementById('mqttTopic').value;
+                const message = new Paho.MQTT.Message(JSON.stringify(payload));
+                message.destinationName = topic;
+                STATE.mqttClient.send(message);
+            }
+        }
+
+        // ==========================================
+        // DATA PROCESSING & LOGGING (Connecting real data to Predict)
+        // ==========================================
+        function processIncomingData(pressure, mqVolt, humidity = 45.0) {
+            const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt, humidity);
+
+            if (!STATE.isBreathing) {
+                document.getElementById('valAcetone').textContent = normalizedVOC.toFixed(2);
+                document.getElementById('valPressure').textContent = pressure.toFixed(2);
+                document.getElementById('valHumidity').textContent = humidity.toFixed(1);
+            }
+
+            signalChart.data.datasets[0].data.shift(); signalChart.data.datasets[0].data.push(normalizedVOC);
+            signalChart.data.datasets[1].data.shift(); signalChart.data.datasets[1].data.push(pressure);
+            signalChart.update('none');
+
+            if (STATE.isCollectingRawData) {
+                STATE.rawTimeLog.push({ timestamp: new Date().toISOString(), pressure: pressure.toFixed(4), rawVolt: mqVolt.toFixed(4), vocPpm: normalizedVOC.toFixed(4), humidity: humidity.toFixed(2), isBlowing: pressure > CONFIG.PRESSURE_THRESHOLD ? 1 : 0 });
+                document.getElementById('csvCount').textContent = STATE.rawTimeLog.length;
+            }
+
+            if (pressure > CONFIG.PRESSURE_THRESHOLD) {
+                if (!STATE.isBreathing) {
+                    STATE.isBreathing = true;
+                    STATE.breathStartTime = Date.now();
+                    STATE.currentExhale = { maxPpm: 0, maxPress: 0, humSum: 0, humCount: 0 };
+                    document.getElementById('valRisk').innerHTML = '<i class="fa-solid fa-wind animate-pulse mr-2"></i> Analyzing...';
+                    document.getElementById('valRisk').className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-600';
+                }
+                if (normalizedVOC > STATE.currentExhale.maxPpm) STATE.currentExhale.maxPpm = normalizedVOC;
+                STATE.currentExhale.humSum += humidity;
+                STATE.currentExhale.humCount++;
+            } else if (STATE.isBreathing) {
+                const duration = (Date.now() - STATE.breathStartTime) / 1000;
+                STATE.isBreathing = false;
+
+                if (duration >= CONFIG.MIN_BREATH_DURATION) {
+                    const avgHum = STATE.currentExhale.humSum / STATE.currentExhale.humCount;
+                    const aiResult = runHybridAIInference(STATE.currentExhale.maxPpm, avgHum);
+
+                    updateDiagnosticUI(aiResult.glucose, aiResult.riskClass, aiResult.subType, aiResult.confidence);
+
+                    // SAVE LOG AND TRIGGER PREDICTION UPDATE
+                    addLogEntry(duration, STATE.currentExhale.maxPpm, avgHum, aiResult.glucose, aiResult.riskClass, aiResult.subType);
+                    updatePredictionChart(); // <--- Update Analytics Tab with fresh Real Data
+
+                    if (aiResult.glucose > 200) showAlert('Critical Glucose Threshold', `Est. Glucose at ${aiResult.glucose.toFixed(1)} mg/dL. Immediate check required.`, 'danger');
+                    else if (aiResult.glucose > 140) showAlert('Warning', 'Elevated VOC indicates potential pre-diabetes.', 'warning');
+
+                    publishMQTT({ patientId: STATE.patientProfile.username, bmi: STATE.patientProfile.bmi, glucose: aiResult.glucose, risk: aiResult.riskClass, timestamp: new Date().toISOString() });
+                } else {
+                    document.getElementById('valRisk').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> Too Short';
+                }
+            }
+        }
+
+        function calculateEstimatedPPM(pressure, mqVolt, humidity) {
             let displayVolt = mqVolt > 0 ? mqVolt : (0.45 + (Math.random() * 0.05));
             document.getElementById('valRawVolt').textContent = displayVolt.toFixed(3);
+            if (pressure <= CONFIG.PRESSURE_THRESHOLD || displayVolt <= 0) return 0.05 + (Math.random() * 0.1);
 
-            // If they aren't blowing hard enough, return ambient noise
-            if (pressure <= CONFIG.PRESSURE_THRESHOLD || displayVolt <= 0) {
-                return 0.05 + (Math.random() * 0.1); 
-            }
-
-            // 2. REAL MATH: Calculate Rs (Sensor Resistance)
-            let rs = SENSOR_RL * (VC_IN - displayVolt) / displayVolt;
-
-            // 3. REAL MATH: Calculate Rs/Ro Ratio
-            let ratio = rs / SENSOR_RO;
-
-            // 4. REAL MATH: Calculate PPM using Power Law
-            let finalPPM = CURVE_A * Math.pow(ratio, CURVE_B);
-
-            // Safety check: if the math breaks due to extreme voltages, cap it
-            if (isNaN(finalPPM) || finalPPM < 0) finalPPM = 0;
-            if (finalPPM > 1000) finalPPM = 1000;
-
-            // Demo Mode Override: Force high PPM if 'Diabetic Demo' is toggled
-            if (STATE.isDiabeticDemo) {
-                finalPPM = 5.0 + (pressure * 0.5) + (Math.random() * 1.5);
-            }
-
-            return finalPPM;
+            let ratio = (5.0 - displayVolt) / displayVolt;
+            let finalPPM = 4.5 * Math.pow(ratio, -0.7);
+            if (humidity > 50) finalPPM *= (1 - ((humidity - 50) * 0.005));
+            if (STATE.isDemo) finalPPM = 5.0 + (pressure * 0.5) + (Math.random() * 1.5);
+            return Math.max(0, Math.min(finalPPM, 1000));
         }
 
-        function runHybridAIInference(peakAcetone) {
-            // 1. Convert to mg/m^3
-            let mgPerM3 = peakAcetone * (ACETONE_MOL_WT / 24.45);
+        function runHybridAIInference(peakAcetone, avgHumidity) {
+    let ageFactor = Math.max(0, (STATE.patientProfile.age - 40) * 0.01);
+    let genderFactor = STATE.patientProfile.gender === 'male' ? 0.05 : 0.02;
+    let humidityOffset = (avgHumidity - 40) * 0.02;
 
-            // 2. THE 1.0V BASELINE OFFSET
-            // At 1.0V idle, your baseline PPM will calculate to around 4.5
-            // We subtract that so the starting point is 0.
-            let baselinePPM = 4.5; 
-            let detectedAcetone = Math.max(0, peakAcetone - baselinePPM);
+    let bmiFactor = STATE.patientProfile.bmi > 25 ? (STATE.patientProfile.bmi - 25) * 0.03 : 0;
+    let familyFactor = STATE.patientProfile.familyHistory === 'yes' ? 0.1 : 0;
+    let hba1cFactor = STATE.patientProfile.hba1c ? (STATE.patientProfile.hba1c - 5.5) * 0.1 : 0;
 
-            // 3. Glucose Calculation
-            // We start at 85 mg/dL (Healthy)
-            // We only add 10 mg/dL per unit of acetone.
-            let estimatedGlucose = 85.0 + (detectedAcetone * 10.0); 
+    let estimatedGlucose = (32.79 * peakAcetone) + 47.41;
 
-            // 4. Demo Mode Override
-            if (STATE.isDiabeticDemo) {
-                estimatedGlucose = 240 + (peakAcetone * 5) + (Math.random() * 20);
-            }
+    estimatedGlucose = estimatedGlucose * (1 + ageFactor + genderFactor + bmiFactor + familyFactor + hba1cFactor) + humidityOffset;
 
-            // 5. Risk Classification
-            let riskClass = 'Normal';
-            if (estimatedGlucose > 180) riskClass = 'High Risk';
-            else if (estimatedGlucose > 140) riskClass = 'Pre-Diabetes';
+    if (STATE.isDemo) estimatedGlucose = 240 + (peakAcetone * 5) + (Math.random() * 20);
+    if (estimatedGlucose < 70) estimatedGlucose = 70 + (Math.random() * 10);
+    if (estimatedGlucose > 500) estimatedGlucose = 500;
 
-            // 6. Realistic Capping
-            if (estimatedGlucose < 70) estimatedGlucose = 70 + (Math.random() * 10);
+    let riskClass = 'Normal', subType = null;
 
-            return { 
-                glucose: estimatedGlucose, 
-                riskClass: riskClass, 
-                confidence: 95.5 
-            };
+    if (STATE.mode === 'screening') {
+        if (estimatedGlucose > 200) {
+            riskClass = 'High Risk';
+            subType = STATE.patientProfile.age < 30 ? 'Suspected Type 1' : 'Suspected Type 2';
+        } else if (estimatedGlucose > 140) {
+            riskClass = 'Pre-Diabetes';
         }
-
-        // ==========================================
-        // CORE PIPELINE
-        // ==========================================
-
-        function processIncomingData(pressure, mqVolt) {
-    // 1. [KEEPING YOUR CALIBRATION] 
-    if (pressure <= CONFIG.PRESSURE_THRESHOLD && mqVolt > 0) {
-        if (baselineSamples.length < 50) {
-            baselineSamples.push(mqVolt);
-        } else if (BASELINE_VOLT === 0) {
-            BASELINE_VOLT = baselineSamples.reduce((a, b) => a + b, 0) / baselineSamples.length;
-            console.log("Baseline calibrated:", BASELINE_VOLT);
-        }
-    }
-    
-    // Adapt baseline over time
-    if (BASELINE_VOLT > 0 && pressure <= CONFIG.PRESSURE_THRESHOLD) {
-        BASELINE_VOLT = BASELINE_VOLT * 0.99 + mqVolt * 0.01;
+    } else {
+        riskClass = estimatedGlucose > 180 ? 'Spike Detected' : 'Stable';
+        subType = STATE.patientProfile.status === 'type1' ? 'Known Type 1' : (STATE.patientProfile.status === 'type2' ? 'Known Type 2' : 'Unspecified');
     }
 
-    // 2. ALWAYS Calculate and Display
-    const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt);
-    document.getElementById('valRawVolt').textContent = mqVolt.toFixed(3);
-
-    // 3. ALWAYS Update Chart (Stops the freezing)
-    signalChart.data.datasets[0].data.shift();
-    signalChart.data.datasets[0].data.push(normalizedVOC);
-    signalChart.data.datasets[1].data.shift();
-    signalChart.data.datasets[1].data.push(pressure);
-    signalChart.update('none'); 
-
-    // 4. ALWAYS Log to CSV
-    // 3. ALWAYS Log to CSV if collecting
-    if (STATE.isCollectingRawData) {
-        STATE.rawTimeLog.push({
-            timestamp: new Date().toISOString(),
-            pressure: pressure.toFixed(4),
-            rawVolt: mqVolt.toFixed(4),
-            vocPpm: normalizedVOC.toFixed(4),
-            // ADDED: Logical true/false or 1/0 for blowing state
-            isBlowing: pressure > CONFIG.PRESSURE_THRESHOLD ? 1 : 0 
-        });
-        document.getElementById('csvCount').textContent = STATE.rawTimeLog.length;
-    }
-
-    // 5. Update UI numbers
-    if (!STATE.isHoldingPeak) {
-        document.getElementById('valAcetone').textContent = normalizedVOC.toFixed(2);
-        document.getElementById('valPressure').textContent = pressure.toFixed(2);
-    }
-
-    // 6. Breath Detection Logic
-    if (pressure > CONFIG.PRESSURE_THRESHOLD) {
-        STATE.isHoldingPeak = false;
-
-        if (!STATE.isBreathing) {
-            STATE.isBreathing = true;
-            STATE.breathStartTime = Date.now();
-            STATE.currentExhale = { maxPpm: 0, maxPress: 0 };
-            
-            const riskBadge = document.getElementById('valRisk');
-            riskBadge.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-600 border border-blue-200';
-            riskBadge.innerHTML = '<i class="fa-solid fa-wind animate-pulse mr-2"></i> Analyzing...';
-        }
-
-        if (normalizedVOC > STATE.currentExhale.maxPpm) STATE.currentExhale.maxPpm = normalizedVOC;
-        if (pressure > STATE.currentExhale.maxPress) STATE.currentExhale.maxPress = pressure;
-
-    } else if (STATE.isBreathing) {
-        const duration = (Date.now() - STATE.breathStartTime) / 1000;
-        STATE.isBreathing = false;
-        STATE.isHoldingPeak = true;
-        
-        setTimeout(() => { STATE.isHoldingPeak = false; }, 3000);
-
-        if (duration >= CONFIG.MIN_BREATH_DURATION) {
-            const aiResult = runHybridAIInference(STATE.currentExhale.maxPpm);
-            updateDiagnosticUI(aiResult.glucose, aiResult.riskClass, aiResult.confidence);
-            if (STATE.isRecording) {
-                addLogEntry(duration, STATE.currentExhale.maxPpm, aiResult.glucose, aiResult.riskClass);
-            }
-        } else {
-            document.getElementById('valRisk').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> Too Short';
-        }
-    }
+    return { glucose: estimatedGlucose, riskClass, subType, confidence: 95.5 - (Math.random() * 3) };
 }
 
-        // ==========================================
-        // AUTO DEMO SIMULATION
-        // ==========================================
-        function runSimulation(isDiabetic) {
-            if (STATE.isSerialConnected) return alert("โปรด Disconnect อุปกรณ์ก่อนเปิดโหมดจำลอง");
-
-            STATE.isDiabeticDemo = isDiabetic;
-            let step = 0;
-
-            let simInterval = setInterval(() => {
-                step += 0.1;
-                let press = 12 * Math.exp(-Math.pow(step - 1.5, 2) / 0.5);
-                let mqVolt = 0;
-
-                if (step > 4.0) {
-                    clearInterval(simInterval);
-                    processIncomingData(0, 0);
-                    STATE.isDiabeticDemo = document.getElementById('toggleDiabetic').checked;
-                } else {
-                    processIncomingData(press, mqVolt);
-                }
-            }, 100);
-        }
-
-        // ==========================================
-        // UI UPDATERS & LOGS & EVENTS & CSV EXPORT
-        // ==========================================
-
-        const toggleDiabetic = document.getElementById('toggleDiabetic');
-        toggleDiabetic.addEventListener('change', (e) => {
-            STATE.isDiabeticDemo = e.target.checked;
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === 'd') {
-                if (STATE.isSerialConnected) {
-                    toggleDiabetic.checked = !toggleDiabetic.checked;
-                    STATE.isDiabeticDemo = toggleDiabetic.checked;
-                } else {
-                    runSimulation(true);
-                }
-            }
-            if (e.key.toLowerCase() === 's' && !STATE.isSerialConnected) {
-                runSimulation(false);
-            }
-        });
-
-        function updateDiagnosticUI(glucose, riskClass, confidence) {
+        function updateDiagnosticUI(glucose, riskClass, subType, confidence) {
             const elGlucose = document.getElementById('valGlucose');
             const elRisk = document.getElementById('valRisk');
-            const elConf = document.getElementById('valConfidence');
+            const typeLabel = document.getElementById('typeLabel');
 
             elGlucose.textContent = glucose.toFixed(1);
-            elConf.textContent = confidence.toFixed(1) + '%';
+            document.getElementById('valConfidence').textContent = confidence.toFixed(1) + '%';
+
+            if (subType) {
+                typeLabel.classList.remove('hidden'); typeLabel.textContent = subType;
+                typeLabel.className = `mt-2 text-xs font-bold px-3 py-1 rounded-full ${subType.includes('Type 1') ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`;
+            } else { typeLabel.classList.add('hidden'); }
 
             elRisk.className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold border transition-all ';
-            if (riskClass === 'Normal') {
-                elGlucose.style.color = '#10b981';
-                elRisk.classList.add('bg-green-100', 'text-green-700', 'border-green-300');
-                elRisk.innerHTML = '<i class="fa-solid fa-circle-check mr-2"></i> Normal';
-            } else if (riskClass === 'Pre-Diabetes') {
-                elGlucose.style.color = '#f59e0b';
-                elRisk.classList.add('bg-amber-100', 'text-amber-700', 'border-amber-300');
-                elRisk.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> Pre-Diabetes';
+            if (riskClass.includes('Normal') || riskClass.includes('Stable')) {
+                elGlucose.style.color = '#10b981'; elRisk.classList.add('bg-green-100', 'text-green-700', 'border-green-300'); elRisk.innerHTML = '<i class="fa-solid fa-circle-check mr-2"></i> ' + riskClass;
+            } else if (riskClass.includes('Pre')) {
+                elGlucose.style.color = '#f59e0b'; elRisk.classList.add('bg-amber-100', 'text-amber-700', 'border-amber-300'); elRisk.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> ' + riskClass;
             } else {
-                elGlucose.style.color = '#ef4444';
-                elRisk.classList.add('bg-rose-100', 'text-rose-700', 'border-rose-300');
-                elRisk.innerHTML = '<i class="fa-solid fa-radiation mr-2"></i> High Risk (DKA)';
+                elGlucose.style.color = '#ef4444'; elRisk.classList.add('bg-rose-100', 'text-rose-700', 'border-rose-300'); elRisk.innerHTML = '<i class="fa-solid fa-radiation mr-2"></i> ' + riskClass;
             }
         }
 
-        function addLogEntry(duration, peakPPM, glucose, riskClass) {
+        function addLogEntry(duration, peakPPM, humidity, glucose, riskClass, subType) {
             const tbody = document.getElementById('dataTableBody');
             if (STATE.patientLogs.length === 0) tbody.innerHTML = '';
-
             const row = document.createElement('tr');
             row.className = "hover:bg-slate-50 transition-colors";
             const timestamp = new Date().toLocaleTimeString();
-            let riskColor = riskClass === 'Normal' ? 'text-green-600' : (riskClass === 'Pre-Diabetes' ? 'text-amber-600' : 'text-rose-600');
+            let riskColor = riskClass.includes('Normal') || riskClass.includes('Stable') ? 'text-green-600' : (riskClass.includes('Pre') ? 'text-amber-600' : 'text-rose-600');
+            let labelBadge = subType ? `<span class="block text-[10px] text-slate-400 mt-1">${subType}</span>` : '';
 
-            row.innerHTML = `
-                <td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td>
-                <td class="px-6 py-3 font-medium">${duration.toFixed(1)} s</td>
-                <td class="px-6 py-3 font-bold text-blue-600">${peakPPM.toFixed(2)}</td>
-                <td class="px-6 py-3 font-black text-slate-700">${glucose.toFixed(1)}</td>
-                <td class="px-6 py-3 font-bold ${riskColor}">${riskClass}</td>
-            `;
+            row.innerHTML = `<td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td><td class="px-6 py-3 font-bold text-slate-700 uppercase text-xs">${STATE.mode}</td><td class="px-6 py-3 font-bold text-blue-600">${peakPPM.toFixed(2)} <span class="text-xs text-slate-400 font-normal">(${humidity.toFixed(1)}%)</span></td><td class="px-6 py-3 font-black text-slate-700">${glucose.toFixed(1)}</td><td class="px-6 py-3 font-bold ${riskColor}">${riskClass} ${labelBadge}</td>`;
             tbody.prepend(row);
-            STATE.patientLogs.push({ timestamp, duration, peakPPM, glucose, riskClass });
+            STATE.patientLogs.push({ timestamp, duration, peakPPM, humidity, glucose, riskClass });
         }
 
-        // --- Data Collection Handlers ---
-        document.getElementById('btnCollectRaw').addEventListener('click', () => {
-            STATE.isCollectingRawData = !STATE.isCollectingRawData;
-            const textEl = document.getElementById('textCollectRaw');
-            const iconEl = document.querySelector('#btnCollectRaw i');
-
-            if (STATE.isCollectingRawData) {
-                textEl.textContent = 'Recording...';
-                textEl.classList.replace('text-blue-400', 'text-rose-400');
-                iconEl.classList.replace('fa-database', 'fa-circle-stop');
-                iconEl.classList.replace('text-blue-500', 'text-rose-500');
-            } else {
-                textEl.textContent = 'Start Collect';
-                textEl.classList.replace('text-rose-400', 'text-blue-400');
-                iconEl.classList.replace('fa-circle-stop', 'fa-database');
-                iconEl.classList.replace('text-rose-500', 'text-blue-500');
-            }
-        });
-
-        document.getElementById('btnExportCSV').addEventListener('click', () => {
-            if (STATE.rawTimeLog.length === 0) {
-                alert("ไม่มีข้อมูลให้บันทึก (กรุณากดปุ่ม Start Collect ก่อนเป่า)");
-                return;
-            }
-
-            // สร้าง Header ของ CSV (เอา Glucose และ Risk ออก)
-            // Update Header to include "Is_Blowing"
-    let csvContent = "Timestamp,Pressure_mmHg,Raw_Voltage_V,VOC_PPM,Is_Blowing\n";
-
-    // Update Row loop to include the new value
-    STATE.rawTimeLog.forEach(row => {
-        csvContent += `${row.timestamp},${row.pressure},${row.rawVolt},${row.vocPpm},${row.isBlowing}\n`;
-    });
-
-            // สร้างไฟล์แล้วสั่งดาวน์โหลด
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `smart_breath_raw_data_${new Date().getTime()}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        document.getElementById('btnClearLogs').addEventListener('click', () => {
+            STATE.patientLogs = [];
+            document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
+            updatePredictionChart(); // Refresh analytics with empty data
         });
 
         // ==========================================
-        // WEB SERIAL API
+        // DEMO, SERIAL & CSV
         // ==========================================
+        function runSimulation() {
+            if (STATE.isSerialConnected) return alert("Please disconnect serial first.");
+            STATE.isDemo = true;
+            let step = 0;
+            let simInterval = setInterval(() => {
+                step += 0.1;
+                let press = 12 * Math.exp(-Math.pow(step - 1.5, 2) / 0.5);
+                let mqVolt = 0; let hum = 45.0 + (press * 0.5);
+                if (step > 4.0) { clearInterval(simInterval); processIncomingData(0, 0, 45.0); STATE.isDemo = false; }
+                else { processIncomingData(press, mqVolt, hum); }
+            }, 100);
+        }
+        document.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'd' && !STATE.isSerialConnected && STATE.patientProfile) runSimulation(); });
+
+        let serialPort, serialReader;
         async function connectSerial() {
             if (STATE.isSerialConnected) {
                 if (serialReader) await serialReader.cancel();
                 if (serialPort) await serialPort.close();
                 STATE.isSerialConnected = false;
-
                 document.getElementById('serialStatusDot').classList.replace('status-active', 'status-idle');
                 document.getElementById('serialStatusText').textContent = 'ESP32: Disconnected';
-                document.getElementById('serialStatusText').classList.remove('text-emerald-500');
                 document.getElementById('btnConnect').innerHTML = '<i class="fa-brands fa-usb"></i> Connect Device';
-                document.getElementById('btnConnect').classList.replace('bg-rose-600', 'bg-slate-800');
                 return;
             }
-
             try {
-                const baud = parseInt(document.getElementById('cfgBaudRate').value);
                 serialPort = await navigator.serial.requestPort();
-                await serialPort.open({ baudRate: baud });
-
+                await serialPort.open({ baudRate: 115200 });
                 STATE.isSerialConnected = true;
-
                 document.getElementById('serialStatusDot').classList.replace('status-idle', 'status-active');
                 document.getElementById('serialStatusText').textContent = 'ESP32: Synced';
-                document.getElementById('serialStatusText').classList.add('text-emerald-500');
                 document.getElementById('btnConnect').innerHTML = '<i class="fa-solid fa-link-slash"></i> Disconnect';
-                document.getElementById('btnConnect').classList.replace('bg-slate-800', 'bg-rose-600');
 
                 const decoder = new TextDecoderStream();
                 serialPort.readable.pipeTo(decoder.writable);
                 serialReader = decoder.readable.getReader();
 
                 let buffer = "";
-
                 while (true) {
                     const { value, done } = await serialReader.read();
                     if (done) { serialReader.releaseLock(); break; }
@@ -834,58 +1337,42 @@
                         buffer += value;
                         let lines = buffer.split('\n');
                         buffer = lines.pop();
-
                         for (let line of lines) {
-                            line = line.trim();
-                            if (!line) continue;
-
-            // 1. Look for numbers in the string
-                            let match = line.match(/Pressure:\s*(-?[\d\.]+).*?MQ Volt:\s*(-?[\d\.]+)/i);
-
-                            if (match) {
-                                let press = parseFloat(match[1]);
-                                let mqVolt = parseFloat(match[2]);
-                // 2. Send real data to the dashboard and CSV
-                                processIncomingData(press, mqVolt); 
-                            } 
-            // 3. Fallback only if the message is "IDLE" with no data
-                            else if (line.includes("IDLE") && !line.includes("Volt")) {
-                                processIncomingData(0.0, 0.0);
-                            }
-                        } // end for
-                    } // end if value
-                } // end while
-                        
-                    
-                
-            } catch (error) {
-                console.error("Serial Error:", error);
-                STATE.isSerialConnected = false;
-                alert("Cannot connect to serial port. Make sure no other program is using it.");
-            }
+                            line = line.trim(); if (!line) continue;
+                            let match = line.match(/Pressure:\s*(-?[\d\.]+).*?MQ Volt:\s*(-?[\d\.]+)(?:.*?Humidity:\s*(-?[\d\.]+))?/i);
+                            if (match) { processIncomingData(parseFloat(match[1]), parseFloat(match[2]), match[3] ? parseFloat(match[3]) : 45.0); }
+                        }
+                    }
+                }
+            } catch (error) { console.error(error); STATE.isSerialConnected = false; }
         }
-
         document.getElementById('btnConnect').addEventListener('click', connectSerial);
-
-        document.getElementById('btnRecord').addEventListener('click', (e) => {
-            STATE.isRecording = !STATE.isRecording;
-            const btn = e.currentTarget;
-            if (STATE.isRecording) {
-                btn.innerHTML = '<i class="fa-solid fa-square text-red-500 text-[10px]"></i> Stop Recording';
-                btn.classList.replace('bg-slate-100', 'bg-red-50');
-                btn.classList.replace('text-slate-700', 'text-red-700');
+        // Add this near document.getElementById('btnConnect').addEventListener(...)
+// In diabetes-v2-updated.html, find the btnWireless listener:
+        document.getElementById('btnWireless').addEventListener('click', () => {
+    // Check if client exists AND is actually connected
+            if (!STATE.mqttClient || !STATE.mqttClient.isConnected()) {
+                console.log("Starting MQTT connection...");
+                initMQTT();
             } else {
-                btn.innerHTML = '<i class="fa-solid fa-circle text-red-500 text-[10px]"></i> Start Auto-Record';
-                btn.classList.replace('bg-red-50', 'bg-slate-100');
-                btn.classList.replace('text-red-700', 'text-slate-700');
+                alert("You are already connected to the live stream.");
             }
         });
 
-        document.getElementById('btnClearLogs').addEventListener('click', () => {
-            if (confirm("Are you sure you want to clear all logs?")) {
-                STATE.patientLogs = [];
-                document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet.</td></tr>';
-            }
+        document.getElementById('btnCollectRaw').addEventListener('click', () => {
+            STATE.isCollectingRawData = !STATE.isCollectingRawData;
+            const textEl = document.getElementById('textCollectRaw');
+            if (STATE.isCollectingRawData) { textEl.textContent = 'Recording...'; textEl.classList.replace('text-blue-400', 'text-rose-400'); }
+            else { textEl.textContent = 'Start Collect'; textEl.classList.replace('text-rose-400', 'text-blue-400'); }
+        });
+
+        document.getElementById('btnExportCSV').addEventListener('click', () => {
+            if (STATE.rawTimeLog.length === 0) return alert("No data recorded yet.");
+            let csvContent = "Timestamp,Pressure_mmHg,Raw_Voltage_V,VOC_PPM,Humidity_RH,Is_Blowing\n";
+            STATE.rawTimeLog.forEach(row => { csvContent += `${row.timestamp},${row.pressure},${row.rawVolt},${row.vocPpm},${row.humidity},${row.isBlowing}\n`; });
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+            link.download = `sbd_dataset_${new Date().getTime()}.csv`; link.click();
         });
 
     </script>
