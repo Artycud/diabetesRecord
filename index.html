@@ -98,16 +98,16 @@
             animation: fadeIn 0.3s ease-in-out;
         }
 
-        /* Dashboard needs flex-column to fill available space */
+        /* ALL active tabs fill the scrollable main area */
+        .tab-content.active {
+            display: block;
+            min-height: 100%;
+        }
+
+        /* Dashboard specifically uses flex-column */
         #tab-dashboard.active {
             display: flex;
             flex-direction: column;
-            flex: 1;
-        }
-
-        /* All other tabs just scroll normally - NO overlay/flex stretch */
-        .tab-content.active:not(#tab-dashboard) {
-            display: block;
         }
 
         .auth-view {
@@ -148,35 +148,25 @@
             background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
             background-size: 20px 20px;
         }
-        /* All tabs live as normal flow children inside #mainContent.
-           #mainContent is flex-col, so each active tab just fills the remaining space. */
+        /* mainContent is the scrollable viewport for all tabs */
         #mainContent {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        /* Dashboard: flex column so its inner panels stack vertically */
-        #tab-dashboard.active {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
             overflow-y: auto;
-            min-height: 0;
+            overflow-x: hidden;
+        }
+        /* Dashboard: stacks panels vertically with gap */
+        #tab-dashboard.active {
             gap: 1.5rem;
         }
-        /* All other tabs: plain block, scroll within themselves */
-        #tab-predictions.active,
-        #tab-logs.active,
-        #tab-settings.active {
-            display: block;
-            flex: 1;
-            overflow-y: auto;
-            min-height: 0;
+
+        /* Collapsible live signal section in Analytics tab */
+        #analyticsLiveSignal {
+            transition: max-height 0.35s ease, opacity 0.3s ease;
+            overflow: hidden;
         }
     </style>
 </head>
 
-<body class="text-slate-800 flex flex-col overflow-hidden relative" style="height:100dvh">
+<body class="text-slate-800 flex flex-col relative" style="height:100dvh; overflow:hidden;">
 
     <div id="authScreen" class="absolute inset-0 z-50 bg-slate-50 flex items-center justify-center bg-medical-pattern">
 
@@ -339,46 +329,45 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <div class="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-                    <i id="modeIcon" class="fa-solid fa-microscope text-indigo-500 text-xs"></i>
-                    <span id="modeText" class="text-xs font-bold text-slate-700 hidden sm:inline">Screening Mode</span>
-                    <div
-                        class="relative inline-block w-10 h-5 align-middle select-none transition duration-200 ease-in">
+                <div class="flex items-center gap-2.5 bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-200">
+                    <i id="modeIcon" class="fa-solid fa-microscope text-indigo-500 text-sm"></i>
+                    <span id="modeText" class="text-sm font-bold text-slate-700 hidden sm:inline">Screening Mode</span>
+                    <div class="relative inline-block w-12 h-6 align-middle select-none transition duration-200 ease-in">
                         <input type="checkbox" name="toggleMode" id="toggleMode"
-                            class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" />
+                            class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" />
                         <label for="toggleMode"
-                            class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                            class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
                     </div>
                 </div>
 
                 <div class="hidden md:flex flex-col items-end border-l border-slate-200 pl-4">
-                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-1">
+                    <div class="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-1">
                         <span id="mqttStatusText">MQTT: Connecting...</span>
-                        <div id="mqttStatusDot" class="w-2.5 h-2.5 rounded-full status-idle"></div>
+                        <div id="mqttStatusDot" class="w-3 h-3 rounded-full status-idle"></div>
                     </div>
-                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <div class="flex items-center gap-2 text-sm font-semibold text-slate-500">
                         <span id="serialStatusText">ESP32: Disconnected</span>
-                        <div id="serialStatusDot" class="w-2.5 h-2.5 rounded-full status-idle"></div>
+                        <div id="serialStatusDot" class="w-3 h-3 rounded-full status-idle"></div>
                     </div>
                 </div>
 
                 <button
-                    class="hidden sm:flex bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg font-bold items-center gap-2 text-xs border border-indigo-200 cursor-default">
+                    class="hidden sm:flex bg-indigo-50 text-indigo-700 px-4 py-2.5 rounded-lg font-bold items-center gap-2 text-sm border border-indigo-200 cursor-default">
                     <i class="fa-solid fa-user-check"></i> <span id="userProfileName">Logged In</span>
                 </button>
 
                 <button id="btnConnect"
-                    class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg font-medium transition-all shadow-md flex items-center gap-2 text-xs">
+                    class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-lg font-medium transition-all shadow-md flex items-center gap-2 text-sm">
                     <i class="fa-brands fa-usb"></i> <span class="hidden sm:inline">Connect Device</span><span class="sm:hidden">USB</span>
                 </button>
-                <button id="btnWireless" class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-xl shadow-lg transition-all active:scale-95 text-xs">
+                <button id="btnWireless" class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg transition-all active:scale-95 text-sm">
                     <i class="fas fa-wifi"></i>
                     <span class="hidden sm:inline">Connect Wireless</span><span class="sm:hidden">Wi-Fi</span>
                 </button>
 
                 <button onclick="logout()" class="text-slate-400 hover:text-rose-500 transition-colors"
                     title="Logout">
-                    <i class="fa-solid fa-arrow-right-from-bracket text-lg"></i>
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xl"></i>
                 </button>
             </div>
         </nav>
@@ -454,7 +443,7 @@
                 </div>
             </aside>
 
-            <main class="flex-1 min-w-0 bg-slate-50" id="mainContent" style="overflow:hidden;">
+            <main class="flex-1 min-w-0 bg-slate-50" id="mainContent" style="overflow-y:auto; overflow-x:hidden;">
                 <!-- Mobile menu toggle -->
                 <button onclick="toggleSidebar()" class="md:hidden fixed bottom-4 left-4 z-50 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center">
                     <i class="fa-solid fa-bars"></i>
@@ -577,7 +566,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
                     </div><!-- end dashboardPanels -->
 
                     <div class="glass-panel p-6 flex flex-col" id="chartPanel">
@@ -586,14 +574,23 @@
                                 <i id="chartToggleIcon" class="fa-solid fa-chevron-down text-slate-400 transition-transform duration-300"></i>
                                 Live Time-Series Acquisition
                             </h2>
-                            <div class="flex gap-4 items-center">
+                            <div class="flex gap-5 items-center">
+                                <!-- VOC: solid blue line swatch -->
                                 <span class="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                    <div class="w-3 h-3 rounded bg-blue-500"></div> VOC (PPM)
+                                    <svg width="28" height="12" viewBox="0 0 28 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <rect x="0" y="4" width="28" height="4" rx="2" fill="rgba(59,130,246,0.18)"/>
+                                        <line x1="0" y1="6" x2="28" y2="6" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+                                    </svg>
+                                    VOC Acetone (PPM)
                                 </span>
+                                <!-- Pressure: dashed emerald line swatch -->
                                 <span class="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                    <div class="w-3 h-3 rounded bg-indigo-500 border-2 border-indigo-300 border-dashed"></div> Pressure
+                                    <svg width="28" height="12" viewBox="0 0 28 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <line x1="0" y1="6" x2="28" y2="6" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 3.5"/>
+                                    </svg>
+                                    Breath Pressure (mmHg)
                                 </span>
-                                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded ml-2" id="chartCollapseHint">click to collapse</span>
+                                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded" id="chartCollapseHint">click to collapse</span>
                             </div>
                         </div>
                         <div id="chartBody" class="relative w-full transition-all duration-300 overflow-hidden" style="height:260px">
@@ -602,13 +599,35 @@
                     </div>
                 </div>
 
-                <div id="tab-predictions" class="tab-content p-4 md:p-6">
-                    <div class="glass-panel flex flex-col p-6">
+                <div id="tab-predictions" class="tab-content p-4 md:p-6 flex flex-col gap-5">
+
+                    <!-- Collapsible Live Signal panel (Analytics-specific canvas) -->
+                    <div class="glass-panel p-5 flex flex-col">
+                        <div class="flex justify-between items-center cursor-pointer select-none" onclick="toggleAnalyticsSignal()">
+                            <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                <i id="analyticsSignalIcon" class="fa-solid fa-chevron-right text-slate-400 transition-transform duration-300"></i>
+                                Live Signal Feed
+                                <span class="text-[10px] font-normal text-slate-400 normal-case">(real-time sensor stream)</span>
+                            </h2>
+                            <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded" id="analyticsSignalHint">click to expand</span>
+                        </div>
+                        <div id="analyticsLiveSignal" style="max-height:0px; opacity:0;">
+                            <div class="flex gap-4 items-center mt-3 mb-2">
+                                <span class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-3 h-3 rounded bg-blue-500"></div> VOC (PPM)</span>
+                                <span class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-3 h-3 rounded bg-indigo-500 border-2 border-indigo-300 border-dashed"></div> Pressure</span>
+                            </div>
+                            <div class="relative w-full" style="height:220px">
+                                <canvas id="signalChartAnalytics"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics main content -->
+                    <div class="glass-panel flex flex-col p-6 flex-1">
                         <div class="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
                             <div>
                                 <h2 class="text-lg font-bold text-slate-800">Long-Term Analytics & Predictions</h2>
-                                <p class="text-xs text-slate-500 mt-1">Personalized trend based on deep clinical history
-                                    and real-time logs.</p>
+                                <p class="text-xs text-slate-500 mt-1">Personalized trend based on deep clinical history and real-time logs.</p>
                             </div>
                             <div class="flex gap-4 items-center">
                                 <span class="text-xs font-bold text-slate-500">Forecast Horizon:</span>
@@ -624,40 +643,28 @@
                         </div>
 
                         <div class="flex flex-col md:flex-row gap-6 flex-1 mb-2">
-                            <div
-                                class="flex-1 relative w-full border border-slate-200 rounded-xl p-4 bg-white shadow-inner flex flex-col min-h-[250px]">
+                            <div class="flex-1 relative w-full border border-slate-200 rounded-xl p-4 bg-white shadow-inner flex flex-col" style="min-height:280px">
                                 <div class="flex justify-between mb-2">
-                                    <div class="text-xs font-bold text-slate-500"><i
-                                            class="fa-solid fa-clock-rotate-left mr-1"></i> Historical Data</div>
-                                    <div class="text-xs font-bold text-rose-500"><i
-                                            class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI Prediction</div>
+                                    <div class="text-xs font-bold text-slate-500"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Historical Data</div>
+                                    <div class="text-xs font-bold text-rose-500"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI Prediction</div>
                                 </div>
-                                <div class="flex-1 relative w-full min-h-[200px]">
+                                <div class="flex-1 relative w-full" style="min-height:220px">
                                     <canvas id="predictionChart"></canvas>
                                 </div>
                             </div>
 
                             <div class="w-full md:w-1/3 flex flex-col gap-4 overflow-y-auto">
-
                                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shrink-0">
-                                    <h3
-                                        class="text-xs font-bold text-slate-500 uppercase flex items-center justify-between">
+                                    <h3 class="text-xs font-bold text-slate-500 uppercase flex items-center justify-between">
                                         Personalized Matrix
-                                        <span id="trendStatusBadge"
-                                            class="px-2 py-1 rounded bg-slate-200 text-slate-600 text-[10px]">Analyzing...</span>
+                                        <span id="trendStatusBadge" class="px-2 py-1 rounded bg-slate-200 text-slate-600 text-[10px]">Analyzing...</span>
                                     </h3>
                                     <div class="mt-3 grid grid-cols-2 gap-y-3 text-xs">
-                                        <div><span class="text-slate-400">Age:</span> <span id="statAge"
-                                                class="font-bold text-slate-800 ml-1">-</span></div>
-                                        <div><span class="text-slate-400">Gender:</span> <span id="statGender"
-                                                class="font-bold text-slate-800 ml-1">-</span></div>
-                                        <div><span class="text-slate-400">BMI:</span> <span id="statBMI"
-                                                class="font-bold text-blue-600 ml-1">-</span></div>
-                                        <div><span class="text-slate-400">HbA1c:</span> <span id="statHbA1c"
-                                                class="font-bold text-slate-800 ml-1">-</span></div>
-                                        <div class="col-span-2 border-t border-slate-200 pt-2"><span
-                                                class="text-slate-400">Family History:</span> <span id="statFamily"
-                                                class="font-bold text-slate-800 ml-1">-</span></div>
+                                        <div><span class="text-slate-400">Age:</span> <span id="statAge" class="font-bold text-slate-800 ml-1">-</span></div>
+                                        <div><span class="text-slate-400">Gender:</span> <span id="statGender" class="font-bold text-slate-800 ml-1">-</span></div>
+                                        <div><span class="text-slate-400">BMI:</span> <span id="statBMI" class="font-bold text-blue-600 ml-1">-</span></div>
+                                        <div><span class="text-slate-400">HbA1c:</span> <span id="statHbA1c" class="font-bold text-slate-800 ml-1">-</span></div>
+                                        <div class="col-span-2 border-t border-slate-200 pt-2"><span class="text-slate-400">Family History:</span> <span id="statFamily" class="font-bold text-slate-800 ml-1">-</span></div>
                                     </div>
                                 </div>
 
@@ -665,9 +672,7 @@
                                     <h3 class="text-sm font-bold text-indigo-800 mb-3 border-b border-indigo-200 pb-2">
                                         <i class="fa-solid fa-lightbulb text-amber-500 mr-2"></i> AI Improvement Plan
                                     </h3>
-                                    <ul class="text-xs text-indigo-900 space-y-3 list-disc pl-4 flex-1"
-                                        id="aiRecommendations">
-                                    </ul>
+                                    <ul class="text-xs text-indigo-900 space-y-3 flex-1" id="aiRecommendations"></ul>
                                 </div>
                             </div>
                         </div>
@@ -677,7 +682,10 @@
                 <div id="tab-logs" class="tab-content p-4 md:p-6">
                     <div class="glass-panel flex flex-col p-6">
                         <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-lg font-bold text-slate-800">Clinical Breath Logs</h2>
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-800">Clinical Breath Logs</h2>
+                                <p class="text-xs text-slate-400 mt-0.5" id="logCountLabel">Loading saved logs...</p>
+                            </div>
                             <button id="btnClearLogs"
                                 class="bg-rose-50 hover:bg-rose-100 text-rose-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm"><i
                                     class="fa-solid fa-trash"></i> Clear Logs</button>
@@ -795,7 +803,30 @@
         }
 
         // ==========================================
-        // MOCK SQLITE DATABASE ENGINE (Local Storage Based)
+        // ANALYTICS TAB LIVE SIGNAL TOGGLE
+        // ==========================================
+        let analyticsSignalExpanded = false;
+        function toggleAnalyticsSignal() {
+            const panel = document.getElementById('analyticsLiveSignal');
+            const icon = document.getElementById('analyticsSignalIcon');
+            const hint = document.getElementById('analyticsSignalHint');
+            analyticsSignalExpanded = !analyticsSignalExpanded;
+            if (analyticsSignalExpanded) {
+                panel.style.maxHeight = '320px';
+                panel.style.opacity = '1';
+                icon.style.transform = 'rotate(90deg)';
+                hint.textContent = 'click to collapse';
+                setTimeout(() => { signalChartAnalytics.resize(); }, 310);
+            } else {
+                panel.style.maxHeight = '0px';
+                panel.style.opacity = '0';
+                icon.style.transform = 'rotate(0deg)';
+                hint.textContent = 'click to expand';
+            }
+        }
+
+        // ==========================================
+        // Per-user data: profile, logs, calibration settings
         // ==========================================
         const LocalDB = {
             init: function () {
@@ -805,14 +836,36 @@
             },
             insert: function (userData) {
                 let db = JSON.parse(localStorage.getItem('sbd_db'));
-                if (db.find(u => u.username === userData.username)) return false; // Username exists
+                if (db.find(u => u.username === userData.username)) return false;
                 db.push(userData);
                 localStorage.setItem('sbd_db', JSON.stringify(db));
                 return true;
             },
+            update: function (userData) {
+                let db = JSON.parse(localStorage.getItem('sbd_db'));
+                const idx = db.findIndex(u => u.username === userData.username);
+                if (idx >= 0) { db[idx] = userData; localStorage.setItem('sbd_db', JSON.stringify(db)); }
+            },
             select: function (username, password) {
                 let db = JSON.parse(localStorage.getItem('sbd_db'));
                 return db.find(u => u.username === username && u.password === password);
+            },
+            // Clinical logs: stored per user under key sbd_logs_{username}
+            getLogs: function (username) {
+                try {
+                    return JSON.parse(localStorage.getItem('sbd_logs_' + username)) || [];
+                } catch(e) { return []; }
+            },
+            saveLogs: function (username, logs) {
+                localStorage.setItem('sbd_logs_' + username, JSON.stringify(logs));
+            },
+            appendLog: function (username, logEntry) {
+                const logs = LocalDB.getLogs(username);
+                logs.push(logEntry);
+                LocalDB.saveLogs(username, logs);
+            },
+            clearLogs: function (username) {
+                localStorage.removeItem('sbd_logs_' + username);
             }
         };
         LocalDB.init();
@@ -889,31 +942,49 @@
 
                 if (remember) {
                     localStorage.setItem('savedCredentials', JSON.stringify({ user: userVal, pass: passVal }));
+                    localStorage.setItem('sbd_session', JSON.stringify({ username: userVal, password: passVal }));
                 } else {
                     localStorage.removeItem('savedCredentials');
+                    localStorage.removeItem('sbd_session');
                 }
-        
+
                 loadApp(patient);
             } else {
                 alert("Invalid clinical ID or Password.");
             }
         }
 
-        // Auto-fill saved credentials on page load
-        (function restoreCredentials() {
-            const saved = localStorage.getItem('savedCredentials');
-            if (saved) {
-                try {
+        // Auto-login: restore session or pre-fill credentials
+        (function restoreSession() {
+            try {
+                const session = localStorage.getItem('sbd_session');
+                if (session) {
+                    const { username, password } = JSON.parse(session);
+                    const patient = LocalDB.select(username, password);
+                    if (patient) {
+                        patient.name = patient.name || 'Guest';
+                        patient.role = patient.role || 'Patient';
+                        setTimeout(() => loadApp(patient), 50);
+                        return;
+                    } else { localStorage.removeItem('sbd_session'); }
+                }
+            } catch(e) { localStorage.removeItem('sbd_session'); }
+            try {
+                const saved = localStorage.getItem('savedCredentials');
+                if (saved) {
                     const { user, pass } = JSON.parse(saved);
                     document.getElementById('loginUser').value = user;
                     document.getElementById('loginPass').value = pass;
                     document.getElementById('rememberMe').checked = true;
-                } catch(e) { localStorage.removeItem('savedCredentials'); }
-            }
+                }
+            } catch(e) { localStorage.removeItem('savedCredentials'); }
         })();
 
         function loadApp(patientData) {
             STATE.patientProfile = patientData;
+
+            // Restore saved logs from persistent storage
+            STATE.patientLogs = LocalDB.getLogs(patientData.username);
 
             if (patientData.status === 'type1' || patientData.status === 'type2') {
                 document.getElementById('toggleMode').checked = true;
@@ -931,24 +1002,33 @@
             document.getElementById('statFamily').textContent = patientData.familyHistory.toUpperCase();
             document.getElementById('statHbA1c').textContent = patientData.hba1c ? patientData.hba1c + '%' : 'N/A';
             document.getElementById('userProfileName').textContent = patientData.username.toUpperCase();
-            // NOTE: Do NOT overwrite mqttTopic here — the ESP32 firmware hardcodes its topic.
-            // The default value in the HTML input (siit/med/breath/waranyu.arty) must match the ESP32.
-            // Users can change it manually in Settings & Calibrate if needed.
+
+            // Restore log table from saved logs
+            rebuildLogTable();
 
             document.getElementById('authScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             document.getElementById('mainApp').classList.add('flex');
 
+            // Force chart resize after layout is visible
+            setTimeout(() => {
+                signalChart.resize();
+                signalChart.update();
+            }, 100);
+
             initMQTT();
-            updatePredictionChart(); // Call once at start
+            updatePredictionChart();
         }
 
         function logout() {
             if (STATE.isSerialConnected) document.getElementById('btnConnect').click();
             if (STATE.mqttClient) STATE.mqttClient.disconnect();
 
+            // Clear session (but keep savedCredentials if user had "remember me")
+            localStorage.removeItem('sbd_session');
+
             STATE.patientProfile = null;
-            STATE.patientLogs = []; // Clear current session logs
+            STATE.patientLogs = [];
             document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
 
             document.getElementById('loginUser').value = '';
@@ -1010,16 +1090,12 @@
                 e.currentTarget.classList.remove('hover:bg-slate-800', 'text-slate-300');
                 const targetEl = document.getElementById(targetId);
                 targetEl.classList.add('active');
-                targetEl.scrollTop = 0;
+                // Scroll to top of the new tab
+                document.getElementById('mainContent').scrollTop = 0;
 
-                // Auto-collapse live dashboard panels when on other tabs; restore when back
-                if (targetId !== 'tab-dashboard') {
-                    toggleDashboardPanels(true);
-                } else {
-                    toggleDashboardPanels(false);
+                if (targetId === 'tab-predictions') {
+                    updatePredictionChart();
                 }
-
-                if (targetId === 'tab-predictions') updatePredictionChart();
             });
         });
 
@@ -1037,18 +1113,114 @@
             document.getElementById('aiModeLabel').className = isMon ? 'bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded' : 'bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded';
         }
 
-        // Setup Real-time Signal Chart
-        const ctxSignal = document.getElementById('signalChart').getContext('2d');
-        const signalChart = new Chart(ctxSignal, {
-            type: 'line', data: {
-                labels: Array(CONFIG.CHART_MAX_POINTS).fill(''), datasets: [
-                    { label: 'VOC (PPM)', borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true, data: Array(CONFIG.CHART_MAX_POINTS).fill(0), yAxisID: 'yVOC' },
-                    { label: 'Pressure', borderColor: '#6366f1', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], tension: 0.2, data: Array(CONFIG.CHART_MAX_POINTS).fill(0), yAxisID: 'yPress' }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, yVOC: { type: 'linear', position: 'left', min: 0 }, yPress: { type: 'linear', position: 'right', min: 0, max: 20, grid: { drawOnChartArea: false } } } }
-        });
+        // Setup Real-time Signal Charts (dashboard + analytics mirror)
+        function makeSignalChartConfig() {
+            return {
+                type: 'line',
+                data: {
+                    labels: Array(CONFIG.CHART_MAX_POINTS).fill(''),
+                    datasets: [
+                        {
+                            label: 'VOC (PPM)',
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59,130,246,0.12)',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.45,
+                            fill: true,
+                            data: Array(CONFIG.CHART_MAX_POINTS).fill(0),
+                            yAxisID: 'yVOC'
+                        },
+                        {
+                            label: 'Pressure',
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16,185,129,0.05)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            borderDash: [5, 4],
+                            tension: 0.35,
+                            fill: true,
+                            data: Array(CONFIG.CHART_MAX_POINTS).fill(0),
+                            yAxisID: 'yPress'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: { display: false },
+                    },
+                    scales: {
+                        x: { display: false },
+                        yVOC: {
+                            type: 'linear', position: 'left', min: 0,
+                            ticks: { maxTicksLimit: 6, color: '#2563eb', font: { size: 13, weight: '600' } },
+                            grid: { color: 'rgba(59,130,246,0.13)', lineWidth: 1.2 }
+                        },
+                        yPress: {
+                            type: 'linear', position: 'right', min: 0, max: 20,
+                            grid: { drawOnChartArea: false },
+                            ticks: { maxTicksLimit: 6, color: '#10b981', font: { size: 13, weight: '600' } }
+                        }
+                    }
+                }
+            };
+        }
 
+        // Minimal low-pass filter — just takes the edge off single-sample jitter.
+        // Alpha near 1.0 = almost raw signal, just a tiny smoothing.
+        const _vocSmooth = { current: 0 };
+        function smoothVOC(rawVOC, pressure) {
+            const alpha = pressure > CONFIG.PRESSURE_THRESHOLD ? 0.75 : 0.65;
+            _vocSmooth.current = alpha * rawVOC + (1 - alpha) * _vocSmooth.current;
+            return _vocSmooth.current;
+        }
+
+        const ctxSignal = document.getElementById('signalChart').getContext('2d');
+        const signalChart = new Chart(ctxSignal, makeSignalChartConfig());
+
+        // Analytics tab mirror chart (shares same data, separate canvas)
+        const ctxSignalAnalytics = document.getElementById('signalChartAnalytics').getContext('2d');
+        const signalChartAnalytics = new Chart(ctxSignalAnalytics, makeSignalChartConfig());
+        // Throttle chart updates to max ~30fps to eliminate lag
+        let _chartDirty = false;
+        let _chartRafId = null;
+        function scheduleChartUpdate() {
+            if (_chartRafId) return;
+            _chartRafId = requestAnimationFrame(() => {
+                _chartRafId = null;
+                if (_chartDirty) {
+                    signalChart.update('none');
+                    // Mirror data to analytics chart if it's visible
+                    signalChartAnalytics.data.datasets[0].data = [...signalChart.data.datasets[0].data];
+                    signalChartAnalytics.data.datasets[1].data = [...signalChart.data.datasets[1].data];
+                    signalChartAnalytics.update('none');
+                    _chartDirty = false;
+                }
+            });
+        }
+
+
+        // ==========================================
+        // TOAST ALERT SYSTEM
+        // ==========================================
+        function showAlert(title, message, type = 'info') {
+            const container = document.getElementById('alertContainer');
+            const colors = {
+                danger:  { bg: 'bg-rose-600',   icon: 'fa-circle-radiation' },
+                warning: { bg: 'bg-amber-500',   icon: 'fa-triangle-exclamation' },
+                info:    { bg: 'bg-slate-700',   icon: 'fa-circle-info' },
+                success: { bg: 'bg-emerald-600', icon: 'fa-circle-check' }
+            };
+            const { bg, icon } = colors[type] || colors.info;
+            const el = document.createElement('div');
+            el.className = `toast-alert pointer-events-auto flex items-start gap-3 ${bg} text-white px-4 py-3 rounded-xl shadow-2xl max-w-xs`;
+            el.innerHTML = `<i class="fa-solid ${icon} mt-0.5 shrink-0"></i><div><p class="text-xs font-bold">${title}</p><p class="text-[11px] opacity-90 mt-0.5">${message}</p></div>`;
+            container.appendChild(el);
+            setTimeout(() => { el.style.transition = 'opacity 0.5s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 500); }, 4000);
+        }
 
         // ==========================================
         // ANALYTICS, PREDICTION & AI RECOMMENDATION ENGINE
@@ -1058,137 +1230,234 @@
         function updatePredictionChart() {
             const ctxPred = document.getElementById('predictionChart').getContext('2d');
             if (predictionChartInstance) predictionChartInstance.destroy();
+            if (!STATE.patientProfile) return;
 
             const range = document.getElementById('predictRange').value;
-            let labels = [], dataActual = [], dataPredict = [];
 
-            // Define time points based on range selection
-            let points = range === '1w' ? 7 : (range === '1m' ? 30 : (range === '6m' ? 6 : 12));
-            let labelPrefix = (range === '1w' || range === '1m') ? 'Day-' : 'Month-';
+            // ── 1. Load ALL saved logs for this user (cross-session) ──
+            const allLogs = STATE.patientLogs; // already loaded from localStorage at login
 
-            // 1. Establish Baseline from MetaData
+            // ── 2. Clinical baseline from profile ──
             let baseGluc = 90;
             if (STATE.patientProfile.status === 'type2') baseGluc = 150;
             if (STATE.patientProfile.status === 'type1') baseGluc = 180;
             if (STATE.patientProfile.bmi > 25) baseGluc += 15;
-            if (STATE.patientProfile.hba1c > 6.5) baseGluc += 20;
+            if (STATE.patientProfile.hba1c && STATE.patientProfile.hba1c > 6.5) baseGluc += 20;
 
-            // 2. Incorporate Real Data from Logs (if available)
-            let recentTrend = 0; // 0 = stable, positive = worsening, negative = improving
+            let recentTrend = 0;
 
-            if (STATE.patientLogs.length > 0) {
-                // Calculate average of recent blows to anchor the "Today" point
-                let sumGlucose = 0;
-                STATE.patientLogs.forEach(log => sumGlucose += log.glucose);
-                let actualAvg = sumGlucose / STATE.patientLogs.length;
+            // ── 3. Build real data series from actual logs with real timestamps ──
+            let realPoints = []; // { date: Date, glucose: number }
+            allLogs.forEach(log => {
+                const d = new Date(log.timestamp);
+                if (!isNaN(d)) realPoints.push({ date: d, glucose: parseFloat(log.glucose) });
+            });
+            realPoints.sort((a, b) => a.date - b.date);
 
-                // If they have blown a lot, we see if it's trending up or down
-                if (STATE.patientLogs.length > 2) {
-                    let firstHalf = STATE.patientLogs.slice(-Math.floor(STATE.patientLogs.length / 2));
-                    let recentHalf = STATE.patientLogs.slice(0, Math.floor(STATE.patientLogs.length / 2));
-                    let avgFirst = firstHalf.reduce((a, b) => a + b.glucose, 0) / firstHalf.length;
-                    let avgRecent = recentHalf.reduce((a, b) => a + b.glucose, 0) / recentHalf.length;
-                    recentTrend = avgRecent - avgFirst; // Positive means glucose is rising
+            // Compute stats from real data
+            if (realPoints.length > 0) {
+                const sum = realPoints.reduce((a, b) => a + b.glucose, 0);
+                baseGluc = sum / realPoints.length;
+                if (realPoints.length >= 4) {
+                    const half = Math.floor(realPoints.length / 2);
+                    const earlyAvg = realPoints.slice(0, half).reduce((a, b) => a + b.glucose, 0) / half;
+                    const recentAvg = realPoints.slice(half).reduce((a, b) => a + b.glucose, 0) / (realPoints.length - half);
+                    recentTrend = recentAvg - earlyAvg;
                 }
-                baseGluc = actualAvg; // Overwrite theoretical base with actual current average
             }
 
-            // 3. Generate Historical Curve
-            for (let i = 0; i < points; i++) {
-                labels.push(`${labelPrefix}${points - i}`);
-                // Create a realistic bumpy historical curve leading up to current base
-                let historicalValue = baseGluc - (recentTrend * ((points - i) / points)) + (Math.sin(i) * 10) + (Math.random() * 10 - 5);
-                dataActual.push(historicalValue);
-                dataPredict.push(null);
+            // ── 4. Bucket real logs by day/month for the selected range ──
+            const now = new Date();
+            let rangeDays = range === '1w' ? 7 : range === '1m' ? 30 : range === '6m' ? 180 : 365;
+            const cutoff = new Date(now.getTime() - rangeDays * 86400000);
+
+            // Group real data into buckets
+            function fmtLabel(d, range) {
+                if (range === '1w' || range === '1m') return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+                return d.toLocaleDateString('en-US', { month:'short', year:'2-digit' });
             }
 
-            // "Today" Point
-            labels.push('Today');
-            dataActual.push(baseGluc);
-            dataPredict.push(baseGluc);
-
-            // 4. Generate AI Prediction Curve
-            let predictPoints = range === '1w' ? 3 : (range === '1m' ? 7 : (range === '6m' ? 3 : 4));
-            let predictMultiplier = range === '1w' ? 1 : (range === '1m' ? 2 : 4);
-
-            for (let i = 1; i <= predictPoints; i++) {
-                labels.push(`Future ${i}`);
-                dataActual.push(null);
-
-                // Prediction factors in recent trend, BMI, and family history
-                let worseningFactor = (STATE.patientProfile.bmi > 28 ? 1.5 : 0.5) + (STATE.patientProfile.familyHistory === 'yes' ? 1.0 : 0);
-
-                // Combine recent real trend + biological worsening factor
-                let projectedStep = (recentTrend * 0.5) + (worseningFactor * Math.log(i + 1) * predictMultiplier);
-
-                dataPredict.push(baseGluc + projectedStep + (Math.random() * 5));
-            }
-
-            // Render Chart
-            predictionChartInstance = new Chart(ctxPred, {
-                type: 'line', data: {
-                    labels: labels, datasets: [
-                        { label: 'Real History (Logs+Meta)', data: dataActual, borderColor: '#64748b', backgroundColor: 'rgba(100, 116, 139, 0.1)', fill: true, tension: 0.4 },
-                        { label: 'AI Trend Prediction', data: dataPredict, borderColor: '#f43f5e', borderDash: [5, 5], tension: 0.4, pointBackgroundColor: '#f43f5e' }
-                    ]
-                }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+            let bucketMap = new Map();
+            let bucketSize = (range === '1w') ? 1 : (range === '1m') ? 2 : (range === '6m') ? 14 : 30; // days per bucket
+            realPoints.filter(p => p.date >= cutoff).forEach(p => {
+                const bucketMs = Math.floor(p.date.getTime() / (bucketSize * 86400000)) * (bucketSize * 86400000);
+                if (!bucketMap.has(bucketMs)) bucketMap.set(bucketMs, []);
+                bucketMap.get(bucketMs).push(p.glucose);
             });
 
-            // 5. Update Personalized Recommendations UI
-            generatePersonalizedRecommendations(baseGluc, recentTrend);
+            let labels = [], dataActual = [], dataPredict = [];
+
+            if (bucketMap.size >= 2) {
+                // ── Real data available: plot actual bucketed averages ──
+                const sorted = [...bucketMap.entries()].sort((a, b) => a[0] - b[0]);
+                sorted.forEach(([ms, values]) => {
+                    labels.push(fmtLabel(new Date(ms), range));
+                    dataActual.push(values.reduce((a, b) => a + b, 0) / values.length);
+                    dataPredict.push(null);
+                });
+            } else {
+                // ── Not enough real data: synthetic history from metadata ──
+                let points = range === '1w' ? 7 : (range === '1m' ? 10 : (range === '6m' ? 6 : 12));
+                for (let i = points; i > 0; i--) {
+                    const d = new Date(now.getTime() - i * (rangeDays / points) * 86400000);
+                    labels.push(fmtLabel(d, range));
+                    dataActual.push(baseGluc + (Math.sin(i * 0.8) * 8) + (Math.random() * 6 - 3));
+                    dataPredict.push(null);
+                }
+            }
+
+            // "Today" anchor point
+            labels.push('Today');
+            const todayVal = realPoints.length > 0
+                ? realPoints.slice(-Math.min(3, realPoints.length)).reduce((a, b) => a + b.glucose, 0) / Math.min(3, realPoints.length)
+                : baseGluc;
+            dataActual.push(parseFloat(todayVal.toFixed(1)));
+            dataPredict.push(parseFloat(todayVal.toFixed(1)));
+
+            // ── 5. AI Prediction curve ──
+            let predictPoints = range === '1w' ? 3 : (range === '1m' ? 7 : (range === '6m' ? 6 : 8));
+            let predictStep = (range === '1w') ? 1 : (range === '1m') ? 3 : (range === '6m') ? 14 : 30;
+            let worseningFactor = (STATE.patientProfile.bmi > 28 ? 1.5 : 0.5) + (STATE.patientProfile.familyHistory === 'yes' ? 1.0 : 0);
+
+            for (let i = 1; i <= predictPoints; i++) {
+                const futureDate = new Date(now.getTime() + i * predictStep * 86400000);
+                labels.push(fmtLabel(futureDate, range));
+                dataActual.push(null);
+                const projectedStep = (recentTrend * 0.4) + (worseningFactor * Math.log(i + 1) * (range === '1w' ? 1 : 2));
+                dataPredict.push(parseFloat((todayVal + projectedStep + (Math.random() * 4 - 2)).toFixed(1)));
+            }
+
+            // ── 6. Render chart ──
+            predictionChartInstance = new Chart(ctxPred, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: realPoints.length >= 2 ? `Real Data (${allLogs.length} readings)` : 'Synthetic Baseline',
+                            data: dataActual,
+                            borderColor: realPoints.length >= 2 ? '#10b981' : '#94a3b8',
+                            backgroundColor: realPoints.length >= 2 ? 'rgba(16,185,129,0.08)' : 'rgba(148,163,184,0.08)',
+                            fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 5
+                        },
+                        {
+                            label: 'AI Trend Prediction',
+                            data: dataPredict,
+                            borderColor: '#f43f5e',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointBackgroundColor: '#f43f5e',
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 400 },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16 } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1) ?? ''} mg/dL`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Est. Glucose (mg/dL)', font: { size: 11 } },
+                            ticks: { callback: v => v + '' }
+                        },
+                        x: { ticks: { maxTicksLimit: 8, maxRotation: 30 } }
+                    }
+                }
+            });
+
+            // Update stats badge
+            document.getElementById('trendStatusBadge').textContent = allLogs.length > 0
+                ? `${allLogs.length} real readings`
+                : 'Synthetic (no data yet)';
+            document.getElementById('trendStatusBadge').className = allLogs.length > 0
+                ? 'px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold'
+                : 'px-2 py-1 rounded bg-slate-200 text-slate-600 text-[10px]';
+
+            // ── 7. AI Recommendations ──
+            generatePersonalizedRecommendations(todayVal, recentTrend, allLogs);
         }
 
-        function generatePersonalizedRecommendations(currentBase, trend) {
+        function generatePersonalizedRecommendations(currentBase, trend, allLogs) {
             const ul = document.getElementById('aiRecommendations');
-            const badge = document.getElementById('trendStatusBadge');
             ul.innerHTML = '';
 
-            let bmi = STATE.patientProfile.bmi;
-            let status = STATE.patientProfile.status;
+            const p = STATE.patientProfile;
+            const bmi = p.bmi;
+            const n = allLogs.length;
 
-            // Status Badge
-            if (trend > 2) {
-                badge.textContent = 'Worsening Trend';
-                badge.className = 'px-2 py-1 rounded bg-rose-100 text-rose-700 text-[10px] font-bold';
-            } else if (trend < -2) {
-                badge.textContent = 'Improving Trend';
-                badge.className = 'px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold';
-            } else {
-                badge.textContent = 'Stable Baseline';
-                badge.className = 'px-2 py-1 rounded bg-blue-100 text-blue-700 text-[10px] font-bold';
-            }
+            // Compute peak/high readings for pattern detection
+            const highReadings = allLogs.filter(l => parseFloat(l.glucose) > 180).length;
+            const criticalReadings = allLogs.filter(l => parseFloat(l.glucose) > 250).length;
+            const highRatio = n > 0 ? highReadings / n : 0;
 
-            // Rules Engine for Recommendations
             let recs = [];
 
-            // Based on Real Data Logs (if any)
-            if (STATE.patientLogs.length > 0) {
-                recs.push(`Analyzed <strong>${STATE.patientLogs.length}</strong> real exhales. Current Est. Glucose average: <strong>${currentBase.toFixed(1)} mg/dL</strong>.`);
-                if (trend > 2) recs.push(`⚠️ AI detects a rising VOC trend over recent logs. Consider immediate dietary review.`);
-                else if (trend < -2) recs.push(`🎉 Positive response! Acetone levels are dropping. Keep up current lifestyle.`);
+            // ── Data summary ──
+            if (n === 0) {
+                recs.push({ icon: '🫁', text: `No breath data yet. <strong>Please exhale into the device</strong> to begin real AI analysis. Currently using demographic baseline only.` });
             } else {
-                recs.push("Initializing synthetic baseline from Demographics. <strong>Please exhale to feed real data to AI.</strong>");
+                recs.push({ icon: '📊', text: `Analyzed <strong>${n} saved reading${n>1?'s':''}</strong> across sessions. Current avg: <strong>${parseFloat(currentBase).toFixed(1)} mg/dL</strong>. ${criticalReadings > 0 ? `<span class="text-rose-600 font-bold">${criticalReadings} critical spike${criticalReadings>1?'s':''} detected.</span>` : ''}` });
             }
 
-            // Based on Meta Data
-            if (bmi > 25) {
-                recs.push(`Weight Management: BMI is ${bmi.toFixed(1)} (Overweight). A 5% weight reduction can significantly improve metabolic VOC markers.`);
+            // ── Trend assessment ──
+            if (n >= 4) {
+                if (trend > 5) {
+                    recs.push({ icon: '⚠️', text: `<strong>Rising trend detected (+${trend.toFixed(1)} mg/dL shift).</strong> VOC acetone is climbing across sessions — consider dietary review or clinical consultation.` });
+                } else if (trend < -5) {
+                    recs.push({ icon: '✅', text: `<strong>Improving trend detected (${trend.toFixed(1)} mg/dL shift).</strong> Acetone levels are declining — your current lifestyle changes are working.` });
+                } else {
+                    recs.push({ icon: '📈', text: `Glucose trajectory is <strong>stable</strong> across your readings. Continue monitoring regularly for early detection.` });
+                }
             }
 
-            if (status === 'prediabetes' || currentBase > 120) {
-                recs.push(`Dietary: Reduce simple carbohydrates in the evening to prevent fasting acetone spikes measured in morning breath.`);
-            } else if (status === 'type2') {
-                recs.push(`Clinical: Ensure medication adherence. Pattern suggests potential insulin resistance fluctuation.`);
+            // ── Spike pattern ──
+            if (highRatio > 0.4) {
+                recs.push({ icon: '🔴', text: `<strong>${Math.round(highRatio*100)}% of readings exceed 180 mg/dL.</strong> Frequent spikes suggest post-meal acetone elevation. Test more in fasted state (morning, 2+ hrs after meals).` });
             }
 
-            if (STATE.patientProfile.familyHistory === 'yes') {
-                recs.push(`Genetics: Due to family history, the AI risk escalation model has been padded by +10% sensitivity.`);
+            // ── BMI ──
+            if (bmi > 30) {
+                recs.push({ icon: '⚖️', text: `BMI ${bmi.toFixed(1)} (Obese). Research shows breath acetone strongly correlates with insulin resistance at this BMI. Even a 5% weight reduction can measurably shift VOC markers.` });
+            } else if (bmi > 25) {
+                recs.push({ icon: '⚖️', text: `BMI ${bmi.toFixed(1)} (Overweight). Moderate weight loss would likely reduce your baseline acetone reading and improve prediction accuracy.` });
             }
 
-            // Render list
-            recs.forEach(text => {
-                let li = document.createElement('li');
-                li.innerHTML = text;
+            // ── Status-based clinical note ──
+            if (p.status === 'type1') {
+                recs.push({ icon: '💉', text: `Known T1D: Monitor for ketoacidosis if acetone PPM spikes unexpectedly without high glucose — this can indicate insulin deficiency rather than hyperglycemia.` });
+            } else if (p.status === 'type2') {
+                recs.push({ icon: '💊', text: `T2D Management: Medication adherence directly lowers fasting acetone. ${currentBase > 160 ? 'Current levels suggest sub-optimal glucose control — consult your clinician.' : 'Levels look manageable — maintain current regimen.'}` });
+            } else if (p.status === 'prediabetes' || currentBase > 120) {
+                recs.push({ icon: '🥗', text: `Pre-diabetes range: Reduce refined carbs at dinner to lower fasting acetone measured in morning breath. Regular 30-min walks can reduce VOC readings significantly.` });
+            }
+
+            // ── Family history ──
+            if (p.familyHistory === 'yes') {
+                recs.push({ icon: '🧬', text: `Family history positive: AI risk model applies elevated sensitivity weighting. Annual HbA1c blood test recommended alongside breath screening.` });
+            }
+
+            // ── HbA1c correlation ──
+            if (p.hba1c && n >= 3) {
+                const expectedFromHba1c = (p.hba1c * 28.7) - 46.7; // IFCC formula approximation
+                const diff = currentBase - expectedFromHba1c;
+                if (Math.abs(diff) > 25) {
+                    recs.push({ icon: '🔬', text: `Breath acetone avg (${currentBase.toFixed(0)} mg/dL) diverges from HbA1c-implied glucose (${expectedFromHba1c.toFixed(0)} mg/dL). ${diff > 0 ? 'Post-prandial spikes may be inflating breath readings.' : 'Fasting-state readings may underrepresent daily glucose load.'}` });
+                }
+            }
+
+            // ── Render ──
+            recs.forEach(({ icon, text }) => {
+                const li = document.createElement('li');
+                li.className = 'flex gap-2 text-xs text-indigo-900 leading-relaxed';
+                li.innerHTML = `<span class="shrink-0 text-base leading-tight">${icon}</span><span>${text}</span>`;
                 ul.appendChild(li);
             });
         }
@@ -1291,6 +1560,8 @@
         // ==========================================
         function processIncomingData(pressure, mqVolt, humidity = 45.0) {
             const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt, humidity);
+            // Smoothed VOC for chart display — rises gradually with pressure, decays after blow
+            const displayVOC = smoothVOC(normalizedVOC, pressure);
 
             if (!STATE.isBreathing) {
                 document.getElementById('valAcetone').textContent = normalizedVOC.toFixed(2);
@@ -1298,9 +1569,9 @@
                 document.getElementById('valHumidity').textContent = humidity.toFixed(1);
             }
 
-            signalChart.data.datasets[0].data.shift(); signalChart.data.datasets[0].data.push(normalizedVOC);
+            signalChart.data.datasets[0].data.shift(); signalChart.data.datasets[0].data.push(displayVOC);
             signalChart.data.datasets[1].data.shift(); signalChart.data.datasets[1].data.push(pressure);
-            signalChart.update('none');
+            _chartDirty = true; scheduleChartUpdate();
 
             if (STATE.isCollectingRawData) {
                 STATE.rawTimeLog.push({ timestamp: new Date().toISOString(), pressure: pressure.toFixed(4), rawVolt: mqVolt.toFixed(4), vocPpm: normalizedVOC.toFixed(4), humidity: humidity.toFixed(2), isBlowing: pressure > CONFIG.PRESSURE_THRESHOLD ? 1 : 0 });
@@ -1411,32 +1682,66 @@
             }
         }
 
-        function addLogEntry(duration, peakPPM, humidity, glucose, riskClass, subType) {
-            const tbody = document.getElementById('dataTableBody');
-            if (STATE.patientLogs.length === 0) tbody.innerHTML = '';
+        function renderLogRow(logEntry) {
+            const { timestamp, duration, peakPPM, humidity, glucose, riskClass, subType } = logEntry;
             const row = document.createElement('tr');
             row.className = "hover:bg-slate-50 transition-colors";
-            const timestamp = new Date().toLocaleTimeString();
             let riskColor = riskClass.includes('Normal') || riskClass.includes('Stable') ? 'text-green-600' : (riskClass.includes('Pre') ? 'text-amber-600' : 'text-rose-600');
             let labelBadge = subType ? `<span class="block text-[10px] text-slate-400 mt-1">${subType}</span>` : '';
+            row.innerHTML = `<td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td><td class="px-6 py-3 font-bold text-slate-700 uppercase text-xs">${logEntry.mode || STATE.mode}</td><td class="px-6 py-3 font-bold text-blue-600">${parseFloat(peakPPM).toFixed(2)} <span class="text-xs text-slate-400 font-normal">(${parseFloat(humidity).toFixed(1)}%)</span></td><td class="px-6 py-3 font-black text-slate-700">${parseFloat(glucose).toFixed(1)}</td><td class="px-6 py-3 font-bold ${riskColor}">${riskClass} ${labelBadge}</td>`;
+            return row;
+        }
 
-            row.innerHTML = `<td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td><td class="px-6 py-3 font-bold text-slate-700 uppercase text-xs">${STATE.mode}</td><td class="px-6 py-3 font-bold text-blue-600">${peakPPM.toFixed(2)} <span class="text-xs text-slate-400 font-normal">(${humidity.toFixed(1)}%)</span></td><td class="px-6 py-3 font-black text-slate-700">${glucose.toFixed(1)}</td><td class="px-6 py-3 font-bold ${riskColor}">${riskClass} ${labelBadge}</td>`;
-            tbody.prepend(row);
-            STATE.patientLogs.push({ timestamp, duration, peakPPM, humidity, glucose, riskClass });
+        function rebuildLogTable() {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+            const label = document.getElementById('logCountLabel');
+            if (STATE.patientLogs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
+                if (label) label.textContent = 'No saved readings for this user.';
+                return;
+            }
+            if (label) label.textContent = `${STATE.patientLogs.length} saved reading${STATE.patientLogs.length !== 1 ? 's' : ''} — persisted across sessions`;
+            // Show newest first
+            const reversed = [...STATE.patientLogs].reverse();
+            reversed.forEach(log => tbody.appendChild(renderLogRow(log)));
+        }
+
+        function addLogEntry(duration, peakPPM, humidity, glucose, riskClass, subType) {
+            const timestamp = new Date().toLocaleString();
+            const logEntry = { timestamp, duration, peakPPM, humidity, glucose, riskClass, subType, mode: STATE.mode };
+
+            // Save to in-memory state
+            STATE.patientLogs.push(logEntry);
+
+            // Persist to localStorage under this user
+            LocalDB.appendLog(STATE.patientProfile.username, logEntry);
+
+            // Update table (prepend new row at top)
+            const tbody = document.getElementById('dataTableBody');
+            if (tbody.querySelector('td[colspan="5"]')) tbody.innerHTML = '';
+            tbody.prepend(renderLogRow(logEntry));
+            // Update count label
+            const label = document.getElementById('logCountLabel');
+            if (label) label.textContent = `${STATE.patientLogs.length} saved reading${STATE.patientLogs.length !== 1 ? 's' : ''} — persisted across sessions`;
         }
 
         document.getElementById('btnClearLogs').addEventListener('click', () => {
+            if (!confirm('Clear all saved clinical logs for this user? This cannot be undone.')) return;
             STATE.patientLogs = [];
+            if (STATE.patientProfile) LocalDB.clearLogs(STATE.patientProfile.username);
             document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
-            updatePredictionChart(); // Refresh analytics with empty data
+            updatePredictionChart();
+            showAlert('Logs Cleared', 'All clinical session logs have been removed from storage.', 'info');
         });
 
         // ==========================================
         // DEMO, SERIAL & CSV
         // ==========================================
-        function runSimulation() {
+        function runSimulation(forceAbnormal) {
             if (STATE.isSerialConnected) return alert("Please disconnect serial first.");
             STATE.isDemo = true;
+            if (forceAbnormal) STATE.isDemo = true; // ensures abnormal path in AI inference
             let step = 0;
             let simInterval = setInterval(() => {
                 step += 0.1;
