@@ -464,7 +464,7 @@
                         </button>
                     </div>
                     <div id="dashboardPanels" class="flex flex-col md:flex-row gap-6 shrink-0 transition-all duration-300 overflow-hidden" style="max-height:600px; opacity:1;">
-                        <div class="glass-panel md:w-1/3 p-5 flex flex-col relative overflow-hidden min-h-[220px]">
+                        <div class="glass-panel md:w-2/5 p-5 flex flex-col relative overflow-hidden min-h-[220px]">
                             <div class="absolute -right-4 -top-4 opacity-5 text-emerald-600 text-9xl"><i
                                     class="fa-solid fa-droplet"></i></div>
                             <div class="flex justify-between items-start mb-3 z-10">
@@ -540,16 +540,18 @@
                                 </div>
 
                                 <div
-                                    class="flex-1 min-w-[120px] bg-cyan-50/50 border border-cyan-100 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
-                                    <i
-                                        class="fa-solid fa-droplet absolute -right-2 -bottom-2 text-5xl text-cyan-100 opacity-50"></i>
-                                    <div>
-                                        <div class="flex items-center gap-2 text-cyan-800 font-bold mb-1">Humidity</div>
-                                        <div class="text-[10px] text-slate-500">Breath Moisture</div>
-                                    </div>
-                                    <div class="text-right z-10 mt-2">
-                                        <span class="text-3xl font-black text-cyan-600" id="valHumidity">0.0</span>
-                                        <span class="text-xs text-cyan-400 font-bold">%RH</span>
+                                    class="flex-1 min-w-[150px] bg-cyan-50/50 border border-cyan-100 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
+                                    <i class="fa-solid fa-droplet absolute -right-2 -bottom-2 text-5xl text-cyan-100 opacity-50"></i>
+                                    <div class="text-cyan-800 font-bold mb-3">Humidity & Temp</div>
+                                    <div class="flex items-end justify-between z-10">
+                                        <div class="text-left">
+                                            <div class="text-[10px] text-cyan-400 font-bold mb-0.5">°C</div>
+                                            <span class="text-xl font-black text-cyan-500" id="valTemperature">--.-</span>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-[10px] text-cyan-400 font-bold mb-0.5">%RH</div>
+                                            <span class="text-3xl font-black text-cyan-600" id="valHumidity">0.0</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -698,7 +700,7 @@
                                     <tr>
                                         <th class="px-6 py-4 border-b">Date / Time</th>
                                         <th class="px-6 py-4 border-b">Mode</th>
-                                        <th class="px-6 py-4 border-b">Peak VOC / Hum.</th>
+                                        <th class="px-6 py-4 border-b">Peak VOC / Hum. / Temp.</th>
                                         <th class="px-6 py-4 border-b">Est. Glucose</th>
                                         <th class="px-6 py-4 border-b">AI Diagnostic</th>
                                     </tr>
@@ -1491,18 +1493,20 @@
         // 1. Convert the message back into a JavaScript Object
         const data = JSON.parse(message.payloadString);
 
-        // 2. Extract sensor values (ESP32 sends: {status, pressure, volt, humidity})
-        const pressure = parseFloat(data.pressure) || 0;
-        const volt     = parseFloat(data.volt)     || 0;
-        const humidity = parseFloat(data.humidity) || 45.0;
+        // 2. Extract sensor values (ESP32 sends: {status, pressure, volt, humidity, temperature})
+        const pressure    = parseFloat(data.pressure)    || 0;
+        const volt        = parseFloat(data.volt)        || 0;
+        const humidity    = parseFloat(data.humidity)    || 45.0;
+        const temperature = parseFloat(data.temperature) || 25.0;
 
         // 3. Immediately update the raw sensor display elements (correct IDs)
-        document.getElementById('valPressure').textContent = pressure.toFixed(2);
-        document.getElementById('valRawVolt').textContent  = volt.toFixed(3);
-        document.getElementById('valHumidity').textContent = humidity.toFixed(1);
+        document.getElementById('valPressure').textContent    = pressure.toFixed(2);
+        document.getElementById('valRawVolt').textContent     = volt.toFixed(3);
+        document.getElementById('valHumidity').textContent    = humidity.toFixed(1);
+        document.getElementById('valTemperature').textContent = temperature.toFixed(1);
 
         // 4. Pipe into the main AI processing pipeline (same as serial)
-        processIncomingData(pressure, volt, humidity);
+        processIncomingData(pressure, volt, humidity, temperature);
 
     } catch (e) {
         console.error("MQTT: Expected JSON but got something else:", message.payloadString, e);
@@ -1558,15 +1562,15 @@
         // ==========================================
         // DATA PROCESSING & LOGGING (Connecting real data to Predict)
         // ==========================================
-        function processIncomingData(pressure, mqVolt, humidity = 45.0) {
-            const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt, humidity);
-            // Smoothed VOC for chart display — rises gradually with pressure, decays after blow
+        function processIncomingData(pressure, mqVolt, humidity = 45.0, temperature = 25.0) {
+            const normalizedVOC = calculateEstimatedPPM(pressure, mqVolt, humidity, temperature);
             const displayVOC = smoothVOC(normalizedVOC, pressure);
 
             if (!STATE.isBreathing) {
                 document.getElementById('valAcetone').textContent = normalizedVOC.toFixed(2);
                 document.getElementById('valPressure').textContent = pressure.toFixed(2);
                 document.getElementById('valHumidity').textContent = humidity.toFixed(1);
+                document.getElementById('valTemperature').textContent = temperature.toFixed(1);
             }
 
             signalChart.data.datasets[0].data.shift(); signalChart.data.datasets[0].data.push(displayVOC);
@@ -1574,7 +1578,7 @@
             _chartDirty = true; scheduleChartUpdate();
 
             if (STATE.isCollectingRawData) {
-                STATE.rawTimeLog.push({ timestamp: new Date().toISOString(), pressure: pressure.toFixed(4), rawVolt: mqVolt.toFixed(4), vocPpm: normalizedVOC.toFixed(4), humidity: humidity.toFixed(2), isBlowing: pressure > CONFIG.PRESSURE_THRESHOLD ? 1 : 0 });
+                STATE.rawTimeLog.push({ timestamp: new Date().toISOString(), pressure: pressure.toFixed(4), rawVolt: mqVolt.toFixed(4), vocPpm: normalizedVOC.toFixed(4), humidity: humidity.toFixed(2), temperature: temperature.toFixed(1), isBlowing: pressure > CONFIG.PRESSURE_THRESHOLD ? 1 : 0 });
                 document.getElementById('csvCount').textContent = STATE.rawTimeLog.length;
             }
 
@@ -1582,25 +1586,27 @@
                 if (!STATE.isBreathing) {
                     STATE.isBreathing = true;
                     STATE.breathStartTime = Date.now();
-                    STATE.currentExhale = { maxPpm: 0, maxPress: 0, humSum: 0, humCount: 0 };
+                    STATE.currentExhale = { maxPpm: 0, maxPress: 0, humSum: 0, humCount: 0, tempSum: 0 };
                     document.getElementById('valRisk').innerHTML = '<i class="fa-solid fa-wind animate-pulse mr-2"></i> Analyzing...';
                     document.getElementById('valRisk').className = 'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-600';
                 }
                 if (normalizedVOC > STATE.currentExhale.maxPpm) STATE.currentExhale.maxPpm = normalizedVOC;
                 STATE.currentExhale.humSum += humidity;
+                STATE.currentExhale.tempSum += temperature;
                 STATE.currentExhale.humCount++;
             } else if (STATE.isBreathing) {
                 const duration = (Date.now() - STATE.breathStartTime) / 1000;
                 STATE.isBreathing = false;
 
                 if (duration >= CONFIG.MIN_BREATH_DURATION) {
-                    const avgHum = STATE.currentExhale.humSum / STATE.currentExhale.humCount;
-                    const aiResult = runHybridAIInference(STATE.currentExhale.maxPpm, avgHum);
+                    const avgHum  = STATE.currentExhale.humSum  / STATE.currentExhale.humCount;
+                    const avgTemp = STATE.currentExhale.tempSum / STATE.currentExhale.humCount;
+                    const aiResult = runHybridAIInference(STATE.currentExhale.maxPpm, avgHum, avgTemp);
 
                     updateDiagnosticUI(aiResult.glucose, aiResult.riskClass, aiResult.subType, aiResult.confidence);
 
                     // SAVE LOG AND TRIGGER PREDICTION UPDATE
-                    addLogEntry(duration, STATE.currentExhale.maxPpm, avgHum, aiResult.glucose, aiResult.riskClass, aiResult.subType);
+                    addLogEntry(duration, STATE.currentExhale.maxPpm, avgHum, avgTemp, aiResult.glucose, aiResult.riskClass, aiResult.subType);
                     updatePredictionChart(); // <--- Update Analytics Tab with fresh Real Data
 
                     if (aiResult.glucose > 200) showAlert('Critical Glucose Threshold', `Est. Glucose at ${aiResult.glucose.toFixed(1)} mg/dL. Immediate check required.`, 'danger');
@@ -1613,22 +1619,39 @@
             }
         }
 
-        function calculateEstimatedPPM(pressure, mqVolt, humidity) {
+        function calculateEstimatedPPM(pressure, mqVolt, humidity, temperature = 25.0) {
             let displayVolt = mqVolt > 0 ? mqVolt : (0.45 + (Math.random() * 0.05));
             document.getElementById('valRawVolt').textContent = displayVolt.toFixed(3);
             if (pressure <= CONFIG.PRESSURE_THRESHOLD || displayVolt <= 0) return 0.05 + (Math.random() * 0.1);
 
             let ratio = (5.0 - displayVolt) / displayVolt;
             let finalPPM = 4.5 * Math.pow(ratio, -0.7);
-            if (humidity > 50) finalPPM *= (1 - ((humidity - 50) * 0.005));
+
+            // Humidity compensation — full range, not just above 50%
+            // MQ sensors over-read in high humidity; correction steepens above 60% RH
+            const humDelta = humidity - 40;
+            const humFactor = humDelta <= 10
+                ? 1 - (humDelta * 0.003)                        // 40–50% RH: gentle -0.3%/RH
+                : 1 - (0.03 + (humDelta - 10) * 0.006);        // >50% RH: steeper -0.6%/RH
+            finalPPM *= Math.max(humFactor, 0.5);
+
+            // Temperature compensation — MQ sensitivity drops in cold, inflates in heat
+            // Reference point is 20°C per MQ datasheet typical curve
+            const tempDelta = temperature - 20;
+            const tempFactor = 1 - (tempDelta * 0.008);        // ~0.8% correction per °C
+            finalPPM *= Math.max(tempFactor, 0.6);
+
             if (STATE.isDemo) finalPPM = 5.0 + (pressure * 0.5) + (Math.random() * 1.5);
             return Math.max(0, Math.min(finalPPM, 1000));
         }
 
-        function runHybridAIInference(peakAcetone, avgHumidity) {
+        function runHybridAIInference(peakAcetone, avgHumidity, avgTemperature = 25.0) {
     let ageFactor = Math.max(0, (STATE.patientProfile.age - 40) * 0.01);
     let genderFactor = STATE.patientProfile.gender === 'male' ? 0.05 : 0.02;
+    // Humidity offset — higher humidity slightly inflates apparent glucose, compensate it back
     let humidityOffset = (avgHumidity - 40) * 0.02;
+    // Temperature offset — above 30°C sensor runs warm, slightly deflate estimate
+    let tempOffset = (avgTemperature - 25) * 0.15;
 
     let bmiFactor = STATE.patientProfile.bmi > 25 ? (STATE.patientProfile.bmi - 25) * 0.03 : 0;
     let familyFactor = STATE.patientProfile.familyHistory === 'yes' ? 0.1 : 0;
@@ -1636,7 +1659,7 @@
 
     let estimatedGlucose = (32.79 * peakAcetone) + 47.41;
 
-    estimatedGlucose = estimatedGlucose * (1 + ageFactor + genderFactor + bmiFactor + familyFactor + hba1cFactor) + humidityOffset;
+    estimatedGlucose = estimatedGlucose * (1 + ageFactor + genderFactor + bmiFactor + familyFactor + hba1cFactor) + humidityOffset - tempOffset;
 
     if (STATE.isDemo) estimatedGlucose = 240 + (peakAcetone * 5) + (Math.random() * 20);
     if (estimatedGlucose < 70) estimatedGlucose = 70 + (Math.random() * 10);
@@ -1683,12 +1706,13 @@
         }
 
         function renderLogRow(logEntry) {
-            const { timestamp, duration, peakPPM, humidity, glucose, riskClass, subType } = logEntry;
+            const { timestamp, duration, peakPPM, humidity, temperature, glucose, riskClass, subType } = logEntry;
             const row = document.createElement('tr');
             row.className = "hover:bg-slate-50 transition-colors";
             let riskColor = riskClass.includes('Normal') || riskClass.includes('Stable') ? 'text-green-600' : (riskClass.includes('Pre') ? 'text-amber-600' : 'text-rose-600');
             let labelBadge = subType ? `<span class="block text-[10px] text-slate-400 mt-1">${subType}</span>` : '';
-            row.innerHTML = `<td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td><td class="px-6 py-3 font-bold text-slate-700 uppercase text-xs">${logEntry.mode || STATE.mode}</td><td class="px-6 py-3 font-bold text-blue-600">${parseFloat(peakPPM).toFixed(2)} <span class="text-xs text-slate-400 font-normal">(${parseFloat(humidity).toFixed(1)}%)</span></td><td class="px-6 py-3 font-black text-slate-700">${parseFloat(glucose).toFixed(1)}</td><td class="px-6 py-3 font-bold ${riskColor}">${riskClass} ${labelBadge}</td>`;
+            const tempStr = temperature != null ? ` <span class="text-xs text-slate-400 font-normal">${parseFloat(temperature).toFixed(1)}°C</span>` : '';
+            row.innerHTML = `<td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td><td class="px-6 py-3 font-bold text-slate-700 uppercase text-xs">${logEntry.mode || STATE.mode}</td><td class="px-6 py-3 font-bold text-blue-600">${parseFloat(peakPPM).toFixed(2)} <span class="text-xs text-slate-400 font-normal">(${parseFloat(humidity).toFixed(1)}%RH)</span>${tempStr}</td><td class="px-6 py-3 font-black text-slate-700">${parseFloat(glucose).toFixed(1)}</td><td class="px-6 py-3 font-bold ${riskColor}">${riskClass} ${labelBadge}</td>`;
             return row;
         }
 
@@ -1707,9 +1731,9 @@
             reversed.forEach(log => tbody.appendChild(renderLogRow(log)));
         }
 
-        function addLogEntry(duration, peakPPM, humidity, glucose, riskClass, subType) {
+        function addLogEntry(duration, peakPPM, humidity, temperature, glucose, riskClass, subType) {
             const timestamp = new Date().toLocaleString();
-            const logEntry = { timestamp, duration, peakPPM, humidity, glucose, riskClass, subType, mode: STATE.mode };
+            const logEntry = { timestamp, duration, peakPPM, humidity, temperature, glucose, riskClass, subType, mode: STATE.mode };
 
             // Save to in-memory state
             STATE.patientLogs.push(logEntry);
@@ -1793,11 +1817,12 @@
                                     const pressure = parseFloat(json.pressure) || 0;
                                     const volt = parseFloat(json.volt) || 0;
                                     const humidity = parseFloat(json.humidity) || 45.0;
-                                    // Immediately update raw volt display for instant feedback
+                                    const temperature = parseFloat(json.temperature) || 25.0;
                                     document.getElementById('valRawVolt').textContent = volt.toFixed(3);
                                     document.getElementById('valPressure').textContent = pressure.toFixed(2);
                                     document.getElementById('valHumidity').textContent = humidity.toFixed(1);
-                                    processIncomingData(pressure, volt, humidity);
+                                    document.getElementById('valTemperature').textContent = temperature.toFixed(1);
+                                    processIncomingData(pressure, volt, humidity, temperature);
                                     continue;
                                 }
                             } catch(e) { /* not JSON, try legacy format */ }
@@ -1839,8 +1864,8 @@
 
         document.getElementById('btnExportCSV').addEventListener('click', () => {
             if (STATE.rawTimeLog.length === 0) return alert("No data recorded yet.");
-            let csvContent = "Timestamp,Pressure_mmHg,Raw_Voltage_V,VOC_PPM,Humidity_RH,Is_Blowing\n";
-            STATE.rawTimeLog.forEach(row => { csvContent += `${row.timestamp},${row.pressure},${row.rawVolt},${row.vocPpm},${row.humidity},${row.isBlowing}\n`; });
+            let csvContent = "Timestamp,Pressure_mmHg,Raw_Voltage_V,VOC_PPM,Humidity_RH,Temperature_C,Is_Blowing\n";
+            STATE.rawTimeLog.forEach(row => { csvContent += `${row.timestamp},${row.pressure},${row.rawVolt},${row.vocPpm},${row.humidity},${row.temperature || ''},${row.isBlowing}\n`; });
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
             link.download = `sbd_dataset_${new Date().getTime()}.csv`; link.click();
