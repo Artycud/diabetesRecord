@@ -105,13 +105,20 @@
             padding-top: 0 !important;
             padding-bottom: 0 !important;
             pointer-events: none;
+            user-select: none;
         }
 
         .tab-content.active {
-            max-height: 9000px;   /* large enough for any content */
+            max-height: 9000px;
             opacity: 1;
             padding-top: 1rem !important;
             padding-bottom: 1.5rem !important;
+            pointer-events: auto !important;
+            user-select: auto;
+        }
+
+        /* Ensure all interactive children inside active tab work */
+        .tab-content.active * {
             pointer-events: auto;
         }
 
@@ -821,10 +828,40 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Cross-Device Data Portability -->
+                        <div class="mt-8 border-t border-slate-200 pt-6">
+                            <h3 class="text-md font-bold text-slate-700 mb-1 flex items-center gap-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-emerald-500"></i> Cross-Device Data Portability
+                            </h3>
+                            <p class="text-xs text-slate-400 mb-5">Export your complete profile + all clinical logs as a backup file. Import on any device to restore your data instantly.</p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Export -->
+                                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+                                    <h4 class="text-sm font-bold text-emerald-800 mb-1 flex items-center gap-2"><i class="fa-solid fa-file-export"></i> Export Backup</h4>
+                                    <p class="text-xs text-emerald-700 mb-4">Downloads a <code class="bg-emerald-100 px-1 rounded">.sbd</code> backup file containing all user profiles and logs stored on this device.</p>
+                                    <button onclick="exportAllData()"
+                                        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-download"></i> Download Backup File
+                                    </button>
+                                </div>
+                                <!-- Import -->
+                                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                                    <h4 class="text-sm font-bold text-blue-800 mb-1 flex items-center gap-2"><i class="fa-solid fa-file-import"></i> Import Backup</h4>
+                                    <p class="text-xs text-blue-700 mb-3">Select a <code class="bg-blue-100 px-1 rounded">.sbd</code> backup file to restore profiles and logs. Existing data will be merged (not overwritten).</p>
+                                    <label class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer">
+                                        <i class="fa-solid fa-upload"></i> Choose Backup File
+                                        <input type="file" accept=".sbd,.json" class="hidden" onchange="importDataFile(event)">
+                                    </label>
+                                    <div id="importStatus" class="mt-3 text-xs text-blue-600 hidden"></div>
+                                </div>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-4 text-center">
+                                <i class="fa-solid fa-lock mr-1"></i> All data stays on your device — no cloud server involved. The backup file is plain JSON you can inspect or archive.
+                            </p>
+                        </div>
                     </div>
                 </div>
-
-            </main>
         </div>
     </div>
 
@@ -1113,8 +1150,95 @@
         }
 
         // ==========================================
-        // UI BINDING
+        // CROSS-DEVICE DATA PORTABILITY
         // ==========================================
+        function exportAllData() {
+            if (!STATE.patientProfile) return showAlert('Not logged in', 'Please log in first.', 'warning');
+
+            // Gather all user profiles from DB
+            let db = [];
+            try { db = JSON.parse(localStorage.getItem('sbd_db')) || []; } catch(e) {}
+
+            // Gather logs for every user in the DB
+            const logsMap = {};
+            db.forEach(u => {
+                logsMap[u.username] = LocalDB.getLogs(u.username);
+            });
+
+            const payload = {
+                version: '8.7',
+                exportedAt: new Date().toISOString(),
+                exportedBy: STATE.patientProfile.username,
+                users: db,
+                logs: logsMap
+            };
+
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sbd_backup_${STATE.patientProfile.username}_${Date.now()}.sbd`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showAlert('Backup Created', `Downloaded backup with ${db.length} profile(s) and ${Object.values(logsMap).flat().length} log entries.`, 'success');
+        }
+
+        function importDataFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const payload = JSON.parse(e.target.result);
+                    if (!payload.users || !payload.logs) throw new Error('Invalid backup format');
+
+                    let imported = 0, skipped = 0, logsAdded = 0;
+                    let db = [];
+                    try { db = JSON.parse(localStorage.getItem('sbd_db')) || []; } catch(err) {}
+
+                    payload.users.forEach(user => {
+                        const exists = db.find(u => u.username === user.username);
+                        if (!exists) {
+                            db.push(user);
+                            imported++;
+                        } else {
+                            skipped++;
+                        }
+                    });
+                    localStorage.setItem('sbd_db', JSON.stringify(db));
+
+                    // Merge logs (append only new ones by timestamp)
+                    Object.entries(payload.logs).forEach(([username, logs]) => {
+                        const existing = LocalDB.getLogs(username);
+                        const existingTs = new Set(existing.map(l => l.timestamp));
+                        const newLogs = logs.filter(l => !existingTs.has(l.timestamp));
+                        newLogs.forEach(l => LocalDB.appendLog(username, l));
+                        logsAdded += newLogs.length;
+                    });
+
+                    const statusEl = document.getElementById('importStatus');
+                    statusEl.classList.remove('hidden');
+                    statusEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Imported <strong>${imported}</strong> new profile(s), skipped <strong>${skipped}</strong> existing, added <strong>${logsAdded}</strong> log entries.`;
+
+                    // Reload current user's logs if their data was in the import
+                    if (STATE.patientProfile && payload.logs[STATE.patientProfile.username]) {
+                        STATE.patientLogs = LocalDB.getLogs(STATE.patientProfile.username);
+                        rebuildLogTable();
+                        updatePredictionChart();
+                    }
+
+                    showAlert('Import Complete', `${imported} profile(s) imported, ${logsAdded} log entries added.`, 'success');
+                } catch(err) {
+                    document.getElementById('importStatus').classList.remove('hidden');
+                    document.getElementById('importStatus').innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-500 mr-1"></i> Import failed: ${err.message}`;
+                    showAlert('Import Failed', err.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // reset input
+        }
+
+
         function toggleDashboardPanels(forceCollapse) {
             const panels = document.getElementById('dashboardPanels');
             const icon = document.getElementById('dashboardToggleIcon');
@@ -1184,9 +1308,12 @@
             const targetEl = document.getElementById(targetId);
             if (targetEl) targetEl.classList.add('active');
 
-            // Trigger analytics chart update if needed
+            // Trigger analytics chart update if needed — wait for accordion to open
             if (targetId === 'tab-predictions') {
-                setTimeout(() => updatePredictionChart(), 80);
+                setTimeout(() => {
+                    updatePredictionChart();
+                    if (predictionChartInstance) predictionChartInstance.resize();
+                }, 480);
             }
 
             // Smooth scroll to section anchor after accordion opens
@@ -1412,12 +1539,13 @@
                     dataPredict.push(null);
                 });
             } else {
-                // ── Not enough real data: synthetic history from metadata ──
+                // ── Not enough real data: stable synthetic history from metadata (seeded, no Math.random) ──
                 let points = range === '1w' ? 7 : (range === '1m' ? 10 : (range === '6m' ? 6 : 12));
                 for (let i = points; i > 0; i--) {
                     const d = new Date(now.getTime() - i * (rangeDays / points) * 86400000);
                     labels.push(fmtLabel(d, range));
-                    dataActual.push(baseGluc + (Math.sin(i * 0.8) * 8) + (Math.random() * 6 - 3));
+                    // Stable sine wave — no random, so it doesn't flicker on re-render
+                    dataActual.push(parseFloat((baseGluc + (Math.sin(i * 0.8) * 8)).toFixed(1)));
                     dataPredict.push(null);
                 }
             }
@@ -1440,7 +1568,7 @@
                 labels.push(fmtLabel(futureDate, range));
                 dataActual.push(null);
                 const projectedStep = (recentTrend * 0.4) + (worseningFactor * Math.log(i + 1) * (range === '1w' ? 1 : 2));
-                dataPredict.push(parseFloat((todayVal + projectedStep + (Math.random() * 4 - 2)).toFixed(1)));
+                dataPredict.push(parseFloat((todayVal + projectedStep).toFixed(1)));
             }
 
             // ── 6. Render chart ──
