@@ -9,6 +9,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <!-- Firebase SDK (modular via CDN compat build) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap"
@@ -229,12 +233,12 @@
 
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Username</label>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">HN or Username</label>
                     <div class="relative">
                         <i class="fa-solid fa-user absolute left-3 top-3 text-slate-400"></i>
                         <input type="text" id="loginUser"
                             class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-10 p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                            placeholder="Enter clinical ID">
+                            placeholder="e.g. HN-00123 or your username">
                     </div>
                 </div>
                 <div>
@@ -255,77 +259,99 @@
                     Secure Login
                 </button>
             </div>
-            <div class="mt-6 text-center border-t border-slate-200 pt-4">
-                <p class="text-xs text-slate-500">New patient profile? <button onclick="switchAuthView('viewRegister')"
-                        class="text-emerald-600 font-bold hover:underline">Register Meta Data</button></p>
+            <div class="mt-6 text-center border-t border-slate-200 pt-4 space-y-2">
+                <p class="text-xs text-slate-500">New here? <button onclick="switchAuthView('viewRegister')"
+                        class="text-emerald-600 font-bold hover:underline">Create an account</button></p>
+                <p class="text-xs text-slate-500">Forgot your password? <button onclick="handleForgotPassword()"
+                        class="text-blue-500 font-bold hover:underline">Reset via email</button></p>
+                <p class="text-[10px] text-slate-400">Login with your HN or username</p>
             </div>
         </div>
 
         <div id="viewRegister"
             class="auth-view glass-panel w-full max-w-2xl p-8 flex-col shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
-                <h2 class="text-xl font-bold text-slate-800"><i
-                        class="fa-solid fa-file-medical text-emerald-500 mr-2"></i> Patient Clinical Registration</h2>
-                <button onclick="switchAuthView('viewLogin')" class="text-slate-400 hover:text-slate-600"><i
-                        class="fa-solid fa-xmark text-xl"></i></button>
+            <div class="flex justify-between items-center mb-2 border-b border-slate-200 pb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-file-medical text-emerald-500 mr-2"></i> Create Account</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Takes about 30 seconds — optional fields improve AI accuracy</p>
+                </div>
+                <button onclick="switchAuthView('viewLogin')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
             </div>
 
-            <div class="grid grid-cols-2 gap-6">
-                <div class="col-span-2 md:col-span-1 space-y-4">
-                    <h3
-                        class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
-                        Authentication</h3>
+            <!-- REQUIRED FIELDS — always visible -->
+            <div class="mt-5 space-y-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Required</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Username (Patient ID)</label>
-                        <input type="text" id="regUser"
-                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Patient ID / HN <span class="text-rose-400">*</span></label>
+                        <input type="text" id="regUser" placeholder="e.g. HN-00123"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Password</label>
-                        <input type="password" id="regPass"
-                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Email <span class="text-rose-400">*</span></label>
+                        <input type="email" id="regEmail" placeholder="your@email.com"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Password <span class="text-rose-400">*</span></label>
+                        <input type="password" id="regPass" placeholder="Min. 6 characters"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Role <span class="text-rose-400">*</span></label>
+                        <select id="regRole" onchange="togglePatientFields()"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <option value="patient">Patient</option>
+                            <option value="doctor">Doctor / Clinician</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="col-span-2 md:col-span-1 space-y-4">
-                    <h3
-                        class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
-                        Demographics</h3>
-                    <div class="flex gap-4">
-                        <div class="flex-1">
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Age</label>
-                            <input type="number" id="regAge"
-                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
-                                placeholder="Years">
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Gender</label>
-                            <select id="regGender"
-                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                            </select>
-                        </div>
+                <!-- Patient-only fields — hidden for doctors -->
+                <div id="patientOnlyFields" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div class="col-span-1">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Age <span class="text-rose-400">*</span></label>
+                        <input type="number" id="regAge" placeholder="yrs"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                     </div>
-                    <div class="flex gap-4">
-                        <div class="flex-1">
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Weight (kg)</label>
-                            <input type="number" id="regWeight"
-                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Height (cm)</label>
-                            <input type="number" id="regHeight"
-                                class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm">
-                        </div>
+                    <div class="col-span-1">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Gender <span class="text-rose-400">*</span></label>
+                        <select id="regGender"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Weight (kg) <span class="text-rose-400">*</span></label>
+                        <input type="number" id="regWeight" placeholder="kg"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Height (cm) <span class="text-rose-400">*</span></label>
+                        <input type="number" id="regHeight" placeholder="cm"
+                            class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                     </div>
                 </div>
+            </div>
 
-                <div class="col-span-2 space-y-4 mt-2">
-                    <h3
-                        class="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
-                        Deep Clinical Metadata</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- OPTIONAL FIELDS — collapsed by default -->
+            <div class="mt-5 border border-slate-200 rounded-xl overflow-hidden">
+                <button type="button" onclick="toggleOptionalFields()"
+                    class="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fa-solid fa-flask text-indigo-400"></i>
+                        Clinical Metadata
+                        <span class="normal-case font-normal text-slate-400">— improves AI prediction accuracy</span>
+                    </span>
+                    <span class="flex items-center gap-2 text-xs text-slate-400">
+                        <span id="optionalFieldsHint">Optional · click to expand</span>
+                        <i id="optionalFieldsIcon" class="fa-solid fa-chevron-down text-slate-300 transition-transform duration-300"></i>
+                    </span>
+                </button>
+                <div id="optionalFields" class="overflow-hidden transition-all duration-300" style="max-height:0; opacity:0;">
+                    <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-slate-100">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">Family Diabetes History</label>
                             <select id="regFamilyHistory"
@@ -348,16 +374,20 @@
                             <label class="block text-xs font-bold text-slate-700 mb-1">Latest HbA1c (%)</label>
                             <input type="number" step="0.1" id="regHbA1c"
                                 class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
-                                placeholder="Optional (e.g. 5.5)">
+                                placeholder="e.g. 5.5">
                         </div>
                     </div>
                 </div>
             </div>
 
             <button onclick="handleRegister()"
-                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg mt-8 transition-all shadow-md">
-                <i class="fa-solid fa-database mr-2"></i> Save to SQLite & Initialize App
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg mt-6 transition-all shadow-md flex items-center justify-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Create Account & Start
             </button>
+
+            <p class="text-center text-xs text-slate-400 mt-3">
+                Already have an account? <button onclick="switchAuthView('viewLogin')" class="text-emerald-600 font-bold hover:underline">Sign in</button>
+            </p>
         </div>
     </div>
 
@@ -400,7 +430,9 @@
 
                 <button
                     class="hidden sm:flex bg-indigo-50 text-indigo-700 px-4 py-2.5 rounded-lg font-bold items-center gap-2 text-sm border border-indigo-200 cursor-default">
-                    <i class="fa-solid fa-user-check"></i> <span id="userProfileName">Logged In</span>
+                    <i class="fa-solid fa-user-check"></i>
+                    <span id="userProfileName">Logged In</span>
+                    <span id="subscriptionBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Free Plan</span>
                 </button>
 
                 <button id="btnConnect"
@@ -829,6 +861,60 @@
                             </div>
                         </div>
 
+                        <!-- Subscription -->
+                        <div class="mt-8 border-t border-slate-200 pt-6" id="subscriptionSection">
+                            <h3 class="text-md font-bold text-slate-700 mb-1 flex items-center gap-2">
+                                <i class="fa-solid fa-star text-amber-400"></i> Subscription
+                            </h3>
+                            <p class="text-xs text-slate-400 mb-5">Unlock AI Risk Warning alerts and detailed Health Reports with a Premium activation code.</p>
+
+                            <div id="subscriptionFreeUI">
+                                <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
+                                    <div class="flex items-start justify-between mb-4">
+                                        <div>
+                                            <h4 class="text-sm font-bold text-amber-800 flex items-center gap-2">
+                                                <i class="fa-solid fa-lock text-amber-500"></i> Premium Features
+                                            </h4>
+                                            <p class="text-xs text-amber-700 mt-1">Currently on Free Plan</p>
+                                        </div>
+                                        <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">FREE</span>
+                                    </div>
+                                    <ul class="text-xs text-amber-900 space-y-2 mb-5">
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-xmark text-slate-300 w-4"></i> AI Risk Warning Alerts</li>
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-xmark text-slate-300 w-4"></i> Detailed Health Report</li>
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-500 w-4"></i> Live Dashboard & Sensor Data</li>
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-500 w-4"></i> Clinical Logs (unlimited)</li>
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-500 w-4"></i> Analytics & Predictions</li>
+                                    </ul>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="subscriptionCode"
+                                            placeholder="Enter activation code"
+                                            class="flex-1 bg-white border border-amber-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none uppercase tracking-widest font-mono">
+                                        <button onclick="activateSubscription()"
+                                            class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-lg text-sm transition-colors whitespace-nowrap">
+                                            <i class="fa-solid fa-unlock mr-1"></i> Activate
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="subscriptionPremiumUI" class="hidden">
+                                <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h4 class="text-sm font-bold text-emerald-800 flex items-center gap-2">
+                                            <i class="fa-solid fa-star text-amber-400"></i> Premium Active
+                                        </h4>
+                                        <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-300">⭐ PREMIUM</span>
+                                    </div>
+                                    <ul class="text-xs text-emerald-900 space-y-2">
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-500 w-4"></i> AI Risk Warning Alerts — <span class="font-bold">Enabled</span></li>
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-500 w-4"></i> Detailed Health Report — <span class="font-bold">Enabled</span></li>
+                                        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-500 w-4"></i> All Free features included</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Cross-Device Data Portability -->
                         <div class="mt-8 border-t border-slate-200 pt-6">
                             <h3 class="text-md font-bold text-slate-700 mb-1 flex items-center gap-2">
@@ -860,8 +946,102 @@
                                 <i class="fa-solid fa-lock mr-1"></i> All data stays on your device — no cloud server involved. The backup file is plain JSON you can inspect or archive.
                             </p>
                         </div>
+
+                        <!-- Delete Account -->
+                        <div class="mt-8 border-t border-rose-100 pt-6">
+                            <h3 class="text-md font-bold text-rose-600 mb-1 flex items-center gap-2">
+                                <i class="fa-solid fa-skull text-rose-500"></i> Danger Zone
+                            </h3>
+                            <p class="text-xs text-slate-400 mb-5">Permanently delete your account, all clinical logs, and profile data. Your email will be freed and you can re-register. This cannot be undone.</p>
+                            <div class="bg-rose-50 border border-rose-200 rounded-xl p-5">
+                                <button onclick="deleteMyAccount()"
+                                    class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">
+                                    <i class="fa-solid fa-trash"></i> Delete My Account
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  DOCTOR DASHBOARD                                            -->
+    <!-- ============================================================ -->
+    <div id="doctorApp" class="hidden flex-col h-screen w-full bg-slate-50">
+        <!-- Top nav -->
+        <nav class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shrink-0 shadow-sm gap-2">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg">
+                    <i class="fa-solid fa-user-doctor"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-slate-800 leading-tight">Doctor Dashboard</h1>
+                    <p class="text-xs font-medium text-indigo-600 hidden sm:block">Patient Monitoring Portal</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg font-bold text-sm border border-indigo-200 hidden sm:block">
+                    <i class="fa-solid fa-circle-user mr-1"></i>
+                    <span id="doctorName">Doctor</span>
+                </span>
+                <button onclick="logoutDoctor()" class="text-slate-400 hover:text-rose-500 transition-colors" title="Logout">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xl"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
+
+            <!-- Search & stats bar -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">All Patients <span class="text-xs font-semibold text-indigo-500 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full ml-1">Global</span></h2>
+                    <p class="text-sm text-slate-500 mt-0.5">All registered patients across the system — click a row to expand readings</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                        <input type="text" id="doctorSearch" oninput="filterPatients()" placeholder="Search by HN or name…"
+                            class="bg-white border border-slate-300 rounded-lg pl-9 pr-4 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none w-60">
+                    </div>
+                    <button onclick="loadDoctorPatients()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow">
+                        <i class="fa-solid fa-rotate"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="doctorStats">
+                <div class="glass-panel p-4 text-center">
+                    <div class="text-2xl font-black text-slate-800" id="statTotalPatients">—</div>
+                    <div class="text-xs text-slate-500 mt-1">Total Patients</div>
+                </div>
+                <div class="glass-panel p-4 text-center">
+                    <div class="text-2xl font-black text-rose-600" id="statCritical">—</div>
+                    <div class="text-xs text-slate-500 mt-1">Critical (>250 mg/dL)</div>
+                </div>
+                <div class="glass-panel p-4 text-center">
+                    <div class="text-2xl font-black text-amber-500" id="statWarning">—</div>
+                    <div class="text-xs text-slate-500 mt-1">High Risk (>140 mg/dL)</div>
+                </div>
+                <div class="glass-panel p-4 text-center">
+                    <div class="text-2xl font-black text-emerald-600" id="statNormal">—</div>
+                    <div class="text-xs text-slate-500 mt-1">Normal Range</div>
+                </div>
+            </div>
+
+            <!-- Patient list -->
+            <div class="glass-panel overflow-hidden">
+                <div id="doctorPatientList" class="divide-y divide-slate-100">
+                    <!-- Populated by JS -->
+                    <div class="flex items-center justify-center py-16 text-slate-400 gap-3">
+                        <i class="fa-solid fa-spinner fa-spin text-2xl"></i>
+                        <span class="text-sm font-medium">Loading patients…</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -932,49 +1112,54 @@
         }
 
         // ==========================================
-        // Per-user data: profile, logs, calibration settings
+        // FIREBASE INIT
         // ==========================================
-        const LocalDB = {
-            init: function () {
-                if (!localStorage.getItem('sbd_db')) {
-                    localStorage.setItem('sbd_db', JSON.stringify([]));
-                }
+        const firebaseConfig = {
+            apiKey: "AIzaSyAOkos2kfmtlKuun_49xOBJHO4gF916zhI",
+            authDomain: "smart-breath-diabetes-detector.firebaseapp.com",
+            projectId: "smart-breath-diabetes-detector",
+            storageBucket: "smart-breath-diabetes-detector.firebasestorage.app",
+            messagingSenderId: "87851688079",
+            appId: "1:87851688079:web:dcd8771fd97ba21bf8d0fa",
+            measurementId: "G-NPJZ2L3RMB"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const fbAuth = firebase.auth();
+        const fbDb   = firebase.firestore();
+
+        // Persist session across page refreshes (Firebase handles this natively)
+        fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+        // ==========================================
+        // CLOUD DB — mirrors old LocalDB API surface
+        // ==========================================
+        const CloudDB = {
+            // Save / overwrite profile fields (never stores password — Auth handles that)
+            saveProfile: async function(uid, profileData) {
+                await fbDb.collection('users').doc(uid).set(profileData, { merge: true });
             },
-            insert: function (userData) {
-                let db = JSON.parse(localStorage.getItem('sbd_db'));
-                if (db.find(u => u.username === userData.username)) return false;
-                db.push(userData);
-                localStorage.setItem('sbd_db', JSON.stringify(db));
-                return true;
+            getProfile: async function(uid) {
+                const doc = await fbDb.collection('users').doc(uid).get();
+                return doc.exists ? doc.data() : null;
             },
-            update: function (userData) {
-                let db = JSON.parse(localStorage.getItem('sbd_db'));
-                const idx = db.findIndex(u => u.username === userData.username);
-                if (idx >= 0) { db[idx] = userData; localStorage.setItem('sbd_db', JSON.stringify(db)); }
+            getLogs: async function(uid) {
+                const snap = await fbDb.collection('users').doc(uid)
+                    .collection('logs').orderBy('createdAt', 'asc').get();
+                return snap.docs.map(d => d.data());
             },
-            select: function (username, password) {
-                let db = JSON.parse(localStorage.getItem('sbd_db'));
-                return db.find(u => u.username === username && u.password === password);
+            appendLog: async function(uid, logEntry) {
+                await fbDb.collection('users').doc(uid).collection('logs').add({
+                    ...logEntry,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
             },
-            // Clinical logs: stored per user under key sbd_logs_{username}
-            getLogs: function (username) {
-                try {
-                    return JSON.parse(localStorage.getItem('sbd_logs_' + username)) || [];
-                } catch(e) { return []; }
-            },
-            saveLogs: function (username, logs) {
-                localStorage.setItem('sbd_logs_' + username, JSON.stringify(logs));
-            },
-            appendLog: function (username, logEntry) {
-                const logs = LocalDB.getLogs(username);
-                logs.push(logEntry);
-                LocalDB.saveLogs(username, logs);
-            },
-            clearLogs: function (username) {
-                localStorage.removeItem('sbd_logs_' + username);
+            clearLogs: async function(uid) {
+                const snap = await fbDb.collection('users').doc(uid).collection('logs').get();
+                const batch = fbDb.batch();
+                snap.docs.forEach(d => batch.delete(d.ref));
+                await batch.commit();
             }
         };
-        LocalDB.init();
 
         // ==========================================
         // SYSTEM CONFIG & STATE
@@ -993,8 +1178,9 @@
             isSerialConnected: false, isBreathing: false, isDemo: false,
             mode: 'screening',
             patientProfile: null,
+            currentUID: null,
             currentExhale: { maxPpm: 0, maxPress: 0, avgHum: 0 },
-            patientLogs: [], // Saves actual blow data
+            patientLogs: [],
             isCollectingRawData: false, rawTimeLog: [], mqttClient: null, topic: ""
         };
 
@@ -1006,91 +1192,234 @@
             document.getElementById(viewId).classList.add('active');
         }
 
-        function handleRegister() {
-            const user = document.getElementById('regUser').value;
-            const pass = document.getElementById('regPass').value;
-            const age = parseInt(document.getElementById('regAge').value);
+        // ==========================================
+        // REGISTER FORM — role-based field visibility
+        // ==========================================
+        function togglePatientFields() {
+            const role    = document.getElementById('regRole').value;
+            const fields  = document.getElementById('patientOnlyFields');
+            const optional = document.getElementById('optionalFields').closest('.mt-5.border');
+            if (role === 'doctor') {
+                fields.style.opacity  = '0.4';
+                fields.style.pointerEvents = 'none';
+                if (optional) optional.style.display = 'none';
+            } else {
+                fields.style.opacity  = '1';
+                fields.style.pointerEvents = 'auto';
+                if (optional) optional.style.display = '';
+            }
+        }
+
+        // ==========================================
+        // REGISTER FORM — optional fields toggle
+        // ==========================================
+        function toggleOptionalFields() {
+            const panel = document.getElementById('optionalFields');
+            const icon  = document.getElementById('optionalFieldsIcon');
+            const hint  = document.getElementById('optionalFieldsHint');
+            const isOpen = panel.style.maxHeight !== '0px' && panel.style.maxHeight !== '';
+            if (isOpen) {
+                panel.style.maxHeight = '0px';
+                panel.style.opacity   = '0';
+                icon.style.transform  = 'rotate(0deg)';
+                hint.textContent      = 'Optional · click to expand';
+            } else {
+                panel.style.maxHeight = '400px';
+                panel.style.opacity   = '1';
+                icon.style.transform  = 'rotate(180deg)';
+                hint.textContent      = 'Click to collapse';
+            }
+        }
+
+        // ==========================================
+        // AUTH — REGISTER
+        // ==========================================
+        async function handleRegister() {
+            const user   = document.getElementById('regUser').value.trim();
+            const email  = document.getElementById('regEmail').value.trim();
+            const pass   = document.getElementById('regPass').value;
+            const role   = document.getElementById('regRole').value;
+            const age    = parseInt(document.getElementById('regAge').value) || null;
             const gender = document.getElementById('regGender').value;
-            const weight = parseFloat(document.getElementById('regWeight').value);
-            const height = parseFloat(document.getElementById('regHeight').value);
-            const familyHistory = document.getElementById('regFamilyHistory').value;
-            const status = document.getElementById('regStatus').value;
-            const hba1c = parseFloat(document.getElementById('regHbA1c').value) || null;
+            const weight = parseFloat(document.getElementById('regWeight').value) || null;
+            const height = parseFloat(document.getElementById('regHeight').value) || null;
+            // Optional fields — default gracefully
+            const familyHistory = document.getElementById('regFamilyHistory')?.value || 'no';
+            const status        = document.getElementById('regStatus')?.value || 'none';
+            const hba1c         = parseFloat(document.getElementById('regHbA1c')?.value) || null;
 
-            if (!user || !pass || !age || !weight || !height) {
-                alert("Please fill in all required demographic fields."); return;
+            if (!user || !email || !pass) {
+                showAlert('Missing Fields', 'Please fill in all required fields (marked with *).', 'warning'); return;
+            }
+            if (role === 'patient' && (!age || !weight || !height)) {
+                showAlert('Missing Fields', 'Patients must fill in Age, Weight and Height.', 'warning'); return;
             }
 
-            const bmi = weight / Math.pow(height / 100, 2);
-            const newPatient = { username: user, password: pass, age, gender, weight, height, bmi, familyHistory, status, hba1c };
-
-            if (LocalDB.insert(newPatient)) {
-                alert("Clinical Meta Data registered to SQLite successful. Logging in...");
-                loadApp(newPatient);
-            } else {
-                alert("Error: Username already exists in DB.");
-            }
-        }
-
-        function handleLogin() {
-            const userVal = document.getElementById('loginUser').value;
-            const passVal = document.getElementById('loginPass').value;
-            const remember = document.getElementById('rememberMe').checked;
-
-            if (!userVal || !passVal) return alert("Enter credentials.");
-
-            const patient = LocalDB.select(userVal, passVal);
-    
-            if (patient) {
-                patient.name = patient.name || "Guest";
-                patient.role = patient.role || "Patient";
-                localStorage.setItem('currentUser', JSON.stringify(patient));
-
-                if (remember) {
-                    localStorage.setItem('savedCredentials', JSON.stringify({ user: userVal, pass: passVal }));
-                    localStorage.setItem('sbd_session', JSON.stringify({ username: userVal, password: passVal }));
-                } else {
-                    localStorage.removeItem('savedCredentials');
-                    localStorage.removeItem('sbd_session');
-                }
-
-                loadApp(patient);
-            } else {
-                alert("Invalid clinical ID or Password.");
-            }
-        }
-
-        // Auto-login: restore session or pre-fill credentials
-        (function restoreSession() {
             try {
-                const session = localStorage.getItem('sbd_session');
-                if (session) {
-                    const { username, password } = JSON.parse(session);
-                    const patient = LocalDB.select(username, password);
-                    if (patient) {
-                        patient.name = patient.name || 'Guest';
-                        patient.role = patient.role || 'Patient';
-                        setTimeout(() => loadApp(patient), 50);
+                const btn = document.querySelector('[onclick="handleRegister()"]');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Creating account...';
+
+                const cred = await fbAuth.createUserWithEmailAndPassword(email, pass);
+                const uid  = cred.user.uid;
+
+                const bmi = (weight && height) ? weight / Math.pow(height / 100, 2) : null;
+                const profile = {
+                    uid, username: user, email, role, age, gender,
+                    weight, height, bmi, familyHistory, status, hba1c,
+                    subscription: { status: 'free', activatedAt: null, code: null },
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await CloudDB.saveProfile(uid, profile);
+                STATE.currentUID = uid;
+                await loadApp(profile);
+            } catch(err) {
+                const btn = document.querySelector('[onclick="handleRegister()"]');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Create Account & Start';
+                showAlert('Registration Failed', err.message, 'error');
+            }
+        }
+
+        // ==========================================
+        // AUTH — FORGOT PASSWORD
+        // ==========================================
+        async function handleForgotPassword() {
+            const input = document.getElementById('loginUser').value.trim();
+            let email = input;
+
+            function showAuthMsg(msg, color) {
+                let el = document.getElementById('forgotMsg');
+                if (!el) {
+                    el = document.createElement('p');
+                    el.id = 'forgotMsg';
+                    el.className = 'text-xs font-bold mt-2 text-center';
+                    document.getElementById('viewLogin').querySelector('.space-y-4').appendChild(el);
+                }
+                el.textContent = msg;
+                el.style.color = color;
+                setTimeout(() => { if (el) el.textContent = ''; }, 5000);
+            }
+
+            if (!input) {
+                showAuthMsg('⚠ Enter your HN, username, or email above first.', '#f59e0b');
+                return;
+            }
+
+            try {
+                if (!input.includes('@')) {
+                    const snap = await fbDb.collection('users').where('username', '==', input).limit(1).get();
+                    if (snap.empty) {
+                        showAuthMsg('✕ No account found with that HN or username.', '#ef4444');
                         return;
-                    } else { localStorage.removeItem('sbd_session'); }
+                    }
+                    email = snap.docs[0].data().email;
                 }
-            } catch(e) { localStorage.removeItem('sbd_session'); }
+
+                await fbAuth.sendPasswordResetEmail(email);
+                showAuthMsg(`✓ Reset link sent to ${email} — check your inbox.`, '#10b981');
+            } catch(err) {
+                showAuthMsg('✕ ' + err.message, '#ef4444');
+            }
+        }
+
+        // ==========================================
+        // AUTH — LOGIN
+        // ==========================================
+        async function handleLogin() {
+            const input = document.getElementById('loginUser').value.trim();
+            const pass  = document.getElementById('loginPass').value;
+
+            if (!input || !pass) {
+                showAlert('Missing Fields', 'Please enter your HN or username, and password.', 'warning'); return;
+            }
+
             try {
-                const saved = localStorage.getItem('savedCredentials');
-                if (saved) {
-                    const { user, pass } = JSON.parse(saved);
-                    document.getElementById('loginUser').value = user;
-                    document.getElementById('loginPass').value = pass;
-                    document.getElementById('rememberMe').checked = true;
+                const btn = document.querySelector('[onclick="handleLogin()"]');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Signing in...';
+
+                let email = input;
+
+                // If not an email, treat as HN — look up their email in Firestore
+                if (!input.includes('@')) {
+                    const snap = await fbDb.collection('users')
+                        .where('username', '==', input).limit(1).get();
+                    if (snap.empty) {
+                        btn.disabled = false;
+                        btn.innerHTML = 'Secure Login';
+                        showAlert('Not Found', 'No account found with that HN or username.', 'error');
+                        return;
+                    }
+                    email = snap.docs[0].data().email;
                 }
-            } catch(e) { localStorage.removeItem('savedCredentials'); }
-        })();
 
-        function loadApp(patientData) {
+                const cred = await fbAuth.signInWithEmailAndPassword(email, pass);
+                STATE.currentUID = cred.user.uid;
+                const profile = await CloudDB.getProfile(cred.user.uid);
+                if (!profile) {
+                    // Orphaned Auth account — Firestore doc was deleted (e.g. by doctor). Clean up Auth too.
+                    await cred.user.delete();
+                    const btn2 = document.querySelector('[onclick="handleLogin()"]');
+                    btn2.disabled = false;
+                    btn2.innerHTML = 'Secure Login';
+                    showAlert('Account Removed', 'This account was deleted. Your email is now free — please register again.', 'info');
+                    return;
+                }
+                await loadApp(profile);
+            } catch(err) {
+                const btn = document.querySelector('[onclick="handleLogin()"]');
+                btn.disabled = false;
+                btn.innerHTML = 'Secure Login';
+                showAlert('Login Failed', err.message, 'error');
+            }
+        }
+
+        // ==========================================
+        // AUTO-LOGIN — Firebase session persistence
+        // ==========================================
+        fbAuth.onAuthStateChanged(async (user) => {
+            if (user && !STATE.patientProfile) {
+                STATE.currentUID = user.uid;
+                try {
+                    const profile = await CloudDB.getProfile(user.uid);
+                    if (profile) {
+                        await loadApp(profile);
+                    } else {
+                        // Orphaned Auth account (Firestore doc deleted by doctor) — clean up Auth so email is reusable
+                        await user.delete();
+                        showAlert('Account Removed', 'Your account was removed. Please register again with the same email.', 'info');
+                    }
+                } catch(e) {
+                    console.warn('Session restore failed:', e);
+                }
+            }
+        });
+
+        // ==========================================
+        // LOAD APP
+        // ==========================================
+        async function loadApp(patientData) {
             STATE.patientProfile = patientData;
+            document.getElementById('authScreen').classList.add('hidden');
 
-            // Restore saved logs from persistent storage
-            STATE.patientLogs = LocalDB.getLogs(patientData.username);
+            // ── DOCTOR: show monitoring dashboard, not patient app ──
+            if (patientData.role === 'doctor') {
+                document.getElementById('doctorName').textContent = patientData.username.toUpperCase();
+                document.getElementById('doctorApp').classList.remove('hidden');
+                document.getElementById('doctorApp').classList.add('flex');
+                await loadDoctorPatients();
+                return;
+            }
+
+            // ── PATIENT: normal flow ──
+            // Load logs from Firestore
+            try {
+                STATE.patientLogs = await CloudDB.getLogs(STATE.currentUID);
+            } catch(e) {
+                STATE.patientLogs = [];
+            }
 
             if (patientData.status === 'type1' || patientData.status === 'type2') {
                 document.getElementById('toggleMode').checked = true;
@@ -1109,17 +1438,18 @@
             document.getElementById('statHbA1c').textContent = patientData.hba1c ? patientData.hba1c + '%' : 'N/A';
             document.getElementById('userProfileName').textContent = patientData.username.toUpperCase();
 
-            // Restore log table from saved logs
+            // Show subscription badge in nav
+            updateSubscriptionBadge();
+            renderSubscriptionUI();
+
+            // Restore log table
             rebuildLogTable();
 
-            document.getElementById('authScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             document.getElementById('mainApp').classList.add('flex');
 
-            // Initialize accordion — dashboard active by default
             switchToSection('tab-dashboard');
 
-            // Force chart resize after layout is visible
             setTimeout(() => {
                 signalChart.resize();
                 signalChart.update();
@@ -1129,113 +1459,405 @@
             updatePredictionChart();
         }
 
-        function logout() {
-            if (STATE.isSerialConnected) document.getElementById('btnConnect').click();
-            if (STATE.mqttClient) STATE.mqttClient.disconnect();
+        // ==========================================
+        // DOCTOR DASHBOARD LOGIC
+        // ==========================================
+        let _allPatients = []; // cache for search filtering
 
-            // Clear session (but keep savedCredentials if user had "remember me")
-            localStorage.removeItem('sbd_session');
+        async function loadDoctorPatients() {
+            const listEl = document.getElementById('doctorPatientList');
+            listEl.innerHTML = `<div class="flex items-center justify-center py-16 text-slate-400 gap-3">
+                <i class="fa-solid fa-spinner fa-spin text-2xl"></i>
+                <span class="text-sm font-medium">Loading patients…</span>
+            </div>`;
 
+            try {
+                // Fetch all users with role === 'patient'
+                const snap = await fbDb.collection('users').where('role', '==', 'patient').get();
+                _allPatients = [];
+
+                for (const doc of snap.docs) {
+                    const profile = doc.data();
+                    // Fetch their latest log
+                    let logs = [];
+                    try {
+                        const logSnap = await fbDb.collection('users').doc(doc.id)
+                            .collection('logs').orderBy('createdAt', 'desc').limit(10).get();
+                        logs = logSnap.docs.map(d => d.data());
+                    } catch(e) {}
+                    _allPatients.push({ profile, logs });
+                }
+
+                renderPatientList(_allPatients);
+                updateDoctorStats(_allPatients);
+
+            } catch(err) {
+                listEl.innerHTML = `<div class="flex items-center justify-center py-16 text-rose-400 gap-3">
+                    <i class="fa-solid fa-circle-exclamation text-xl"></i>
+                    <span class="text-sm font-medium">Failed to load patients: ${err.message}</span>
+                </div>`;
+            }
+        }
+
+        function updateDoctorStats(patients) {
+            let critical = 0, warning = 0, normal = 0;
+            patients.forEach(({ logs }) => {
+                if (logs.length === 0) { normal++; return; }
+                const latest = parseFloat(logs[0].glucose);
+                if (latest > 250) critical++;
+                else if (latest > 140) warning++;
+                else normal++;
+            });
+            document.getElementById('statTotalPatients').textContent = patients.length;
+            document.getElementById('statCritical').textContent = critical;
+            document.getElementById('statWarning').textContent = warning;
+            document.getElementById('statNormal').textContent = normal;
+        }
+
+        function getRiskBadge(glucose) {
+            if (!glucose || isNaN(glucose)) return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">No data</span>';
+            const g = parseFloat(glucose);
+            if (g > 250) return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">Critical ${g.toFixed(0)} mg/dL</span>`;
+            if (g > 140) return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">High ${g.toFixed(0)} mg/dL</span>`;
+            return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Normal ${g.toFixed(0)} mg/dL</span>`;
+        }
+
+        function renderPatientList(patients) {
+            const listEl = document.getElementById('doctorPatientList');
+            if (patients.length === 0) {
+                listEl.innerHTML = `<div class="flex items-center justify-center py-16 text-slate-400 gap-3">
+                    <i class="fa-solid fa-users-slash text-2xl"></i>
+                    <span class="text-sm font-medium">No patients found</span>
+                </div>`;
+                return;
+            }
+
+            listEl.innerHTML = patients.map(({ profile, logs }, idx) => {
+                const latestGlucose = logs.length > 0 ? logs[0].glucose : null;
+                const latestTime    = logs.length > 0 ? (logs[0].timestamp || '—') : '—';
+                const bmi           = profile.bmi ? profile.bmi.toFixed(1) : '—';
+                const statusLabel   = profile.status ? profile.status.replace('type', 'T') : 'None';
+
+                const logsRows = logs.length > 0
+                    ? logs.map(l => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-2 text-xs text-slate-500 font-mono whitespace-nowrap">${l.timestamp || '—'}</td>
+                            <td class="px-4 py-2 text-xs font-bold text-slate-700">${parseFloat(l.glucose).toFixed(1)} mg/dL</td>
+                            <td class="px-4 py-2 text-xs">${getRiskBadge(l.glucose)}</td>
+                            <td class="px-4 py-2 text-xs text-slate-500">${parseFloat(l.peakPPM || 0).toFixed(2)} ppm</td>
+                            <td class="px-4 py-2 text-xs text-slate-500">${parseFloat(l.humidity || 0).toFixed(1)}% RH</td>
+                        </tr>`).join('')
+                    : `<tr><td colspan="5" class="px-4 py-4 text-center text-slate-400 italic text-xs">No readings yet</td></tr>`;
+
+                return `
+                <div class="patient-row" data-name="${(profile.username||'').toLowerCase()}" data-hn="${(profile.username||'').toLowerCase()}">
+                    <!-- Header row (always visible) -->
+                    <button onclick="togglePatientRow(${idx})"
+                        class="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors text-left gap-4">
+                        <div class="flex items-center gap-4 min-w-0">
+                            <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-user text-indigo-500 text-sm"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="font-bold text-slate-800 text-sm truncate">${profile.username || 'Unknown'}</p>
+                                <p class="text-xs text-slate-400">${profile.age ? profile.age + ' y/o' : ''} · ${profile.gender || ''} · BMI ${bmi} · ${statusLabel}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            <div class="text-right hidden sm:block">
+                                <div class="text-[10px] text-slate-400 mb-0.5">Latest reading</div>
+                                <div>${getRiskBadge(latestGlucose)}</div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">${latestTime}</div>
+                            </div>
+                            <div class="text-right hidden md:block">
+                                <div class="text-[10px] text-slate-400 mb-0.5">Total sessions</div>
+                                <div class="text-sm font-bold text-slate-700">${logs.length}</div>
+                            </div>
+                            <button onclick="event.stopPropagation(); deletePatient('${profile.uid}', '${(profile.username||'').replace(/'/g,"\\'")}');"
+                                class="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors shrink-0" title="Remove patient">
+                                <i class="fa-solid fa-trash text-sm"></i>
+                            </button>
+                            <i id="chevron-${idx}" class="fa-solid fa-chevron-down text-slate-400 transition-transform duration-300"></i>
+                        </div>
+                    </button>
+
+                    <!-- Expandable logs table -->
+                    <div id="patient-logs-${idx}" class="hidden border-t border-slate-100 bg-slate-50/60 px-4 pb-4">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-3 pb-2">Last ${logs.length} Readings</p>
+                        <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Timestamp</th>
+                                        <th class="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Glucose</th>
+                                        <th class="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Risk</th>
+                                        <th class="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">VOC (ppm)</th>
+                                        <th class="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">Humidity</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">${logsRows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('<div class="section-divider"></div>');
+        }
+
+        function togglePatientRow(idx) {
+            const panel   = document.getElementById(`patient-logs-${idx}`);
+            const chevron = document.getElementById(`chevron-${idx}`);
+            const isOpen  = !panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', isOpen);
+            chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        function filterPatients() {
+            const q = document.getElementById('doctorSearch').value.toLowerCase().trim();
+            if (!q) { renderPatientList(_allPatients); return; }
+            const filtered = _allPatients.filter(({ profile }) =>
+                (profile.username || '').toLowerCase().includes(q) ||
+                (profile.email || '').toLowerCase().includes(q)
+            );
+            renderPatientList(filtered);
+        }
+
+        async function deletePatient(uid, username) {
+            if (!confirm(`Remove patient "${username}" and ALL their data? This cannot be undone.`)) return;
+            try {
+                // Delete all logs sub-collection first
+                const logSnap = await fbDb.collection('users').doc(uid).collection('logs').get();
+                const batch = fbDb.batch();
+                logSnap.docs.forEach(d => batch.delete(d.ref));
+                // Delete the user profile doc
+                batch.delete(fbDb.collection('users').doc(uid));
+                await batch.commit();
+                // Remove from local cache and re-render
+                _allPatients = _allPatients.filter(p => p.profile.uid !== uid);
+                renderPatientList(_allPatients);
+                updateDoctorStats(_allPatients);
+                showDoctorAlert(`Patient "${username}" removed successfully.`, 'success');
+            } catch(err) {
+                showDoctorAlert('Delete failed: ' + err.message, 'error');
+            }
+        }
+
+        function showDoctorAlert(message, type) {
+            const colors = { success: 'bg-emerald-600', error: 'bg-rose-600', info: 'bg-blue-600' };
+            const toast = document.createElement('div');
+            toast.className = `fixed top-5 right-5 z-[999] text-white text-sm font-bold px-5 py-3 rounded-xl shadow-xl toast-alert ${colors[type] || colors.info}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        async function logoutDoctor() {
+            await fbAuth.signOut();
             STATE.patientProfile = null;
-            STATE.patientLogs = [];
-            document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
-
+            STATE.currentUID     = null;
+            _allPatients         = [];
             document.getElementById('loginUser').value = '';
             document.getElementById('loginPass').value = '';
-
-            document.getElementById('mainApp').classList.add('hidden');
-            document.getElementById('mainApp').classList.remove('flex');
+            document.getElementById('doctorApp').classList.add('hidden');
+            document.getElementById('doctorApp').classList.remove('flex');
             document.getElementById('authScreen').classList.remove('hidden');
             switchAuthView('viewLogin');
         }
 
         // ==========================================
-        // CROSS-DEVICE DATA PORTABILITY
+        // DELETE MY ACCOUNT
         // ==========================================
-        function exportAllData() {
-            if (!STATE.patientProfile) return showAlert('Not logged in', 'Please log in first.', 'warning');
+        async function deleteMyAccount() {
+            if (!confirm('Delete your account permanently? This removes all your data and frees your email. Cannot be undone.')) return;
 
-            // Gather all user profiles from DB
-            let db = [];
-            try { db = JSON.parse(localStorage.getItem('sbd_db')) || []; } catch(e) {}
+            const password = prompt('Re-enter your password to confirm:');
+            if (!password) return;
 
-            // Gather logs for every user in the DB
-            const logsMap = {};
-            db.forEach(u => {
-                logsMap[u.username] = LocalDB.getLogs(u.username);
-            });
+            try {
+                const user = fbAuth.currentUser;
+                // Re-authenticate first (required by Firebase before sensitive ops)
+                const cred = firebase.auth.EmailAuthProvider.credential(user.email, password);
+                await user.reauthenticateWithCredential(cred);
 
-            const payload = {
-                version: '8.7',
-                exportedAt: new Date().toISOString(),
-                exportedBy: STATE.patientProfile.username,
-                users: db,
-                logs: logsMap
-            };
+                // Delete Firestore logs
+                const logSnap = await fbDb.collection('users').doc(STATE.currentUID).collection('logs').get();
+                const batch = fbDb.batch();
+                logSnap.docs.forEach(d => batch.delete(d.ref));
+                batch.delete(fbDb.collection('users').doc(STATE.currentUID));
+                await batch.commit();
 
-            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `sbd_backup_${STATE.patientProfile.username}_${Date.now()}.sbd`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showAlert('Backup Created', `Downloaded backup with ${db.length} profile(s) and ${Object.values(logsMap).flat().length} log entries.`, 'success');
+                // Delete Firebase Auth account — frees the email
+                await user.delete();
+
+                // Reset UI
+                STATE.patientProfile = null;
+                STATE.patientLogs = [];
+                STATE.currentUID = null;
+                document.getElementById('mainApp').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('flex');
+                document.getElementById('authScreen').classList.remove('hidden');
+                switchAuthView('viewLogin');
+            } catch(err) {
+                showAlert('Delete Failed', err.message, 'error');
+            }
         }
 
-        function importDataFile(event) {
+        // ==========================================
+        // LOGOUT
+        // ==========================================
+        async function logout() {
+            if (STATE.isSerialConnected) document.getElementById('btnConnect').click();
+            if (STATE.mqttClient) STATE.mqttClient.disconnect();
+
+            await fbAuth.signOut();
+
+            STATE.patientProfile = null;
+            STATE.patientLogs    = [];
+            STATE.currentUID     = null;
+
+            document.getElementById('dataTableBody').innerHTML =
+                '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
+            document.getElementById('loginUser').value  = '';
+            document.getElementById('loginPass').value  = '';
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('flex');
+            document.getElementById('doctorApp').classList.add('hidden');
+            document.getElementById('doctorApp').classList.remove('flex');
+            document.getElementById('authScreen').classList.remove('hidden');
+            switchAuthView('viewLogin');
+        }
+
+        // ==========================================
+        // SUBSCRIPTION BADGE
+        // ==========================================
+        function updateSubscriptionBadge() {
+            const isPremium = STATE.patientProfile?.subscription?.status === 'premium';
+            let badge = document.getElementById('subscriptionBadge');
+            if (!badge) return;
+            badge.textContent = isPremium ? '⭐ Premium' : 'Free Plan';
+            badge.className = isPremium
+                ? 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300'
+                : 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200';
+        }
+
+        function renderSubscriptionUI() {
+            const isPremium = STATE.patientProfile?.subscription?.status === 'premium';
+            const freeUI    = document.getElementById('subscriptionFreeUI');
+            const premiumUI = document.getElementById('subscriptionPremiumUI');
+            if (freeUI)    freeUI.classList.toggle('hidden', isPremium);
+            if (premiumUI) premiumUI.classList.toggle('hidden', !isPremium);
+            updateSubscriptionBadge();
+        }
+
+        // ==========================================
+        // ACTIVATE SUBSCRIPTION (code-based)
+        // ==========================================
+        async function activateSubscription() {
+            const code = document.getElementById('subscriptionCode')?.value?.trim().toUpperCase();
+            if (!code) return showAlert('Enter Code', 'Please enter your activation code.', 'warning');
+
+            try {
+                const codeDoc = await fbDb.collection('codes').doc(code).get();
+                if (!codeDoc.exists) {
+                    showAlert('Invalid Code', 'This activation code was not found.', 'error'); return;
+                }
+                const codeData = codeDoc.data();
+                if (codeData.used) {
+                    showAlert('Code Used', 'This activation code has already been redeemed.', 'error'); return;
+                }
+
+                // Mark code as used + update user subscription
+                const batch = fbDb.batch();
+                batch.update(fbDb.collection('codes').doc(code), {
+                    used: true, usedBy: STATE.currentUID, usedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                batch.update(fbDb.collection('users').doc(STATE.currentUID), {
+                    'subscription.status': 'premium',
+                    'subscription.activatedAt': firebase.firestore.FieldValue.serverTimestamp(),
+                    'subscription.code': code
+                });
+                await batch.commit();
+
+                STATE.patientProfile.subscription = { status: 'premium', code, activatedAt: new Date() };
+                updateSubscriptionBadge();
+                showAlert('🎉 Premium Activated!', 'You now have access to AI Risk Reports and Health Reports.', 'success');
+                document.getElementById('subscriptionCode').value = '';
+                renderSubscriptionUI();
+            } catch(err) {
+                showAlert('Activation Error', err.message, 'error');
+            }
+        }
+
+        // ==========================================
+        // CROSS-DEVICE DATA PORTABILITY
+        // ==========================================
+        async function exportAllData() {
+            if (!STATE.patientProfile || !STATE.currentUID)
+                return showAlert('Not logged in', 'Please log in first.', 'warning');
+
+            try {
+                const profile = STATE.patientProfile;
+                const logs    = await CloudDB.getLogs(STATE.currentUID);
+
+                const payload = {
+                    version: '9.0',
+                    exportedAt: new Date().toISOString(),
+                    exportedBy: profile.username,
+                    profile: { ...profile, subscription: undefined }, // don't export sub status
+                    logs
+                };
+
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href = url;
+                a.download = `sbd_backup_${profile.username}_${Date.now()}.sbd`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showAlert('Backup Downloaded', `${logs.length} log entries exported for ${profile.username}.`, 'success');
+            } catch(err) {
+                showAlert('Export Failed', err.message, 'error');
+            }
+        }
+
+        async function importDataFile(event) {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 try {
                     const payload = JSON.parse(e.target.result);
-                    if (!payload.users || !payload.logs) throw new Error('Invalid backup format');
+                    if (!payload.logs) throw new Error('Invalid backup format');
 
-                    let imported = 0, skipped = 0, logsAdded = 0;
-                    let db = [];
-                    try { db = JSON.parse(localStorage.getItem('sbd_db')) || []; } catch(err) {}
+                    // Only merge logs for the currently logged-in user
+                    const existingTs = new Set(STATE.patientLogs.map(l => l.timestamp));
+                    const newLogs    = payload.logs.filter(l => !existingTs.has(l.timestamp));
 
-                    payload.users.forEach(user => {
-                        const exists = db.find(u => u.username === user.username);
-                        if (!exists) {
-                            db.push(user);
-                            imported++;
-                        } else {
-                            skipped++;
-                        }
-                    });
-                    localStorage.setItem('sbd_db', JSON.stringify(db));
-
-                    // Merge logs (append only new ones by timestamp)
-                    Object.entries(payload.logs).forEach(([username, logs]) => {
-                        const existing = LocalDB.getLogs(username);
-                        const existingTs = new Set(existing.map(l => l.timestamp));
-                        const newLogs = logs.filter(l => !existingTs.has(l.timestamp));
-                        newLogs.forEach(l => LocalDB.appendLog(username, l));
-                        logsAdded += newLogs.length;
-                    });
-
-                    const statusEl = document.getElementById('importStatus');
-                    statusEl.classList.remove('hidden');
-                    statusEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Imported <strong>${imported}</strong> new profile(s), skipped <strong>${skipped}</strong> existing, added <strong>${logsAdded}</strong> log entries.`;
-
-                    // Reload current user's logs if their data was in the import
-                    if (STATE.patientProfile && payload.logs[STATE.patientProfile.username]) {
-                        STATE.patientLogs = LocalDB.getLogs(STATE.patientProfile.username);
-                        rebuildLogTable();
-                        updatePredictionChart();
+                    for (const log of newLogs) {
+                        await CloudDB.appendLog(STATE.currentUID, log);
                     }
 
-                    showAlert('Import Complete', `${imported} profile(s) imported, ${logsAdded} log entries added.`, 'success');
+                    // Reload
+                    STATE.patientLogs = await CloudDB.getLogs(STATE.currentUID);
+                    rebuildLogTable();
+                    updatePredictionChart();
+
+                    const statusEl = document.getElementById('importStatus');
+                    if (statusEl) {
+                        statusEl.classList.remove('hidden');
+                        statusEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Added <strong>${newLogs.length}</strong> new log entries from backup.`;
+                    }
+                    showAlert('Import Complete', `${newLogs.length} new log entries imported.`, 'success');
                 } catch(err) {
-                    document.getElementById('importStatus').classList.remove('hidden');
-                    document.getElementById('importStatus').innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-500 mr-1"></i> Import failed: ${err.message}`;
+                    const statusEl = document.getElementById('importStatus');
+                    if (statusEl) {
+                        statusEl.classList.remove('hidden');
+                        statusEl.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-500 mr-1"></i> Import failed: ${err.message}`;
+                    }
                     showAlert('Import Failed', err.message, 'error');
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // reset input
+            event.target.value = '';
         }
 
 
@@ -1980,25 +2602,34 @@
             // Save to in-memory state
             STATE.patientLogs.push(logEntry);
 
-            // Persist to localStorage under this user
-            LocalDB.appendLog(STATE.patientProfile.username, logEntry);
+            // Persist to Firestore (fire-and-forget)
+            if (STATE.currentUID) {
+                CloudDB.appendLog(STATE.currentUID, logEntry).catch(err =>
+                    console.warn('Log save failed:', err)
+                );
+            }
 
             // Update table (prepend new row at top)
             const tbody = document.getElementById('dataTableBody');
             if (tbody.querySelector('td[colspan="5"]')) tbody.innerHTML = '';
             tbody.prepend(renderLogRow(logEntry));
-            // Update count label
             const label = document.getElementById('logCountLabel');
-            if (label) label.textContent = `${STATE.patientLogs.length} saved reading${STATE.patientLogs.length !== 1 ? 's' : ''} — persisted across sessions`;
+            if (label) label.textContent = `${STATE.patientLogs.length} saved reading${STATE.patientLogs.length !== 1 ? 's' : ''} — synced to cloud`;
         }
 
-        document.getElementById('btnClearLogs').addEventListener('click', () => {
+        document.getElementById('btnClearLogs').addEventListener('click', async () => {
             if (!confirm('Clear all saved clinical logs for this user? This cannot be undone.')) return;
             STATE.patientLogs = [];
-            if (STATE.patientProfile) LocalDB.clearLogs(STATE.patientProfile.username);
+            if (STATE.currentUID) {
+                try {
+                    await CloudDB.clearLogs(STATE.currentUID);
+                } catch(err) { console.warn('Clear logs failed:', err); }
+            }
             document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
+            const label = document.getElementById('logCountLabel');
+            if (label) label.textContent = 'No saved readings for this user.';
             updatePredictionChart();
-            showAlert('Logs Cleared', 'All clinical session logs have been removed from storage.', 'info');
+            showAlert('Logs Cleared', 'All clinical session logs have been removed from cloud storage.', 'info');
         });
 
         // ==========================================
