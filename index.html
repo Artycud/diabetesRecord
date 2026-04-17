@@ -200,6 +200,73 @@
             scroll-behavior: smooth;
         }
 
+        /* ---- CRITICAL DKA OVERLAY ---- */
+        @keyframes dka-pulse-bg {
+            0%, 100% { background-color: rgba(127,0,0,0.97); }
+            50%       { background-color: rgba(185,0,0,0.97); }
+        }
+        @keyframes dka-shake {
+            0%,100% { transform: translateX(0); }
+            15%     { transform: translateX(-8px); }
+            30%     { transform: translateX(8px); }
+            45%     { transform: translateX(-6px); }
+            60%     { transform: translateX(6px); }
+            75%     { transform: translateX(-3px); }
+            90%     { transform: translateX(3px); }
+        }
+        @keyframes dka-icon-spin {
+            0%   { transform: scale(1) rotate(0deg); }
+            50%  { transform: scale(1.15) rotate(8deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes sos-glow {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.7), 0 0 30px 6px rgba(255,80,80,0.6); }
+            50%     { box-shadow: 0 0 0 18px rgba(255,255,255,0), 0 0 50px 12px rgba(255,80,80,0.4); }
+        }
+        #dkaOverlay {
+            display: none;
+            position: fixed; inset: 0; z-index: 9999;
+            animation: dka-pulse-bg 1.4s ease-in-out infinite;
+            flex-direction: column; align-items: center; justify-content: center;
+            gap: 1.5rem; padding: 2rem; text-align: center;
+        }
+        #dkaOverlay.show { display: flex; }
+        #dkaOverlay .dka-icon {
+            font-size: 5rem; color: #fff;
+            animation: dka-icon-spin 1.2s ease-in-out infinite, dka-shake 0.6s ease-in-out 0.3s 3;
+        }
+        #dkaOverlay .dka-title {
+            font-size: clamp(1.8rem, 6vw, 3rem);
+            font-weight: 900; color: #fff; letter-spacing: -0.02em;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+        }
+        #dkaOverlay .dka-reading {
+            font-size: clamp(3rem, 10vw, 5rem);
+            font-weight: 900; color: #ffd0d0;
+            text-shadow: 0 0 30px rgba(255,200,200,0.8);
+        }
+        #dkaOverlay .dka-subtitle {
+            font-size: 1rem; color: rgba(255,220,220,0.9);
+            max-width: 400px; line-height: 1.5;
+        }
+        #dkaOverlay .sos-btn {
+            margin-top: 0.5rem;
+            background: #fff; color: #b91c1c;
+            font-size: 1.4rem; font-weight: 900; letter-spacing: 0.08em;
+            padding: 1rem 2.5rem; border-radius: 9999px; border: none; cursor: pointer;
+            animation: sos-glow 1.2s ease-in-out infinite;
+            transition: transform 0.1s;
+        }
+        #dkaOverlay .sos-btn:active { transform: scale(0.96); }
+        #dkaOverlay .dismiss-btn {
+            background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);
+            font-size: 0.8rem; font-weight: 600;
+            padding: 0.6rem 1.5rem; border-radius: 9999px;
+            border: 1px solid rgba(255,255,255,0.3); cursor: pointer;
+            transition: background 0.2s;
+        }
+        #dkaOverlay .dismiss-btn:hover { background: rgba(255,255,255,0.25); }
+
         /* Mobile bottom nav active state */
         .mobile-nav-btn.nav-active {
             color: #10b981;
@@ -218,6 +285,24 @@
 </head>
 
 <body class="text-slate-800 flex flex-col relative" style="height:100dvh; overflow:hidden;">
+
+    <!-- ========== CRITICAL DKA EMERGENCY OVERLAY ========== -->
+    <div id="dkaOverlay">
+        <div class="dka-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="dka-title">⚠ CRITICAL DKA ALERT</div>
+        <div class="dka-reading" id="dkaGlucoseValue">---</div>
+        <div style="color:rgba(255,220,220,0.8);font-size:1rem;font-weight:700;letter-spacing:0.1em;">mg/dL — Dangerously High</div>
+        <div class="dka-subtitle">
+            Estimated glucose exceeds <strong>250 mg/dL</strong>. This may indicate Diabetic Ketoacidosis.
+            Seek <strong>immediate medical attention</strong>.
+        </div>
+        <button class="sos-btn" onclick="triggerSOS()">
+            <i class="fa-solid fa-phone-flip mr-2"></i> SOS — CALL EMERGENCY
+        </button>
+        <button class="dismiss-btn" onclick="dismissDKA()">
+            I understand — dismiss alert
+        </button>
+    </div>
 
     <div id="authScreen" class="absolute inset-0 z-50 bg-slate-50 flex items-center justify-center bg-medical-pattern">
 
@@ -2485,8 +2570,9 @@
                     addLogEntry(duration, STATE.currentExhale.maxPpm, avgHum, avgTemp, aiResult.glucose, aiResult.riskClass, aiResult.subType);
                     updatePredictionChart(); // <--- Update Analytics Tab with fresh Real Data
 
-                    if (aiResult.glucose > 200) showAlert('Critical Glucose Threshold', `Est. Glucose at ${aiResult.glucose.toFixed(1)} mg/dL. Immediate check required.`, 'danger');
-                    else if (aiResult.glucose > 140) showAlert('Warning', 'Elevated VOC indicates potential pre-diabetes.', 'warning');
+                    if (aiResult.glucose > 250) showDKAOverlay(aiResult.glucose);
+                    else if (aiResult.glucose > 200) showAlert('⚠ Critical Glucose Threshold', `Est. Glucose at ${aiResult.glucose.toFixed(1)} mg/dL — seek immediate medical check.`, 'danger');
+                    else if (aiResult.glucose > 140) showAlert('Pre-Diabetes Warning', `Est. Glucose at ${aiResult.glucose.toFixed(1)} mg/dL — elevated VOC detected.`, 'warning');
 
                     publishMQTT({ patientId: STATE.patientProfile.username, bmi: STATE.patientProfile.bmi, glucose: aiResult.glucose, risk: aiResult.riskClass, timestamp: new Date().toISOString() });
                 } else {
@@ -2762,6 +2848,46 @@
             if (STATE.isCollectingRawData) { textEl.textContent = 'Recording...'; textEl.classList.replace('text-blue-400', 'text-rose-400'); }
             else { textEl.textContent = 'Start Collect'; textEl.classList.replace('text-rose-400', 'text-blue-400'); }
         });
+
+        // ==========================================
+        // CRITICAL DKA OVERLAY
+        // ==========================================
+        let _dkaBeepInterval = null;
+
+        function showDKAOverlay(glucoseValue) {
+            document.getElementById('dkaGlucoseValue').textContent = glucoseValue.toFixed(1);
+            document.getElementById('dkaOverlay').classList.add('show');
+            // Audible beep sequence using Web Audio API
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                function beep() {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.35);
+                }
+                beep();
+                _dkaBeepInterval = setInterval(beep, 1200);
+            } catch(e) { /* audio not available */ }
+        }
+
+        function dismissDKA() {
+            document.getElementById('dkaOverlay').classList.remove('show');
+            if (_dkaBeepInterval) { clearInterval(_dkaBeepInterval); _dkaBeepInterval = null; }
+        }
+
+        function triggerSOS() {
+            // Attempt to call local emergency — falls back gracefully if not on mobile
+            window.location.href = 'tel:1669'; // Thailand emergency medical (adjust per region)
+            // Also log the SOS event
+            showAlert('SOS Initiated', 'Calling emergency services (1669). Stay calm and remain with the patient.', 'danger');
+        }
 
         document.getElementById('btnExportCSV').addEventListener('click', () => {
             if (STATE.rawTimeLog.length === 0) return alert("No data recorded yet.");
