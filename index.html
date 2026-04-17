@@ -818,6 +818,7 @@
                                         <th class="px-6 py-4 border-b">Peak VOC / Hum. / Temp.</th>
                                         <th class="px-6 py-4 border-b">Est. Glucose</th>
                                         <th class="px-6 py-4 border-b">AI Diagnostic</th>
+                                        <th class="px-6 py-4 border-b text-center">Delete</th>
                                     </tr>
                                 </thead>
                                 <tbody id="dataTableBody" class="divide-y divide-slate-100">
@@ -2094,56 +2095,71 @@
 
         function updatePredictionChart() {
             const ctxPred = document.getElementById('predictionChart').getContext('2d');
-            if (predictionChartInstance) predictionChartInstance.destroy();
+            if (predictionChartInstance) { predictionChartInstance.destroy(); predictionChartInstance = null; }
             if (!STATE.patientProfile) return;
 
             const range = document.getElementById('predictRange').value;
+            const allLogs = STATE.patientLogs;
 
-            // ── 1. Load ALL saved logs for this user (cross-session) ──
-            const allLogs = STATE.patientLogs; // already loaded from localStorage at login
-
-            // ── 2. Clinical baseline from profile ──
-            let baseGluc = 90;
-            if (STATE.patientProfile.status === 'type2') baseGluc = 150;
-            if (STATE.patientProfile.status === 'type1') baseGluc = 180;
-            if (STATE.patientProfile.bmi > 25) baseGluc += 15;
-            if (STATE.patientProfile.hba1c && STATE.patientProfile.hba1c > 6.5) baseGluc += 20;
-
-            let recentTrend = 0;
-
-            // ── 3. Build real data series from actual logs with real timestamps ──
-            let realPoints = []; // { date: Date, glucose: number }
+            // ── 1. Build real data points from logs ──
+            let realPoints = [];
             allLogs.forEach(log => {
                 const d = new Date(log.timestamp);
                 if (!isNaN(d)) realPoints.push({ date: d, glucose: parseFloat(log.glucose) });
             });
             realPoints.sort((a, b) => a.date - b.date);
 
-            // Compute stats from real data
-            if (realPoints.length > 0) {
-                const sum = realPoints.reduce((a, b) => a + b.glucose, 0);
-                baseGluc = sum / realPoints.length;
-                if (realPoints.length >= 4) {
-                    const half = Math.floor(realPoints.length / 2);
-                    const earlyAvg = realPoints.slice(0, half).reduce((a, b) => a + b.glucose, 0) / half;
-                    const recentAvg = realPoints.slice(half).reduce((a, b) => a + b.glucose, 0) / (realPoints.length - half);
-                    recentTrend = recentAvg - earlyAvg;
-                }
+            // ── 2. If NO real data — show empty state, no chart ──
+            const chartCanvas = document.getElementById('predictionChart');
+            const chartWrapper = chartCanvas.parentElement;
+            let emptyState = document.getElementById('predictionEmptyState');
+            if (!emptyState) {
+                emptyState = document.createElement('div');
+                emptyState.id = 'predictionEmptyState';
+                emptyState.className = 'absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400';
+                emptyState.innerHTML = `
+                    <i class="fa-solid fa-lungs text-4xl text-slate-200"></i>
+                    <p class="text-sm font-bold text-slate-400">No breath data recorded yet</p>
+                    <p class="text-xs text-slate-400 text-center max-w-xs px-4">Complete at least one exhale session on the Live Dashboard to generate your personalized trend chart.</p>`;
+                chartWrapper.appendChild(emptyState);
             }
 
-            // ── 4. Bucket real logs by day/month for the selected range ──
+            if (realPoints.length === 0) {
+                chartCanvas.style.display = 'none';
+                emptyState.style.display = 'flex';
+                document.getElementById('trendStatusBadge').textContent = 'No data yet';
+                document.getElementById('trendStatusBadge').className = 'px-2 py-1 rounded bg-slate-200 text-slate-500 text-[10px]';
+                generatePersonalizedRecommendations(90, 0, []);
+                return;
+            }
+
+            // Real data exists — show chart, hide empty state
+            chartCanvas.style.display = '';
+            emptyState.style.display = 'none';
+
+            // ── 3. Compute trend ──
+            let recentTrend = 0;
+            const sum = realPoints.reduce((a, b) => a + b.glucose, 0);
+            let baseGluc = sum / realPoints.length;
+            if (realPoints.length >= 4) {
+                const half = Math.floor(realPoints.length / 2);
+                const earlyAvg  = realPoints.slice(0, half).reduce((a, b) => a + b.glucose, 0) / half;
+                const recentAvg = realPoints.slice(half).reduce((a, b) => a + b.glucose, 0) / (realPoints.length - half);
+                recentTrend = recentAvg - earlyAvg;
+            }
+
+            // ── 4. Bucket real data into range ──
             const now = new Date();
             let rangeDays = range === '1w' ? 7 : range === '1m' ? 30 : range === '6m' ? 180 : 365;
             const cutoff = new Date(now.getTime() - rangeDays * 86400000);
 
-            // Group real data into buckets
             function fmtLabel(d, range) {
                 if (range === '1w' || range === '1m') return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
                 return d.toLocaleDateString('en-US', { month:'short', year:'2-digit' });
             }
 
+            let bucketSize = (range === '1w') ? 1 : (range === '1m') ? 2 : (range === '6m') ? 14 : 30;
             let bucketMap = new Map();
-            let bucketSize = (range === '1w') ? 1 : (range === '1m') ? 2 : (range === '6m') ? 14 : 30; // days per bucket
             realPoints.filter(p => p.date >= cutoff).forEach(p => {
                 const bucketMs = Math.floor(p.date.getTime() / (bucketSize * 86400000)) * (bucketSize * 86400000);
                 if (!bucketMap.has(bucketMs)) bucketMap.set(bucketMs, []);
@@ -2153,36 +2169,34 @@
             let labels = [], dataActual = [], dataPredict = [];
 
             if (bucketMap.size >= 2) {
-                // ── Real data available: plot actual bucketed averages ──
+                // Enough bucketed data — plot averages
                 const sorted = [...bucketMap.entries()].sort((a, b) => a[0] - b[0]);
                 sorted.forEach(([ms, values]) => {
                     labels.push(fmtLabel(new Date(ms), range));
-                    dataActual.push(values.reduce((a, b) => a + b, 0) / values.length);
+                    dataActual.push(parseFloat((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)));
                     dataPredict.push(null);
                 });
             } else {
-                // ── Not enough real data: stable synthetic history from metadata (seeded, no Math.random) ──
-                let points = range === '1w' ? 7 : (range === '1m' ? 10 : (range === '6m' ? 6 : 12));
-                for (let i = points; i > 0; i--) {
-                    const d = new Date(now.getTime() - i * (rangeDays / points) * 86400000);
-                    labels.push(fmtLabel(d, range));
-                    // Stable sine wave — no random, so it doesn't flicker on re-render
-                    dataActual.push(parseFloat((baseGluc + (Math.sin(i * 0.8) * 8)).toFixed(1)));
+                // Not enough data in range window — plot individual real points (no synthetic)
+                const inRange = realPoints.filter(p => p.date >= cutoff);
+                const toPlot  = inRange.length > 0 ? inRange : realPoints; // fallback: show all-time
+                toPlot.forEach(p => {
+                    labels.push(fmtLabel(p.date, range));
+                    dataActual.push(parseFloat(p.glucose.toFixed(1)));
                     dataPredict.push(null);
-                }
+                });
             }
 
-            // "Today" anchor point
+            // "Today" anchor
+            const todayVal = realPoints.slice(-Math.min(3, realPoints.length))
+                .reduce((a, b) => a + b.glucose, 0) / Math.min(3, realPoints.length);
             labels.push('Today');
-            const todayVal = realPoints.length > 0
-                ? realPoints.slice(-Math.min(3, realPoints.length)).reduce((a, b) => a + b.glucose, 0) / Math.min(3, realPoints.length)
-                : baseGluc;
             dataActual.push(parseFloat(todayVal.toFixed(1)));
             dataPredict.push(parseFloat(todayVal.toFixed(1)));
 
-            // ── 5. AI Prediction curve ──
-            let predictPoints = range === '1w' ? 3 : (range === '1m' ? 7 : (range === '6m' ? 6 : 8));
-            let predictStep = (range === '1w') ? 1 : (range === '1m') ? 3 : (range === '6m') ? 14 : 30;
+            // ── 5. AI Prediction ──
+            let predictPoints   = range === '1w' ? 3 : (range === '1m' ? 7 : (range === '6m' ? 6 : 8));
+            let predictStep     = (range === '1w') ? 1 : (range === '1m') ? 3 : (range === '6m') ? 14 : 30;
             let worseningFactor = (STATE.patientProfile.bmi > 28 ? 1.5 : 0.5) + (STATE.patientProfile.familyHistory === 'yes' ? 1.0 : 0);
 
             for (let i = 1; i <= predictPoints; i++) {
@@ -2200,11 +2214,12 @@
                     labels,
                     datasets: [
                         {
-                            label: realPoints.length >= 2 ? `Real Data (${allLogs.length} readings)` : 'Synthetic Baseline',
+                            label: `Real Data (${allLogs.length} reading${allLogs.length !== 1 ? 's' : ''})`,
                             data: dataActual,
-                            borderColor: realPoints.length >= 2 ? '#10b981' : '#94a3b8',
-                            backgroundColor: realPoints.length >= 2 ? 'rgba(16,185,129,0.08)' : 'rgba(148,163,184,0.08)',
-                            fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 5
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16,185,129,0.08)',
+                            fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
+                            pointBackgroundColor: '#10b981'
                         },
                         {
                             label: 'AI Trend Prediction',
@@ -2212,6 +2227,7 @@
                             borderColor: '#f43f5e',
                             borderDash: [5, 5],
                             tension: 0.4,
+                            backgroundColor: 'rgba(244,63,94,0.06)',
                             pointBackgroundColor: '#f43f5e',
                             pointRadius: 3
                         }
@@ -2239,15 +2255,11 @@
                 }
             });
 
-            // Update stats badge
-            document.getElementById('trendStatusBadge').textContent = allLogs.length > 0
-                ? `${allLogs.length} real readings`
-                : 'Synthetic (no data yet)';
-            document.getElementById('trendStatusBadge').className = allLogs.length > 0
-                ? 'px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold'
-                : 'px-2 py-1 rounded bg-slate-200 text-slate-600 text-[10px]';
+            // ── 7. Badge ──
+            document.getElementById('trendStatusBadge').textContent = `${allLogs.length} real reading${allLogs.length !== 1 ? 's' : ''}`;
+            document.getElementById('trendStatusBadge').className = 'px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold';
 
-            // ── 7. AI Recommendations ──
+            // ── 8. AI Recommendations ──
             generatePersonalizedRecommendations(todayVal, recentTrend, allLogs);
         }
 
@@ -2569,15 +2581,30 @@
             }
         }
 
-        function renderLogRow(logEntry) {
+        function renderLogRow(logEntry, originalIndex) {
             const { timestamp, duration, peakPPM, humidity, temperature, glucose, riskClass, subType } = logEntry;
             const row = document.createElement('tr');
             row.className = "hover:bg-slate-50 transition-colors";
             let riskColor = riskClass.includes('Normal') || riskClass.includes('Stable') ? 'text-green-600' : (riskClass.includes('Pre') ? 'text-amber-600' : 'text-rose-600');
             let labelBadge = subType ? `<span class="block text-[10px] text-slate-400 mt-1">${subType}</span>` : '';
             const tempStr = temperature != null ? ` <span class="text-xs text-slate-400 font-normal">${parseFloat(temperature).toFixed(1)}°C</span>` : '';
-            row.innerHTML = `<td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td><td class="px-6 py-3 font-bold text-slate-700 uppercase text-xs">${logEntry.mode || STATE.mode}</td><td class="px-6 py-3 font-bold text-blue-600">${parseFloat(peakPPM).toFixed(2)} <span class="text-xs text-slate-400 font-normal">(${parseFloat(humidity).toFixed(1)}%RH)</span>${tempStr}</td><td class="px-6 py-3 font-black text-slate-700">${parseFloat(glucose).toFixed(1)}</td><td class="px-6 py-3 font-bold ${riskColor}">${riskClass} ${labelBadge}</td>`;
+            row.innerHTML = `<td class="px-6 py-3 font-mono text-xs text-slate-500">${timestamp}</td><td class="px-6 py-3 font-bold text-slate-700 uppercase text-xs">${logEntry.mode || STATE.mode}</td><td class="px-6 py-3 font-bold text-blue-600">${parseFloat(peakPPM).toFixed(2)} <span class="text-xs text-slate-400 font-normal">(${parseFloat(humidity).toFixed(1)}%RH)</span>${tempStr}</td><td class="px-6 py-3 font-black text-slate-700">${parseFloat(glucose).toFixed(1)}</td><td class="px-6 py-3 font-bold ${riskColor}">${riskClass} ${labelBadge}</td><td class="px-6 py-3 text-center"><button onclick="deleteLogEntry(${originalIndex})" title="Delete this log" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors rounded-lg p-1.5"><i class="fa-solid fa-trash text-xs"></i></button></td>`;
             return row;
+        }
+
+        async function deleteLogEntry(index) {
+            if (!confirm('Delete this log entry? This cannot be undone.')) return;
+            STATE.patientLogs.splice(index, 1);
+            if (STATE.currentUID) {
+                try {
+                    await CloudDB.clearLogs(STATE.currentUID);
+                    for (const log of STATE.patientLogs) {
+                        await CloudDB.appendLog(STATE.currentUID, log).catch(() => {});
+                    }
+                } catch(err) { console.warn('Delete log sync failed:', err); }
+            }
+            rebuildLogTable();
+            updatePredictionChart();
         }
 
         function rebuildLogTable() {
@@ -2585,14 +2612,15 @@
             tbody.innerHTML = '';
             const label = document.getElementById('logCountLabel');
             if (STATE.patientLogs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
                 if (label) label.textContent = 'No saved readings for this user.';
                 return;
             }
             if (label) label.textContent = `${STATE.patientLogs.length} saved reading${STATE.patientLogs.length !== 1 ? 's' : ''} — persisted across sessions`;
-            // Show newest first
-            const reversed = [...STATE.patientLogs].reverse();
-            reversed.forEach(log => tbody.appendChild(renderLogRow(log)));
+            // Show newest first; pass original index for deletion
+            const indexed = STATE.patientLogs.map((log, i) => ({ log, i }));
+            const reversed = [...indexed].reverse();
+            reversed.forEach(({ log, i }) => tbody.appendChild(renderLogRow(log, i)));
         }
 
         function addLogEntry(duration, peakPPM, humidity, temperature, glucose, riskClass, subType) {
@@ -2612,7 +2640,7 @@
             // Update table (prepend new row at top)
             const tbody = document.getElementById('dataTableBody');
             if (tbody.querySelector('td[colspan="5"]')) tbody.innerHTML = '';
-            tbody.prepend(renderLogRow(logEntry));
+            tbody.prepend(renderLogRow(logEntry, STATE.patientLogs.length - 1));
             const label = document.getElementById('logCountLabel');
             if (label) label.textContent = `${STATE.patientLogs.length} saved reading${STATE.patientLogs.length !== 1 ? 's' : ''} — synced to cloud`;
         }
@@ -2625,7 +2653,7 @@
                     await CloudDB.clearLogs(STATE.currentUID);
                 } catch(err) { console.warn('Clear logs failed:', err); }
             }
-            document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
+            document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="6" class="px-6 py-10 text-center text-slate-400 italic">No clinical data recorded yet. Please exhale into device.</td></tr>';
             const label = document.getElementById('logCountLabel');
             if (label) label.textContent = 'No saved readings for this user.';
             updatePredictionChart();
