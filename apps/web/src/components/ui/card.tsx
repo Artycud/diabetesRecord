@@ -20,8 +20,10 @@ const cardVariants = cva("rounded-2xl transition-[box-shadow,background-color] d
         "border border-border-soft bg-bg-elevated shadow-[0_1px_2px_rgba(20,20,20,0.03),0_4px_16px_-8px_rgba(20,20,20,0.06)]",
       // Soft extruded shell — no border (a border line fights the "grows
       // out of the background" illusion). Shadow pair is theme-derived,
-      // see globals.css .neu-raised.
-      neumorphic: "bg-bg-elevated neu-raised",
+      // see globals.css .neu-raised. card-gradient layers a faint
+      // accent-tinted wash on top (globals.css), following whichever
+      // accent color is selected.
+      neumorphic: "bg-bg-elevated neu-raised card-gradient",
       // Frosted/translucent — backdrop-filter blur/saturate + a highlight
       // pseudo-element (globals.css .liquid-glass). No content-distortion
       // effect — an earlier SVG-refraction attempt warped the card's own

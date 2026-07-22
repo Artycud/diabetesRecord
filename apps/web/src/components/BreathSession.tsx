@@ -412,26 +412,28 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
           <div className="relative flex items-center justify-center">
             {(connected || isDemo) && (
               <div className="absolute pointer-events-none">
-                <BreathPulse size={148} />
+                <BreathPulse size={168} />
               </div>
             )}
             <button
               onClick={start}
               className={twMerge(
-                "relative h-28 w-28 rounded-full flex flex-col items-center justify-center gap-2 active:scale-95 transition-all duration-200",
-                cardStyle === "neumorphic"
-                  ? "bg-bg-elevated neu-raised"
-                  : cardStyle === "liquidGlass"
-                    ? "liquid-glass"
-                    : "bg-mint-500/10 border-2 border-mint-500/40 hover:bg-mint-500/20"
+                "relative h-32 w-32 rounded-full flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all duration-200",
+                connected || isDemo
+                  ? "btn-premium"
+                  : cardStyle === "neumorphic"
+                    ? "bg-bg-elevated neu-inset"
+                    : cardStyle === "liquidGlass"
+                      ? "liquid-glass"
+                      : "bg-bg-elevated border-2 border-border-soft"
               )}
             >
               <Wind
-                size={32}
-                className={connected || isDemo ? "text-mint-500" : "text-text-muted"}
-                strokeWidth={1.6}
+                size={34}
+                className={connected || isDemo ? "text-white" : "text-text-disabled"}
+                strokeWidth={1.8}
               />
-              <span className={`text-xs font-semibold uppercase tracking-wide ${connected || isDemo ? "text-mint-500" : "text-text-muted"}`}>
+              <span className={`text-sm font-bold uppercase tracking-wide ${connected || isDemo ? "text-white" : "text-text-disabled"}`}>
                 START
               </span>
             </button>

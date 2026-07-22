@@ -116,6 +116,8 @@
 
 [data-theme="system"] body {
   background-color: #0b1535;
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 14%, transparent) 0%, transparent 65%);
+  background-attachment: fixed;
 }
 
 /* ─── Dark mode = pure black ────────────────────────── */
@@ -150,6 +152,8 @@
 
 [data-theme="dark"] body {
   background-color: #0A0A0A;
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 16%, transparent) 0%, transparent 65%);
+  background-attachment: fixed;
 }
 
 /* ─── Light mode override ───────────────────────────── */
@@ -185,6 +189,12 @@ html { height: 100%; }
 
 body {
   background-color: var(--color-bg-primary);
+  /* Ambient premium wash — reads var(--color-mint-500) directly, which
+     ThemeProvider already repoints to whatever accent the user picked, so
+     this follows accent selection with no extra plumbing. Kept faint
+     (7% base, bumped per-theme below) — "slight," not a colored bg. */
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 7%, transparent) 0%, transparent 65%);
+  background-attachment: fixed;
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -260,6 +270,40 @@ button.neu-raised:active,
 .neu-raised[role="switch"]:active,
 .neu-raised[data-active="true"] {
   box-shadow: inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+}
+
+/* Same accent-following wash as the body gradient, scaled down for card
+   surfaces — reinforces the "soft light source" read of neumorphism
+   instead of competing with it. Slight by design; bumped a touch on
+   darker themes where the same % reads fainter against a near-black base. */
+.card-gradient {
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 5%, transparent) 0%, transparent 55%);
+}
+[data-theme="system"] .card-gradient,
+[data-theme="dark"] .card-gradient {
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 9%, transparent) 0%, transparent 55%);
+}
+
+/* ─── Premium CTA — the single primary action button (Breathing START) ───
+   Deliberately opaque regardless of the selected card appearance: at
+   liquid-glass or flat's translucent backgrounds, BreathPulse's glowing
+   core (rendered behind, same centered position) showed straight through
+   and collided with the button's own label. An accent-gradient fill fixes
+   both — legible text and a more "attracting" primary action. */
+.btn-premium {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-mint-500) 85%, white) 0%,
+    var(--color-mint-500) 55%,
+    color-mix(in srgb, var(--color-mint-500) 78%, black) 100%
+  );
+  box-shadow:
+    0 10px 28px -8px color-mix(in srgb, var(--color-mint-500) 55%, transparent),
+    0 2px 10px -2px color-mix(in srgb, var(--color-mint-500) 40%, transparent);
+  transition: box-shadow var(--motion-fast) var(--ease-standard);
+}
+.btn-premium:active {
+  box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--color-mint-500) 50%, transparent);
 }
 
 /* ─── Liquid Glass ───────────────────────────────────

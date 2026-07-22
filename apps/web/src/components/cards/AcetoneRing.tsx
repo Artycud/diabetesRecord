@@ -26,6 +26,15 @@ export function AcetoneRing({ value, label, size = 200 }: Props) {
   const dashOffset = circumference * (1 - fill);
   const gradId = `ring-grad-${label ?? "empty"}`;
 
+  // Center-text sizing must track `size` — these were fixed text-4xl/text-xs
+  // classes regardless of the size prop, so at smaller rings (e.g. Home's
+  // 160px) the number/unit/zone stack ran wider than the inner ring
+  // diameter and visibly collided with the stroke. Scaled off a 200px
+  // baseline (text-4xl ≈ 36px) so size={200} renders identically to before.
+  const scale = size / 200;
+  const valuePx = Math.max(20, Math.round(36 * scale));
+  const smallPx = Math.max(11, Math.round(13 * scale));
+
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
@@ -59,13 +68,21 @@ export function AcetoneRing({ value, label, size = 200 }: Props) {
         />
       </svg>
       {/* Center text */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <p className="text-4xl font-bold tracking-tight" style={{ color: cfg.color }}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+        <p
+          className="font-bold tracking-tight leading-none"
+          style={{ color: cfg.color, fontSize: valuePx }}
+        >
           {formatAcetone(value, unit)}
         </p>
-        <p className="text-xs text-text-muted mt-0.5">{unitLabel(unit)}</p>
+        <p className="text-text-muted" style={{ fontSize: smallPx, marginTop: 2 * scale }}>
+          {unitLabel(unit)}
+        </p>
         {label && (
-          <p className="text-xs font-semibold mt-2" style={{ color: cfg.color }}>
+          <p
+            className="font-semibold text-center"
+            style={{ color: cfg.color, fontSize: smallPx, marginTop: 8 * scale }}
+          >
             {LABEL_TH[zone] ?? label}
           </p>
         )}
