@@ -25,7 +25,6 @@ export function DailyCheckBanner({ checkedInToday, hasDevice, celebrate }: Daily
     return (
       <div key="done" className="animate-fade-rise-in">
         <Banner
-          refract
           variant={celebrate ? "celebration" : "success"}
           icon={
             <div className="h-10 w-10 rounded-full bg-mint-500/15 flex items-center justify-center">
@@ -45,7 +44,6 @@ export function DailyCheckBanner({ checkedInToday, hasDevice, celebrate }: Daily
   return (
     <div key="pending" className="animate-fade-rise-in">
       <Banner
-        refract
         icon={<BreathPulse size={48} />}
         title="Time for today's breath check"
         subtitle={

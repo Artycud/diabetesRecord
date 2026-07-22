@@ -10,9 +10,6 @@ interface BannerProps {
   subtitle?: ReactNode;
   action?: ReactNode;
   variant?: "default" | "success" | "celebration";
-  /** Opt-in Liquid Glass refraction — see Card's `refract` prop. Only ever
-   * pass this for a genuine hero moment (e.g. DailyCheckBanner), not routine banners. */
-  refract?: boolean;
   className?: string;
 }
 
@@ -28,11 +25,10 @@ const VARIANT_STYLES: Record<NonNullable<BannerProps["variant"]>, string> = {
 /** Generic horizontal card — icon + title + subtitle + optional action.
  *  Used for both the daily-check nudge and streak/badge celebrations so
  *  the "something happened" visual language stays consistent app-wide. */
-export function Banner({ icon, title, subtitle, action, variant = "default", refract, className }: BannerProps) {
+export function Banner({ icon, title, subtitle, action, variant = "default", className }: BannerProps) {
   return (
     <Card
       padding="md"
-      refract={refract}
       className={twMerge(
         "flex items-center gap-3 transition-[border-color,box-shadow] duration-[var(--motion-slow)] ease-[var(--ease-emphasized)]",
         VARIANT_STYLES[variant],
@@ -41,7 +37,7 @@ export function Banner({ icon, title, subtitle, action, variant = "default", ref
     >
       {icon && <div className="shrink-0">{icon}</div>}
       <div className="flex-1 min-w-0">
-        <p className="font-display text-base text-text-primary leading-snug">{title}</p>
+        <p className="text-base font-semibold text-text-primary leading-snug">{title}</p>
         {subtitle && <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{subtitle}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}

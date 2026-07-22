@@ -10,7 +10,6 @@ import { TimezoneProvider } from "@/lib/timezone";
 import { DemoModeProvider } from "@/lib/demoMode";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { LiquidGlassFilterDef } from "@/components/ui/LiquidGlassFilter";
 import { Toaster as Sonner } from "sonner";
 
 function ThemedSonner() {
@@ -49,7 +48,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <TimezoneProvider>
               <DemoModeProvider>
                 <AuthProvider>
-                  <LiquidGlassFilterDef />
                   {children}
                   <Toaster />
                   <ThemedSonner />

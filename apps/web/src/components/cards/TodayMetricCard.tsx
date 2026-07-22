@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { twMerge } from "tailwind-merge";
 import { api, type WeightLog, type ActivityLog } from "@/lib/api";
+import { useThemeConfig } from "@/components/theme/ThemeProvider";
 
 // ── Metric definitions ─────────────────────────────────────────────────────
 // Steps + calories are stored in `activity_log` with a well-known `kind` string,
@@ -48,6 +50,7 @@ interface Props {
 
 export function TodayMetricCard({ kind }: Props) {
   const qc = useQueryClient();
+  const { cardStyle } = useThemeConfig();
   const meta = META[kind];
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
@@ -119,7 +122,14 @@ export function TodayMetricCard({ kind }: Props) {
     <>
       <button
         onClick={handleOpen}
-        className="bg-bg-elevated rounded-2xl p-3 text-left hover:bg-bg-raised transition-colors active:scale-95"
+        className={twMerge(
+          "rounded-2xl p-3 text-left transition-all active:scale-95",
+          cardStyle === "neumorphic"
+            ? "bg-bg-elevated neu-raised"
+            : cardStyle === "liquidGlass"
+              ? "liquid-glass"
+              : "bg-bg-elevated hover:bg-bg-raised"
+        )}
       >
         <div className="flex items-center gap-1.5 mb-2">
           <span className="text-sm">{meta.icon}</span>

@@ -22,8 +22,10 @@ const cardVariants = cva("rounded-2xl transition-[box-shadow,background-color] d
       // out of the background" illusion). Shadow pair is theme-derived,
       // see globals.css .neu-raised.
       neumorphic: "bg-bg-elevated neu-raised",
-      // Frosted/translucent — base look only; the SVG-refraction modifier
-      // (.liquid-glass-refract) is applied ad-hoc on hero surfaces, not here.
+      // Frosted/translucent — backdrop-filter blur/saturate + a highlight
+      // pseudo-element (globals.css .liquid-glass). No content-distortion
+      // effect — an earlier SVG-refraction attempt warped the card's own
+      // text/icons, not just its backdrop, and was removed.
       liquidGlass: "liquid-glass",
     },
   },
@@ -35,22 +37,14 @@ export interface CardProps
     Omit<VariantProps<typeof cardVariants>, "appearance"> {
   /** Overrides the user's saved appearance preference for this one card (rare — most cards should just follow the global setting). */
   forceAppearance?: "neumorphic" | "liquidGlass" | "flat";
-  /** Opt-in SVG-refraction enhancement, only visible when appearance is
-   * liquidGlass. Reserve for one or two hero surfaces (see globals.css
-   * .liquid-glass-refract) — GPU-expensive, not for every card on a list. */
-  refract?: boolean;
 }
 
-export function Card({ className, padding, forceAppearance, refract, ...props }: CardProps) {
+export function Card({ className, padding, forceAppearance, ...props }: CardProps) {
   const { cardStyle } = useThemeConfig();
   const appearance = forceAppearance ?? cardStyle;
   return (
     <div
-      className={twMerge(
-        cardVariants({ padding, appearance }),
-        refract && appearance === "liquidGlass" && "liquid-glass-refract",
-        className
-      )}
+      className={twMerge(cardVariants({ padding, appearance }), className)}
       {...props}
     />
   );

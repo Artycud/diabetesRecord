@@ -263,11 +263,13 @@ button.neu-raised:active,
 }
 
 /* ─── Liquid Glass ───────────────────────────────────
-   Base frosted/specular look — broadly supported, cheap, safe to use
-   anywhere. The optional .liquid-glass-refract modifier (SVG displacement
-   filter, defined once via <LiquidGlassFilterDef/> in app/providers.tsx)
-   is reserved for one or two hero surfaces only — see plan notes on
-   backdrop-filter + SVG filter perf/Safari quirks. */
+   Frosted/specular look only — backdrop-filter blur/saturate + a highlight
+   pseudo-element. An earlier SVG-displacement "refraction" enhancement
+   (feTurbulence/feDisplacementMap) was removed: filter: url(...) distorts
+   the element's own content, not just its backdrop, so any real text/icons
+   inside a refracted card came out visibly warped. Revisit only with a
+   technique that distorts a backdrop layer behind the content, not the
+   content itself. */
 .liquid-glass {
   position: relative;
   background: rgba(255,255,255,0.06);
@@ -275,17 +277,19 @@ button.neu-raised:active,
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
   border: 1px solid rgba(255,255,255,0.15);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.1);
-  overflow: hidden;
 }
+/* border-radius: inherit (not overflow:hidden on the parent) keeps the
+   highlight clipped to the card's rounded corners — overflow:hidden here
+   would also clip any fixed/absolute-positioned descendant (e.g. a modal)
+   to the card's bounds instead of the viewport, since backdrop-filter
+   already creates a new containing block for those per the CSS spec. */
 .liquid-glass::before {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 40%);
   pointer-events: none;
-}
-.liquid-glass-refract {
-  filter: url(#liquid-glass-distortion);
 }
 
 /* ─── Scrollbar ─────────────────────────────────────── */

@@ -85,7 +85,7 @@ export default function HomePage() {
         <div className="min-w-0">
           <p className="text-xs text-text-muted">{dateStr}</p>
           <h1 className="text-xl font-semibold text-text-primary mt-0.5 truncate">
-            {t("health.greeting")}, <span className="font-display font-normal">{name}</span>
+            {t("health.greeting")}, {name}
           </h1>
         </div>
         <StreakChip current={streak?.current} className="shrink-0" />
@@ -99,7 +99,7 @@ export default function HomePage() {
       />
 
       {/* Flexibility Score — Layer 3 hero */}
-      <div className="bg-bg-elevated rounded-3xl p-5">
+      <Card padding="lg">
         <div className="flex items-start justify-between mb-4">
           <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">
             Metabolic Flexibility
@@ -125,11 +125,10 @@ export default function HomePage() {
           </InfoButton>
         </div>
         <FlexibilityBar data={flexData} loading={!!deviceId && flexLoading} hasDevice={!!deviceId} />
-      </div>
+      </Card>
 
-      {/* Acetone ring — secondary snapshot, hero surface (gets the full
-          Liquid Glass refraction treatment when that appearance is picked) */}
-      <Card padding="lg" refract className="flex flex-col items-center gap-3 relative">
+      {/* Acetone ring — secondary snapshot */}
+      <Card padding="lg" className="flex flex-col items-center gap-3 relative">
         <div className="absolute top-3 right-3">
           <InfoButton title="Breath Acetone · สูงสุดวันนี้" ariaLabel="รายละเอียด Breath Acetone">
             <p>
@@ -300,7 +299,7 @@ export default function HomePage() {
           </Link>
         </div>
         {liveReading ? (
-          <div className="bg-bg-elevated rounded-2xl p-4 flex items-center gap-3">
+          <Card padding="md" className="flex items-center gap-3">
             <div className="text-right min-w-[44px]">
               <p className="text-xs text-text-muted">{parseServerTime(liveReading.time).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</p>
             </div>
@@ -311,12 +310,12 @@ export default function HomePage() {
                 Q: {liveReading.quality_score?.toFixed(0)}/100
               </p>
             </div>
-          </div>
+          </Card>
         ) : (
-          <div className="bg-bg-elevated rounded-2xl p-4 text-center">
+          <Card padding="md" className="text-center">
             <p className="text-sm text-text-muted">{t("health.noReadingToday")}</p>
             <Link href="/breathing" className="text-xs text-mint-500 mt-1 block">{t("health.startSession")}</Link>
-          </div>
+          </Card>
         )}
       </div>
     </div>
