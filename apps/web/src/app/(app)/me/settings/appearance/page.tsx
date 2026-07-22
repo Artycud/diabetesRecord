@@ -28,7 +28,7 @@ const CARD_STYLES: { value: CardStyle; label: string; hint: string }[] = [
 export default function AppearancePage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { accent, setAccent, cardStyle, setCardStyle } = useThemeConfig();
+  const { accent, setAccent, cardStyle, setCardStyle, gradientIntensity, setGradientIntensity } = useThemeConfig();
 
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-6">
@@ -86,6 +86,27 @@ export default function AppearancePage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Background gradient intensity — the accent-tinted wash on the page
+          background and card surfaces; 0 turns it off entirely. */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">Background Gradient</p>
+          <span className="text-xs text-text-muted font-mono">{gradientIntensity}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={gradientIntensity}
+          onChange={(e) => setGradientIntensity(Number(e.target.value))}
+          className="w-full accent-mint-500"
+        />
+        <p className="text-[11px] text-text-disabled">
+          Tints the background with your {ACCENT_LABELS[accent].toLowerCase()} accent. Set to 0 for a plain background.
+        </p>
       </div>
 
       {/* Card style */}

@@ -47,6 +47,10 @@
   --neu-light: rgba(255,255,255,0.06);
   --neu-dark:  rgba(0,0,0,0.35);
 
+  /* User-adjustable via Settings → Theme & appearance (0-1, ThemeProvider
+     writes the resolved value here). Default 1 = the shipped intensity. */
+  --gradient-intensity: 1;
+
   /* ─── Semantic defaults (navy — same as System mode) ── */
   --color-bg-primary:  #0b1535;
   --color-bg-surface:  #142552;
@@ -116,8 +120,9 @@
 
 [data-theme="system"] body {
   background-color: #0b1535;
+}
+[data-theme="system"] body::before {
   background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 18%, transparent) 0%, transparent 65%);
-  background-attachment: fixed;
 }
 
 /* ─── Dark mode = pure black ────────────────────────── */
@@ -152,8 +157,9 @@
 
 [data-theme="dark"] body {
   background-color: #0A0A0A;
+}
+[data-theme="dark"] body::before {
   background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 20%, transparent) 0%, transparent 65%);
-  background-attachment: fixed;
 }
 
 /* ─── Light mode override ───────────────────────────── */
@@ -193,12 +199,6 @@ html { height: 100%; }
 
 body {
   background-color: var(--color-bg-primary);
-  /* Ambient premium wash — reads var(--color-mint-500) directly, which
-     ThemeProvider already repoints to whatever accent the user picked, so
-     this follows accent selection with no extra plumbing. Intensity is
-     tuned per-theme below — still a wash, not a colored background. */
-  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 11%, transparent) 0%, transparent 65%);
-  background-attachment: fixed;
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -206,6 +206,23 @@ body {
   /* Slightly denser default weight so labels/metadata read at a glance
      without over-scaling the design system. */
   font-weight: 450;
+}
+/* Ambient premium wash lives on a dedicated fixed pseudo-element rather
+   than body's own background so its opacity (the user's gradient
+   intensity slider, Settings → Theme & appearance) can be scaled
+   independently of page content — scaling body's own opacity would fade
+   the whole page, not just the wash. Reads var(--color-mint-500)
+   directly, which ThemeProvider already repoints to whatever accent the
+   user picked, so color follows accent selection with no extra plumbing;
+   per-theme intensity is tuned in each [data-theme] block above. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--gradient-intensity, 1);
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 11%, transparent) 0%, transparent 65%);
 }
 
 /* ─── Readability upgrades ──────────────────────────
@@ -292,13 +309,16 @@ button.neu-raised:active,
 /* Same accent-following wash as the body gradient, scaled down for card
    surfaces — reinforces the "soft light source" read of neumorphism
    instead of competing with it. Slight by design; bumped a touch on
-   darker themes where the same % reads fainter against a near-black base. */
+   darker themes where the same % reads fainter against a near-black base.
+   Also follows the gradient-intensity setting: calc() inside color-mix's
+   percentage argument (not a separate opacity layer, since Card has no
+   pseudo-element to spare here) — supported in evergreen browsers. */
 .card-gradient {
-  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 8%, transparent) 0%, transparent 55%);
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) calc(8% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
 }
 [data-theme="system"] .card-gradient,
 [data-theme="dark"] .card-gradient {
-  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 13%, transparent) 0%, transparent 55%);
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) calc(13% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
 }
 
 /* ─── Premium CTA — the single primary action button (Breathing START) ───
@@ -343,7 +363,13 @@ button.neu-raised:active,
    gradient instead (bright corner → fades near-clear → picks back up)
    keeps the same accent-follows-picker guarantee while giving the tint
    visible variation, same direction as the ::before specular highlight
-   below so the two reinforce the same "light source" instead of fighting. */
+   below so the two reinforce the same "light source" instead of fighting.
+
+   Outer shadow added on top of the existing inset edge highlight — without
+   one, glass in light mode (where var(--neu-dark) itself is faint against
+   a near-white bg) had nothing lifting it off the page and read as flat.
+   Reuses the same --neu-dark/--neu-light tokens as .neu-raised so glass
+   and neumorphic cards sit at the same visual "height" on every theme. */
 .liquid-glass {
   position: relative;
   background: linear-gradient(
@@ -355,7 +381,11 @@ button.neu-raised:active,
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
   border: 1px solid color-mix(in srgb, var(--color-mint-500) 20%, rgba(255,255,255,0.3));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.1);
+  box-shadow:
+    8px 8px 18px var(--neu-dark),
+    -8px -8px 18px var(--neu-light),
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
 }
 /* border-radius: inherit (not overflow:hidden on the parent) keeps the
    highlight clipped to the card's rounded corners — overflow:hidden here

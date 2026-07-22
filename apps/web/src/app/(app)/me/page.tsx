@@ -73,6 +73,9 @@ export default function MePage() {
             <div className="h-1.5 rounded-full bg-bg-raised overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-gold-300 to-gold-500 transition-all duration-700" style={{ width: `${pct}%` }} />
             </div>
+            <p className="text-[11px] text-text-disabled">
+              +10 XP per breath check · redeemable for gift cards soon
+            </p>
           </div>
         ) : (
           <div className="mt-4 animate-pulse space-y-1.5">

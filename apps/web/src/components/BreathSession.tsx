@@ -137,6 +137,11 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);   // 0-100 within current phase
   const [result, setResult] = useState<SessionSummary | null>(null);
+  // Populated after finalize()'s checkin() resolves — null while pending,
+  // 0 if today's check-in was already claimed (no double-award). Threaded
+  // through to DoneCard so the "+N XP" feedback ties directly to *this*
+  // session instead of only ever showing the running lifetime total.
+  const [xpAwarded, setXpAwarded] = useState<number | null>(null);
   const [chartData, setChartData] = useState<{ t: number; mv: number; kpa: number }[]>([]);
   // Real-time blow intensity (0-1), smoothed each animation frame from the
   // live pressure reading — drives the inner ring fill during recording.
@@ -327,7 +332,10 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     onSavedRef.current?.();
     // Streak/XP/quest check-in — unconditional for both real and Demo Mode
     // sessions by design, so the habit loop counts identically either way.
-    try { await api.gamification.checkin(); } catch { /* non-critical */ }
+    try {
+      const checkin = await api.gamification.checkin();
+      setXpAwarded(checkin.xp_awarded);
+    } catch { /* non-critical */ }
     // Invalidate gamification so home/profile show fresh streak + XP
     qc.invalidateQueries({ queryKey: ["me", "xp"] });
     qc.invalidateQueries({ queryKey: ["me", "streak"] });
@@ -376,6 +384,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     setPhase("idle");
     setProgress(0);
     setResult(null);
+    setXpAwarded(null);
     setChartData([]);
     setContextTag(null);
     setShowContextSelector(false);
@@ -622,13 +631,14 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
       fmtAcetone={fmtAcetone}
       unitLbl={unitLbl}
       onReset={reset}
+      xpAwarded={xpAwarded}
     />
   );
 }
 
 /* ── Done result card — shows measurement + live gamification feedback ── */
 function DoneCard({
-  result, lColor, lText, fmtAcetone, unitLbl, onReset,
+  result, lColor, lText, fmtAcetone, unitLbl, onReset, xpAwarded,
 }: {
   result: SessionSummary;
   lColor: string;
@@ -636,6 +646,7 @@ function DoneCard({
   fmtAcetone: (v: number) => string;
   unitLbl: string;
   onReset: () => void;
+  xpAwarded: number | null;
 }) {
   const { data: xpData }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streakData } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
@@ -669,23 +680,37 @@ function DoneCard({
           </p>
         )}
 
-        {/* Gamification feedback — refreshes after invalidation */}
+        {/* Gamification feedback — refreshes after invalidation. The "+N XP"
+            line ties the reward directly to *this* session (xpAwarded, from
+            finalize()'s checkin() response) rather than only ever showing
+            the running lifetime total, which never made clear that the
+            check-in itself is what earns XP. Kept inside this existing
+            secondary panel, below the actual breath result above, so it
+            stays a footnote to the measurement — not competing for
+            attention with it. */}
         {(streakData || xpData) && (
-          <div className="bg-mint-500/10 rounded-xl px-3 py-2.5 flex items-center justify-center gap-5">
-            {streakData && (
-              <div className="flex items-center gap-1.5">
-                <Flame size={14} className="text-peach-500" />
-                <span className="text-sm font-bold text-text-primary">{streakData.current}</span>
-                <span className="text-xs text-text-muted">day streak</span>
-              </div>
+          <div className="bg-mint-500/10 rounded-xl px-3 py-2.5 space-y-1.5">
+            {!!xpAwarded && (
+              <p className="text-center text-xs font-bold text-gold-500">
+                +{xpAwarded} XP earned · redeemable for rewards soon
+              </p>
             )}
-            {xpData && (
-              <div className="flex items-center gap-1.5">
-                <Star size={14} className="text-gold-500" />
-                <span className="text-sm font-bold text-text-primary">{xpData.total.toLocaleString()}</span>
-                <span className="text-xs text-text-muted">XP total</span>
-              </div>
-            )}
+            <div className="flex items-center justify-center gap-5">
+              {streakData && (
+                <div className="flex items-center gap-1.5">
+                  <Flame size={14} className="text-peach-500" />
+                  <span className="text-sm font-bold text-text-primary">{streakData.current}</span>
+                  <span className="text-xs text-text-muted">day streak</span>
+                </div>
+              )}
+              {xpData && (
+                <div className="flex items-center gap-1.5">
+                  <Star size={14} className="text-gold-500" />
+                  <span className="text-sm font-bold text-text-primary">{xpData.total.toLocaleString()}</span>
+                  <span className="text-xs text-text-muted">XP total</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
