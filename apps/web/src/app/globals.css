@@ -324,19 +324,28 @@ button.neu-raised:active,
 }
 
 /* ─── Liquid Glass ───────────────────────────────────
-   Frosted/specular look only — backdrop-filter blur/saturate + a highlight
+   Frosted/specular look — backdrop-filter blur/saturate + a highlight
    pseudo-element. An earlier SVG-displacement "refraction" enhancement
    (feTurbulence/feDisplacementMap) was removed: filter: url(...) distorts
    the element's own content, not just its backdrop, so any real text/icons
    inside a refracted card came out visibly warped. Revisit only with a
    technique that distorts a backdrop layer behind the content, not the
-   content itself. */
+   content itself.
+
+   The glass's own fill must carry the accent color, not just rely on
+   backdrop-filter to pick color up from whatever's behind — this app's
+   backgrounds are flat single colors (no photos/vivid content to tint
+   from), so the old fixed rgba(255,255,255,0.06) fill always composited
+   down to a neutral gray/white regardless of accent or light/dark theme.
+   color-mix against transparent keeps it translucent (still reads as
+   glass) while guaranteeing a visible accent tint on every theme — the
+   same var(--color-mint-500) the accent picker already drives. */
 .liquid-glass {
   position: relative;
-  background: rgba(255,255,255,0.06);
+  background: color-mix(in srgb, var(--color-mint-500) 16%, transparent);
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid color-mix(in srgb, var(--color-mint-500) 32%, transparent);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.1);
 }
 /* border-radius: inherit (not overflow:hidden on the parent) keeps the
