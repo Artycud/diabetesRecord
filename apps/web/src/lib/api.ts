@@ -697,7 +697,7 @@ export const api = {
         `/sensor/device/${deviceId}/calibrate`,
         { method: "POST", body: JSON.stringify(data) }
       ),
-    pairDevice: (data?: { kind?: string; sensor_model?: string; firmware_version?: string }) =>
+    pairDevice: (data?: { kind?: string; sensor_model?: string; firmware_version?: string; mac?: string }) =>
       request<{
         device_id: string; mqtt_topic: string; mqtt_user: string;
         mqtt_broker: string; mqtt_port: number; secret: string; message: string;

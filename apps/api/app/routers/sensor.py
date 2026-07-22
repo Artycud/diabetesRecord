@@ -82,6 +82,12 @@ class DevicePairRequest(BaseModel):
     kind: str = "breath"
     sensor_model: str = "TGS1820"
     firmware_version: Optional[str] = None
+    # Real ESP32 MAC address (e.g. "88F155302810" or "88:F1:55:30:28:10").
+    # Required for the stock MetaBreath firmware — it always publishes under
+    # metabreath/<its own MAC>/reading, so the DB row must be registered under
+    # that same topic or the device will never be reachable. Omit only for
+    # "custom firmware" devices where the caller controls their own topic.
+    mac: Optional[str] = None
 
 
 class DevicePairResponse(BaseModel):
@@ -104,10 +110,83 @@ async def pair_device(
     """
     Pair a new MetaBreath device with the user account.
     Returns MQTT credentials and topic for the ESP32 firmware to use.
+
+    When `mac` is given, the device is registered under the topic the real
+    firmware actually publishes to (metabreath/<MAC>/reading) — idempotent,
+    and safe to re-run (e.g. user retries setup) as long as the MAC still
+    belongs to this user or has no owner yet.
     """
     import secrets as _secrets
     import os
 
+    mqtt_broker = os.getenv("MQTT_BROKER_PUBLIC", "metabreath.duckdns.org")
+    mqtt_port = int(os.getenv("MQTT_PORT_PUBLIC", "1883"))
+    mqtt_user = os.getenv("MQTT_ESP32_USER", "esp32")
+    mqtt_pass = os.getenv("MQTT_ESP32_PASS", "")
+
+    if body.mac:
+        mac = body.mac.upper().replace(":", "").replace("-", "")
+        if len(mac) != 12 or not all(c in "0123456789ABCDEF" for c in mac):
+            raise HTTPException(status_code=400, detail="MAC ต้องมี 12 hex chars เช่น 88F155302810")
+
+        mqtt_topic = f"metabreath/{mac}/reading"
+        existing_result = await db.exec(select(Device).where(Device.mqtt_topic == mqtt_topic))
+        device = existing_result.first()
+
+        if device and device.user_id != user.id and not device.is_shared:
+            # Already claimed by someone else and not shared — refuse rather than steal it.
+            raise HTTPException(
+                status_code=409,
+                detail="อุปกรณ์นี้ถูกลงทะเบียนกับบัญชีอื่นแล้ว ติดต่อแอดมินหากต้องการโอนย้าย",
+            )
+
+        if device and device.is_shared and device.user_id != user.id:
+            # Shared device someone else owns. Pairing must never itself grant a
+            # claim — that would let typing in a MAC silently "steal" the active
+            # session with no confirmation. Claiming only ever happens through
+            # the explicit ใช้เครื่องนี้ button (POST /device/{id}/claim).
+            raise HTTPException(
+                status_code=409,
+                detail="อุปกรณ์นี้ใช้ร่วมกันอยู่แล้ว — ไปที่หน้าอุปกรณ์แล้วกด \"ใช้เครื่องนี้\" เพื่อจอง",
+            )
+
+        if device:
+            # Re-registering own device (retry) — refresh metadata, keep secret.
+            device.kind = body.kind
+            device.sensor_model = body.sensor_model
+            device.firmware_version = body.firmware_version
+            device.active = True
+            if not device.secret:
+                device.secret = _secrets.token_hex(16)
+            db.add(device)
+        else:
+            device = Device(
+                user_id=user.id,
+                kind=body.kind,
+                sensor_model=body.sensor_model,
+                firmware_version=body.firmware_version,
+                active=True,
+                mqtt_topic=mqtt_topic,
+                secret=_secrets.token_hex(16),
+            )
+            db.add(device)
+
+        await db.commit()
+        await db.refresh(device)
+
+        return DevicePairResponse(
+            device_id=str(device.id),
+            mqtt_topic=mqtt_topic,
+            mqtt_user=mqtt_user,
+            mqtt_pass=mqtt_pass,
+            mqtt_broker=mqtt_broker,
+            mqtt_port=mqtt_port,
+            secret=device.secret,
+            message=f"อุปกรณ์จับคู่สำเร็จ! กำลังรอสัญญาณจาก {mac}",
+        )
+
+    # No MAC given — "custom firmware" path. Server invents an ID; caller's
+    # own firmware must be configured to publish to the returned mqtt_topic.
     device = Device(
         user_id=user.id,
         kind=body.kind,
@@ -127,11 +206,6 @@ async def pair_device(
 
     await db.commit()
     await db.refresh(device)
-
-    mqtt_broker = os.getenv("MQTT_BROKER_PUBLIC", "metabreath.duckdns.org")
-    mqtt_port = int(os.getenv("MQTT_PORT_PUBLIC", "1883"))
-    mqtt_user = os.getenv("MQTT_ESP32_USER", "esp32")
-    mqtt_pass = os.getenv("MQTT_ESP32_PASS", "")
 
     return DevicePairResponse(
         device_id=device_id_str,

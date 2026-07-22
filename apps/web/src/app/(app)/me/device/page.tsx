@@ -249,6 +249,23 @@ export default function DevicePage() {
                 </div>
               )}
 
+              {/* Owned device stopped sending data — give a real way out instead of
+                  a dead "Offline" screen: retry WiFi, or unlink and use a shared one. */}
+              {linkStatus === "offline" && ownedDevice && (
+                <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-2">
+                  <p className="text-xs text-amber-400 font-semibold">อุปกรณ์ไม่ได้เชื่อมต่อ</p>
+                  <p className="text-[11px] text-text-disabled leading-relaxed">
+                    ตรวจสอบว่าอุปกรณ์เปิดอยู่และเชื่อม WiFi ได้ปกติ หรือลองรีเซ็ต WiFi ใหม่จากเมนู Advanced ด้านล่าง
+                  </p>
+                  <button
+                    onClick={() => handleUnlink(ownedDevice.id)}
+                    className="w-full mt-1 text-[11px] text-text-muted underline hover:text-red-400 transition-colors"
+                  >
+                    ยกเลิกการเชื่อมต่อ (เลือกเครื่องอื่นจาก shared pool)
+                  </button>
+                </div>
+              )}
+
               <button
                 disabled={!isLive}
                 className={`mt-3 w-full rounded-full py-2.5 text-sm font-semibold transition-colors ${
@@ -276,8 +293,9 @@ export default function DevicePage() {
 
       {/* Release action moved to the compact status row at the top of the page. */}
 
-      {/* Shared device pool — visible when the user doesn't own any device */}
-      {!ownedDevice && claimableDevices.length > 0 && (
+      {/* Shared device pool — visible when the user has no device, or their
+          owned device has gone offline and they need a working fallback */}
+      {(!ownedDevice || linkStatus === "offline") && claimableDevices.length > 0 && (
         <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
           <div>
             <p className="text-sm font-semibold text-text-primary">อุปกรณ์ที่ใช้ร่วมกัน</p>

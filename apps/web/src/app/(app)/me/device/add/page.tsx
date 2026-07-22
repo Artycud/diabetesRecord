@@ -11,16 +11,35 @@ const MODELS = [
   { value: "custom",  label: "Custom firmware",       desc: "Sensor รุ่นอื่น / ทดสอบ" },
 ];
 
+// Accepts a bare MAC ("88F155302810", "88:F1:55:30:28:10") or a pasted
+// AP name ("MetaBreath-Setup-88F155302810") and normalizes to 12 hex chars.
+function normalizeMac(input: string): string {
+  const stripped = input.replace(/^MetaBreath-Setup-/i, "");
+  return stripped.toUpperCase().replace(/[^0-9A-F]/g, "");
+}
+
 function AddDeviceInner() {
   const router = useRouter();
   const [selectedModel, setSelectedModel] = useState("TGS1820");
+  const [macInput, setMacInput] = useState("");
   const [pairing, setPairing] = useState(false);
 
+  const isStock = selectedModel === "TGS1820";
+  const mac = normalizeMac(macInput);
+  const macValid = mac.length === 12;
+
   async function createDevice() {
+    if (isStock && !macValid) {
+      toast.error("กรอก Device ID ให้ครบ 12 ตัว (ดูจากชื่อ WiFi MetaBreath-Setup-XXXXXXXXXXXX)");
+      return;
+    }
     setPairing(true);
     try {
-      await api.sensor.pairDevice({ sensor_model: selectedModel });
-      toast.success("สร้างอุปกรณ์สำเร็จ");
+      await api.sensor.pairDevice({
+        sensor_model: selectedModel,
+        ...(isStock ? { mac } : {}),
+      });
+      toast.success("เพิ่มอุปกรณ์สำเร็จ — เปิด 192.168.4.1 เพื่อตั้งค่า WiFi บ้านต่อ");
       router.replace("/me/device");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
@@ -49,15 +68,15 @@ function AddDeviceInner() {
         <ol className="space-y-2 text-xs text-text-muted leading-relaxed">
           <li className="flex gap-2">
             <span className="w-4 h-4 rounded-full bg-mint-500/20 text-mint-500 text-[10px] flex items-center justify-center shrink-0 mt-0.5 font-bold">1</span>
-            <span>กด <strong className="text-text-primary">"สร้าง Device"</strong> — ระบบออก Device ID ให้ทันที</span>
+            <span>เปิดไฟ MetaBreath → ในตั้งค่า WiFi ของมือถือ เชื่อมกับ <strong className="text-text-primary">MetaBreath-Setup-XXXXXXXXXXXX</strong></span>
           </li>
           <li className="flex gap-2">
             <span className="w-4 h-4 rounded-full bg-mint-500/20 text-mint-500 text-[10px] flex items-center justify-center shrink-0 mt-0.5 font-bold">2</span>
-            <span>เชื่อม WiFi <strong className="text-text-primary">MetaBreath-Setup-XXXX</strong> → เปิด 192.168.4.1</span>
+            <span>คัดลอกรหัส 12 ตัวท้ายชื่อ WiFi นั้น มาใส่ในช่อง Device ID ด้านล่าง แล้วกด "เพิ่มอุปกรณ์"</span>
           </li>
           <li className="flex gap-2">
             <span className="w-4 h-4 rounded-full bg-mint-500/20 text-mint-500 text-[10px] flex items-center justify-center shrink-0 mt-0.5 font-bold">3</span>
-            <span>วาง Device ID → เลือก WiFi บ้าน → กด Save → เสร็จ</span>
+            <span>เปิด Safari/Chrome → พิมพ์ 192.168.4.1 → เลือก WiFi บ้าน → กด Save → เสร็จ</span>
           </li>
         </ol>
       </div>
@@ -83,15 +102,36 @@ function AddDeviceInner() {
         </div>
       </div>
 
+      {/* Device ID (MAC) — required for the stock firmware, which always
+          publishes under its own MAC and can't be told to use a different ID. */}
+      {isStock && (
+        <div className="bg-bg-elevated rounded-2xl p-4 space-y-2">
+          <p className="text-sm font-semibold text-text-primary">Device ID</p>
+          <p className="text-xs text-text-muted">
+            ดูได้จากชื่อ WiFi <strong>MetaBreath-Setup-XXXXXXXXXXXX</strong> ตอนเชื่อมต่อ (หรือหน้าตั้งค่าที่ 192.168.4.1)
+          </p>
+          <input
+            value={macInput}
+            onChange={(e) => setMacInput(e.target.value)}
+            placeholder="88F155302810"
+            maxLength={30}
+            className="w-full bg-bg-raised rounded-xl px-3 py-2.5 text-sm font-mono tracking-wide text-text-primary placeholder:text-text-disabled border border-border-soft focus:border-mint-500 outline-none"
+          />
+          {macInput.length > 0 && !macValid && (
+            <p className="text-[11px] text-red-400">ต้องมี 12 ตัวอักษร (0-9, A-F) — ตอนนี้ได้ {mac.length} ตัว</p>
+          )}
+        </div>
+      )}
+
       <button
         onClick={createDevice}
-        disabled={pairing}
+        disabled={pairing || (isStock && !macValid)}
         className="w-full bg-mint-500 text-white rounded-full py-3 text-sm font-semibold hover:bg-mint-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {pairing ? (
-          <><Loader2 size={16} className="animate-spin" /> กำลังสร้าง...</>
+          <><Loader2 size={16} className="animate-spin" /> กำลังเพิ่ม...</>
         ) : (
-          <><Cpu size={16} /> สร้าง Device</>
+          <><Cpu size={16} /> เพิ่มอุปกรณ์</>
         )}
       </button>
     </div>
