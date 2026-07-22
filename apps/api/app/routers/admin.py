@@ -38,6 +38,7 @@ class AdminDeviceOut(BaseModel):
     active: bool
     needs_recalibration: bool
     last_calibrated_at: Optional[datetime]
+    simulate_acetone: bool = False
 
 
 class AdminReadingSummary(BaseModel):
@@ -182,6 +183,7 @@ async def list_users(
                     active=d.active,
                     needs_recalibration=d.needs_recalibration,
                     last_calibrated_at=d.last_calibrated_at,
+                    simulate_acetone=d.simulate_acetone,
                 )
                 for d in devs
             ],
@@ -336,6 +338,7 @@ async def ensure_manual_device(
             id=str(device.id), kind=device.kind, sensor_model=device.sensor_model,
             active=device.active, needs_recalibration=device.needs_recalibration,
             last_calibrated_at=device.last_calibrated_at,
+            simulate_acetone=device.simulate_acetone,
         )
 
     device = Device(
@@ -352,6 +355,7 @@ async def ensure_manual_device(
         id=str(device.id), kind=device.kind, sensor_model=device.sensor_model,
         active=device.active, needs_recalibration=device.needs_recalibration,
         last_calibrated_at=device.last_calibrated_at,
+        simulate_acetone=device.simulate_acetone,
     )
 
 
@@ -396,6 +400,7 @@ async def register_mac_device(
             id=str(device.id), kind=device.kind, sensor_model=device.sensor_model,
             active=device.active, needs_recalibration=device.needs_recalibration,
             last_calibrated_at=device.last_calibrated_at,
+            simulate_acetone=device.simulate_acetone,
         )
 
     device = Device(
@@ -415,6 +420,7 @@ async def register_mac_device(
         id=str(device.id), kind=device.kind, sensor_model=device.sensor_model,
         active=device.active, needs_recalibration=device.needs_recalibration,
         last_calibrated_at=device.last_calibrated_at,
+        simulate_acetone=device.simulate_acetone,
     )
 
 
@@ -454,6 +460,43 @@ async def assign_device_to_user(
         id=str(device.id), kind=device.kind, sensor_model=device.sensor_model,
         active=device.active, needs_recalibration=device.needs_recalibration,
         last_calibrated_at=device.last_calibrated_at,
+        simulate_acetone=device.simulate_acetone,
+    )
+
+
+# ─── Simulated acetone toggle (hardware-fault workaround) ────────────────────
+
+class SimulateAcetoneRequest(BaseModel):
+    enabled: bool
+
+@router.post("/device/{device_id}/simulate-acetone", response_model=AdminDeviceOut)
+async def set_simulate_acetone(
+    device_id: str,
+    body: SimulateAcetoneRequest,
+    _admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle pressure-driven synthetic acetone for a device whose gas sensor
+    is broken. Instant, no redeploy — flip back off the moment hardware is fixed."""
+    try:
+        dev_uuid = UUID(device_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID")
+
+    device_result = await db.exec(select(Device).where(Device.id == dev_uuid))
+    device = device_result.first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    device.simulate_acetone = body.enabled
+    await db.commit()
+    await db.refresh(device)
+
+    return AdminDeviceOut(
+        id=str(device.id), kind=device.kind, sensor_model=device.sensor_model,
+        active=device.active, needs_recalibration=device.needs_recalibration,
+        last_calibrated_at=device.last_calibrated_at,
+        simulate_acetone=device.simulate_acetone,
     )
 
 

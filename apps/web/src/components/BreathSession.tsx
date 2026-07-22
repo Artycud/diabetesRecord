@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Wind, X, RefreshCw, Flame, Star } from "lucide-react";
 import { toast } from "sonner";
-import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
+import { ComposedChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AcetoneLabel, LiveReading } from "@/lib/useDeviceStream";
 import { api } from "@/lib/api";
@@ -107,6 +107,11 @@ const SW = 5;
 const RING_R = (SZ - SW) / 2;
 const CIRC = 2 * Math.PI * RING_R;
 
+// Inner ring — real-time blow intensity, nested inside the outer time ring.
+const INNER_SW = 11;
+const INNER_R = RING_R - 16;
+const INNER_CIRC = 2 * Math.PI * INNER_R;
+
 interface Props {
   liveReading: LiveReading | null;
   connected: boolean;
@@ -121,7 +126,12 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);   // 0-100 within current phase
   const [result, setResult] = useState<SessionSummary | null>(null);
-  const [chartData, setChartData] = useState<{ t: number; mv: number }[]>([]);
+  const [chartData, setChartData] = useState<{ t: number; mv: number; kpa: number }[]>([]);
+  // Real-time blow intensity (0-1), smoothed each animation frame from the
+  // live pressure reading — drives the inner ring fill during recording.
+  const [intensity, setIntensity] = useState(0);
+  const intensityRef = useRef(0);
+  const liveReadingRef = useRef<LiveReading | null>(null);
   const [showContextSelector, setShowContextSelector] = useState(false);
   const [contextTag, setContextTag] = useState<ContextTag | null>(null);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -137,6 +147,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const sessionBaseline = useRef<number | null>(null);
   const onSavedRef = useRef(onSessionSaved);
   useEffect(() => { onSavedRef.current = onSessionSaved; }, [onSessionSaved]);
+  useEffect(() => { liveReadingRef.current = liveReading; }, [liveReading]);
 
   function clearScheduled() {
     timerIds.current.forEach((id) => window.clearTimeout(id));
@@ -156,7 +167,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     }
     samplesRef.current.push(liveReading);
     const normMv = liveReading.acetone_delta_mv - (sessionBaseline.current ?? 0);
-    setChartData((prev) => [...prev, { t: prev.length, mv: normMv }]);
+    setChartData((prev) => [...prev, { t: prev.length, mv: normMv, kpa: liveReading.pressure_kpa ?? 0 }]);
   }, [liveReading, phase]);
 
   // Calibration phase — 10 s countdown, 3-2-1 beeps, transition to recording
@@ -195,6 +206,8 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     sessionBaseline.current = null;
     setChartData([]);
     setProgress(0);
+    intensityRef.current = 0;
+    setIntensity(0);
 
     if (deviceId) {
       api.sensor.startRecording(deviceId).catch(() => {
@@ -205,6 +218,13 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     const tick = () => {
       const p = Math.min(100, ((Date.now() - t0.current) / RECORDING_MS) * 100);
       setProgress(p);
+
+      // Smooth the live pressure reading into a 0-1 intensity so the inner
+      // ring visibly tracks the exhale in real time, not just the wall clock.
+      const targetIntensity = Math.min(1, Math.max(0, (liveReadingRef.current?.pressure_kpa ?? 0) / 10));
+      intensityRef.current += (targetIntensity - intensityRef.current) * 0.25;
+      setIntensity(intensityRef.current);
+
       if (p >= 100) {
         beepEnd();
         finalize();
@@ -303,6 +323,8 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     setShowContextSelector(false);
     samplesRef.current = [];
     lastReading.current = null;
+    intensityRef.current = 0;
+    setIntensity(0);
   }
 
   async function reset() {
@@ -406,19 +428,42 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     const yMin = mvVals.length > 1 ? Math.min(...mvVals) - 5 : 0;
     const yMax = mvVals.length > 1 ? Math.max(...mvVals) + 5 : 50;
 
+    const zone = backendLabelToZone(liveReading?.label ?? null);
+    const zoneStyle = LABEL_STYLE[zone] ?? LABEL_STYLE.unreliable;
+    const innerDashOffset = INNER_CIRC * (1 - intensity);
+
     return (
       <div className="flex flex-col items-center py-6 gap-4">
         <div className="relative" style={{ width: SZ, height: SZ }}>
           <svg width={SZ} height={SZ} className="rotate-[-90deg]">
-            <circle cx={SZ/2} cy={SZ/2} r={RING_R} fill="none" stroke="currentColor" className="text-mint-500/20" strokeWidth={SW} />
+            <defs>
+              <linearGradient id="blowIntensityGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={zoneStyle.grad[0]} />
+                <stop offset="100%" stopColor={zoneStyle.grad[1]} />
+              </linearGradient>
+            </defs>
+            {/* Outer: flat 5s countdown, demoted to a subtle secondary cue */}
+            <circle cx={SZ/2} cy={SZ/2} r={RING_R} fill="none" stroke="currentColor" className="text-mint-500/10" strokeWidth={3} />
             <circle
               cx={SZ/2} cy={SZ/2} r={RING_R}
-              fill="none" stroke="currentColor" className="text-mint-500"
-              strokeWidth={SW} strokeLinecap="round"
+              fill="none" stroke="currentColor" className="text-mint-500/40"
+              strokeWidth={3} strokeLinecap="round"
               strokeDasharray={CIRC} strokeDashoffset={dashOffset}
             />
+            {/* Inner: real-time blow intensity from live pressure, gradient tracks zone */}
+            <circle cx={SZ/2} cy={SZ/2} r={INNER_R} fill="none" stroke="currentColor" className="text-bg-raised" strokeWidth={INNER_SW} />
+            <circle
+              cx={SZ/2} cy={SZ/2} r={INNER_R}
+              fill="none" stroke="url(#blowIntensityGrad)"
+              strokeWidth={INNER_SW} strokeLinecap="round"
+              strokeDasharray={INNER_CIRC} strokeDashoffset={innerDashOffset}
+              style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)" }}
+            />
           </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center"
+            style={{ transform: `scale(${1 + intensity * 0.03})`, transition: "transform 0.15s ease-out" }}
+          >
             <span className="text-3xl font-bold text-mint-500 leading-none">{secsLeft}</span>
             <span className="text-[10px] text-text-muted mt-1">{fmtAcetone(liveMv)} {unitLbl}</span>
           </div>
@@ -426,33 +471,55 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
         <p className="text-sm font-semibold text-mint-500">เป่าออกยาวๆ ค้างไว้</p>
 
-        <div className="w-full rounded-2xl bg-bg-elevated overflow-hidden" style={{ height: 96 }}>
-          {chartData.length > 1 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="breathGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#00C896" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#00C896" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <YAxis domain={[yMin, yMax]} hide />
-                <Area
-                  type="monotoneX"
-                  dataKey="mv"
-                  stroke="#00C896"
-                  strokeWidth={2}
-                  fill="url(#breathGrad)"
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-xs text-text-muted">รอสัญญาณ...</p>
-            </div>
-          )}
+        <div className="w-full space-y-1.5">
+          <div className="flex items-center justify-center gap-4 text-[10px] text-text-muted">
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-mint-500" />Acetone</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Pressure</span>
+          </div>
+          <div className="w-full rounded-2xl bg-bg-elevated overflow-hidden" style={{ height: 96 }}>
+            {chartData.length > 1 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="breathGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#00C896" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#00C896" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="pressureGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <YAxis yAxisId="acetone" domain={[yMin, yMax]} hide />
+                  <YAxis yAxisId="pressure" domain={[0, 10]} hide />
+                  <Area
+                    yAxisId="pressure"
+                    type="monotoneX"
+                    dataKey="kpa"
+                    stroke="#60A5FA"
+                    strokeWidth={1.5}
+                    fill="url(#pressureGrad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    yAxisId="acetone"
+                    type="monotoneX"
+                    dataKey="mv"
+                    stroke="#00C896"
+                    strokeWidth={2}
+                    fill="url(#breathGrad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-xs text-text-muted">รอสัญญาณ...</p>
+              </div>
+            )}
+          </div>
         </div>
 
         <button

@@ -23,6 +23,10 @@ class Device(SQLModel, table=True):
     # If true, any signed-in user can claim this device via /devices/pool.
     # Readings during their session are attributed to the claimer, not user_id (owner).
     is_shared: bool = Field(default=False)
+    # Hardware-fault workaround: the gas sensor is dead, so ingestion substitutes
+    # a pressure-driven synthetic value (see app.services.acetone_simulator)
+    # instead of the real (broken) voltage delta. Toggle off once hardware is fixed.
+    simulate_acetone: bool = Field(default=False)
 
 class SensorReading(SQLModel, table=True):
     """TimescaleDB hypertable — partitioned by time. Migration adds create_hypertable call.

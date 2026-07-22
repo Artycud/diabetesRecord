@@ -25,6 +25,7 @@ from sqlmodel import select
 from app.core.config import settings
 from app.models.health import Device, SensorReading, DeviceCalibration
 from app.services import signal_processing as sp
+from app.services import acetone_simulator
 from app.services.device_session import resolve_reading_user
 
 logging.basicConfig(
@@ -114,19 +115,39 @@ async def process_reading(device_id_str: str, payload: dict):
         temp_c           = payload.get("temperature")
         humidity         = payload.get("humidity")
 
+        now = datetime.utcnow()
+
         if calibration and calibration.baseline_voc:
             effective_baseline = calibration.baseline_voc
         else:
             effective_baseline = baseline_voltage
 
-        if sensor_voltage is not None and effective_baseline is not None:
+        is_simulated = bool(device.simulate_acetone)
+
+        if is_simulated:
+            # Hardware-fault workaround: the gas cell is dead, so derive the
+            # acetone signal from the (still-functional) pressure sensor
+            # instead. See app.services.acetone_simulator for the algorithm
+            # and the hard safety cap it enforces.
+            acetone_delta_mv = acetone_simulator.step(device_uuid, pressure_kpa, now.timestamp())
+            # Also synthesize the voltage quality_score() sees — otherwise the
+            # real (broken) near-zero/negative voltage keeps tripping the
+            # quality/confidence deductions and every reading comes back
+            # "unreliable" regardless of the faked delta above.
+            q_sensor_voltage = (effective_baseline or 1.0) + acetone_delta_mv / 1000.0
+            q_baseline_voltage = effective_baseline or 1.0
+        elif sensor_voltage is not None and effective_baseline is not None:
             acetone_delta_mv = (sensor_voltage - effective_baseline) * 1000.0
+            q_sensor_voltage = sensor_voltage
+            q_baseline_voltage = effective_baseline
         else:
             acetone_delta_mv = payload.get("acetone_delta_mv") or 0.0
+            q_sensor_voltage = sensor_voltage
+            q_baseline_voltage = effective_baseline
 
         q_score = sp.quality_score(
-            sensor_voltage=sensor_voltage,
-            baseline_voltage=effective_baseline,
+            sensor_voltage=q_sensor_voltage,
+            baseline_voltage=q_baseline_voltage,
             pressure_kpa=pressure_kpa,
             temp_c=temp_c,
             humidity_pct=humidity,
@@ -144,8 +165,6 @@ async def process_reading(device_id_str: str, payload: dict):
         env_pen = sp.environment_penalty(temp_c, humidity)
         confidence = r_score / 100.0
         classification = sp.classify_acetone(acetone_delta_mv, confidence)
-
-        now = datetime.utcnow()
 
         # Attribute to current session claimer; fallback to device owner
         reading_user_id = await resolve_reading_user(device, db)
@@ -184,7 +203,9 @@ async def process_reading(device_id_str: str, payload: dict):
             metabolic_risk_index=classification["metabolic_risk_index"],
             confidence_score=round(confidence, 4),
             label=classification["label"],
-            raw=payload,
+            # "simulated_" marker is picked up by app.services.ml_data's existing
+            # exclusion filter — synthesized readings never reach training data.
+            raw={**payload, "source": "simulated_pressure_response"} if is_simulated else payload,
         )
         db.add(reading)
 
