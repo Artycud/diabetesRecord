@@ -8,9 +8,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Palette, Globe, LogOut, ChevronRight, Ruler,
-  Flame, Trophy, Star, Shield,
+  Flame, Trophy, Star, Shield, FlaskConical,
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
+import { useDemoMode } from "@/lib/demoMode";
 
 const XP_PER_LEVEL = 100;
 
@@ -33,6 +34,7 @@ export default function MePage() {
   const { t, locale, setLocale } = useT();
   const router = useRouter();
   const { unit: acUnit } = useUnits();
+  const { demoMode, setDemoMode } = useDemoMode();
 
   const { data: xp }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streak } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
@@ -175,13 +177,35 @@ export default function MePage() {
           </Link>
 
           {/* Theme & appearance */}
-          <Link href="/me/settings/appearance" className="flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors">
+          <Link href="/me/settings/appearance" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
             <div className="h-8 w-8 rounded-lg bg-mint-500/20 flex items-center justify-center">
               <Palette size={15} className="text-mint-500" />
             </div>
             <span className="flex-1 text-sm text-mint-500 font-medium">Theme & appearance</span>
             <ChevronRight size={14} className="text-text-disabled" />
           </Link>
+
+          {/* Demo mode — no device needed, runs a full breath-test flow with
+              a synthetic reading stream. Deliberately low-key/muted styling. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={demoMode}
+            onClick={() => setDemoMode(!demoMode)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors"
+          >
+            <div className="h-8 w-8 rounded-lg bg-bg-raised flex items-center justify-center">
+              <FlaskConical size={15} className="text-text-muted" />
+            </div>
+            <span className="flex-1 text-sm text-text-muted text-left">Demo mode</span>
+            <span
+              className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${demoMode ? "bg-mint-500" : "bg-bg-raised"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </span>
+          </button>
         </div>
       </div>
 

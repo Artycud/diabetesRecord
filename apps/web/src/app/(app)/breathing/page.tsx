@@ -6,6 +6,7 @@ import { api, type SharedDeviceOut } from "@/lib/api";
 import { parseServerTime } from "@/lib/time";
 import { useAuth } from "@/lib/auth";
 import { useDeviceStream } from "@/lib/useDeviceStream";
+import { useDemoMode } from "@/lib/demoMode";
 import Link from "next/link";
 import { Radio, TrendingUp, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ import { AcetoneZoneCard } from "@/components/cards/AcetoneZoneCard";
 export default function BreathingPage() {
   const { user } = useAuth();
   const { t } = useT();
+  const { demoMode } = useDemoMode();
   const { reading: liveReading } = useDeviceStream(user?.id);
   const userId = user?.id;
   // Session history has moved to /trends. We still fetch it here so (a) after each
@@ -68,8 +70,9 @@ export default function BreathingPage() {
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-5">
       {/* Device status card removed — same info + release button lives on /me/device now.
-          Users without any device still see the "Add device" prompt via the empty state below. */}
-      {!primaryDevice && (
+          Users without any device still see the "Add device" prompt via the empty state below.
+          Both this and the shared-pool prompt below are irrelevant once Demo Mode is on. */}
+      {!demoMode && !primaryDevice && (
         <div className="bg-bg-elevated rounded-2xl p-4 flex items-center justify-between">
           <p className="text-sm text-text-muted">{t("breathing.noDevice")}</p>
           <Link href="/me/device/add" className="text-xs text-mint-500 font-medium">{t("breathing.addDevice")}</Link>
@@ -77,7 +80,7 @@ export default function BreathingPage() {
       )}
 
       {/* Shared device pool — show only when I don't own AND haven't claimed */}
-      {!ownedDevice && !myClaim && sharedDevices && sharedDevices.length > 0 && (
+      {!demoMode && !ownedDevice && !myClaim && sharedDevices && sharedDevices.length > 0 && (
         <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Radio size={16} className="text-mint-500" strokeWidth={1.6} />
@@ -99,6 +102,7 @@ export default function BreathingPage() {
         deviceId={primaryDevice?.id ?? null}
         userId={userId}
         onSessionSaved={() => refetchSessions()}
+        isDemo={demoMode}
       />
 
       {/* Metabolic zone — where does the current value sit on the 5-zone ladder */}

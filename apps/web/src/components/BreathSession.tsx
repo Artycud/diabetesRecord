@@ -8,9 +8,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AcetoneLabel, LiveReading } from "@/lib/useDeviceStream";
 import { api } from "@/lib/api";
 import type { ContextTag } from "@/lib/api";
-import { useUnits } from "@/lib/units";
-import { LABEL_STYLE, LABEL_TH, backendLabelToZone } from "@/lib/riskLabel";
+import { convertFromMv, useUnits } from "@/lib/units";
+import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone } from "@/lib/riskLabel";
 import { useTimezone } from "@/lib/timezone";
+import { randomDemoParams, demoValueAt, type DemoParams } from "@/lib/demoReading";
 import { ContextSelector } from "./ContextSelector";
 import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
 
@@ -118,9 +119,15 @@ interface Props {
   deviceId: string | null;
   userId?: string | null;
   onSessionSaved?: () => void;
+  // Demo Mode (apps/web/src/lib/demoMode.tsx) — no real device needed at
+  // all; liveReading/connected/deviceId above are ignored internally and a
+  // synthetic reading stream (apps/web/src/lib/demoReading.ts) is used
+  // instead, but every other code path (chart, ring, persisted history,
+  // gamification) runs completely unchanged.
+  isDemo?: boolean;
 }
 
-export default function BreathSession({ liveReading, connected, deviceId, userId, onSessionSaved }: Props) {
+export default function BreathSession({ liveReading, connected, deviceId, userId, onSessionSaved, isDemo = false }: Props) {
   const { format: fmtAcetone, label: unitLbl } = useUnits();
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -132,6 +139,12 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const [intensity, setIntensity] = useState(0);
   const intensityRef = useRef(0);
   const liveReadingRef = useRef<LiveReading | null>(null);
+  // Demo Mode: synthetic reading stream, standing in for the liveReading
+  // prop everywhere below via `effectiveReading`.
+  const [demoReading, setDemoReading] = useState<LiveReading | null>(null);
+  const demoParamsRef = useRef<DemoParams | null>(null);
+  const demoLastSampleRef = useRef(0);
+  const effectiveReading = isDemo ? demoReading : liveReading;
   const [showContextSelector, setShowContextSelector] = useState(false);
   const [contextTag, setContextTag] = useState<ContextTag | null>(null);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -160,15 +173,15 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
   // Collect samples only during the recording phase (normalised to session baseline).
   useEffect(() => {
-    if (phase !== "recording" || !liveReading || liveReading === lastReading.current) return;
-    lastReading.current = liveReading;
+    if (phase !== "recording" || !effectiveReading || effectiveReading === lastReading.current) return;
+    lastReading.current = effectiveReading;
     if (sessionBaseline.current === null) {
-      sessionBaseline.current = liveReading.acetone_delta_mv;
+      sessionBaseline.current = effectiveReading.acetone_delta_mv;
     }
-    samplesRef.current.push(liveReading);
-    const normMv = liveReading.acetone_delta_mv - (sessionBaseline.current ?? 0);
-    setChartData((prev) => [...prev, { t: prev.length, mv: normMv, kpa: liveReading.pressure_kpa ?? 0 }]);
-  }, [liveReading, phase]);
+    samplesRef.current.push(effectiveReading);
+    const normMv = effectiveReading.acetone_delta_mv - (sessionBaseline.current ?? 0);
+    setChartData((prev) => [...prev, { t: prev.length, mv: normMv, kpa: effectiveReading.pressure_kpa ?? 0 }]);
+  }, [effectiveReading, phase]);
 
   // Calibration phase — 10 s countdown, 3-2-1 beeps, transition to recording
   useEffect(() => {
@@ -208,20 +221,56 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     setProgress(0);
     intensityRef.current = 0;
     setIntensity(0);
+    demoLastSampleRef.current = 0;
 
-    if (deviceId) {
+    if (isDemo) {
+      demoParamsRef.current = randomDemoParams();
+    } else if (deviceId) {
       api.sensor.startRecording(deviceId).catch(() => {
         toast.error("เริ่ม session ไม่สำเร็จ");
       });
     }
 
     const tick = () => {
-      const p = Math.min(100, ((Date.now() - t0.current) / RECORDING_MS) * 100);
+      const now = Date.now();
+      const p = Math.min(100, ((now - t0.current) / RECORDING_MS) * 100);
       setProgress(p);
 
-      // Smooth the live pressure reading into a 0-1 intensity so the inner
+      // Smooth the current pressure reading into a 0-1 intensity so the inner
       // ring visibly tracks the exhale in real time, not just the wall clock.
-      const targetIntensity = Math.min(1, Math.max(0, (liveReadingRef.current?.pressure_kpa ?? 0) / 10));
+      let targetKpa: number;
+      if (isDemo) {
+        const { mv, kpa } = demoValueAt(p, demoParamsRef.current!);
+        targetKpa = kpa;
+        // Throttle discrete "readings" (chart samples) to a realistic ~2Hz
+        // cadence, matching real device sampling — separate from the ring's
+        // per-frame intensity smoothing below, which stays buttery smooth.
+        if (now - demoLastSampleRef.current > 500) {
+          demoLastSampleRef.current = now;
+          const zone = metabolicZone(convertFromMv(mv, "ppm"));
+          setDemoReading({
+            device_id: "demo",
+            time: new Date().toISOString(),
+            acetone_delta_mv: mv,
+            sensor_voltage: null,
+            baseline_voltage: null,
+            pressure_kpa: kpa,
+            temperature: 25,
+            humidity: 55,
+            // `zone` is a MetabolicZone (fed_resting/transitional/...) — a
+            // different (and, unlike the AcetoneLabel union below, actually
+            // handled by backendLabelToZone's pass-through) label vocabulary
+            // than useDeviceStream's AcetoneLabel type. Pre-existing mismatch,
+            // not introduced here; cast is intentional, not a type error to fix.
+            label: zone as unknown as AcetoneLabel,
+            quality_score: 95,
+            confidence_score: 0.95,
+          });
+        }
+      } else {
+        targetKpa = liveReadingRef.current?.pressure_kpa ?? 0;
+      }
+      const targetIntensity = Math.min(1, Math.max(0, targetKpa / 10));
       intensityRef.current += (targetIntensity - intensityRef.current) * 0.25;
       setIntensity(intensityRef.current);
 
@@ -235,10 +284,10 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     rafId.current = requestAnimationFrame(tick);
 
     return clearScheduled;
-  }, [phase, deviceId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, deviceId, isDemo]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   async function finalize() {
-    if (deviceId) {
+    if (!isDemo && deviceId) {
       try { await api.sensor.stopRecording(deviceId); } catch { /* non-critical */ }
     }
     const s = samplesRef.current;
@@ -279,15 +328,17 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   }
 
   async function start() {
-    if (!connected) {
-      toast.error("กรุณาเชื่อมต่ออุปกรณ์ก่อนเริ่มตรวจ", {
-        action: { label: "ไปที่ Device", onClick: () => { window.location.href = "/me/device"; } },
-      });
-      return;
-    }
-    if (!deviceId) {
-      toast.error("ไม่พบอุปกรณ์");
-      return;
+    if (!isDemo) {
+      if (!connected) {
+        toast.error("กรุณาเชื่อมต่ออุปกรณ์ก่อนเริ่มตรวจ", {
+          action: { label: "ไปที่ Device", onClick: () => { window.location.href = "/me/device"; } },
+        });
+        return;
+      }
+      if (!deviceId) {
+        toast.error("ไม่พบอุปกรณ์");
+        return;
+      }
     }
     primeAudio();  // must run on user gesture (iOS Safari)
     setShowChecklist(true);
@@ -325,11 +376,12 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     lastReading.current = null;
     intensityRef.current = 0;
     setIntensity(0);
+    setDemoReading(null);
   }
 
   async function reset() {
     clearScheduled();
-    if (deviceId && phase === "recording") {
+    if (!isDemo && deviceId && phase === "recording") {
       try { await api.sensor.stopRecording(deviceId); } catch { /* ignore */ }
     }
     resetToIdle();
@@ -340,7 +392,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const dashOffset = CIRC * (1 - progress / 100);
   // Live display is normalised to session baseline (first sample) so the number
   // tracks the same shape as the waveform, not raw drift-affected delta.
-  const rawLive = liveReading?.acetone_delta_mv ?? 0;
+  const rawLive = effectiveReading?.acetone_delta_mv ?? 0;
   const liveMv = phase === "recording" && sessionBaseline.current !== null
     ? rawLive - sessionBaseline.current
     : rawLive;
@@ -428,7 +480,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     const yMin = mvVals.length > 1 ? Math.min(...mvVals) - 5 : 0;
     const yMax = mvVals.length > 1 ? Math.max(...mvVals) + 5 : 50;
 
-    const zone = backendLabelToZone(liveReading?.label ?? null);
+    const zone = backendLabelToZone(effectiveReading?.label ?? null);
     const zoneStyle = LABEL_STYLE[zone] ?? LABEL_STYLE.unreliable;
     const innerDashOffset = INNER_CIRC * (1 - intensity);
 

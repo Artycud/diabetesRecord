@@ -22,8 +22,21 @@ export type MetabolicZone =
 export type AcetoneLabel = MetabolicZone;
 
 /**
- * Map Anderson 2015 five-class backend labels → 4-zone frontend MetabolicZone.
- * Backend stores: basal|light_ketosis|nutritional_ketosis|deep_ketosis|dka_risk
+ * Map backend labels → 4-zone frontend MetabolicZone.
+ *
+ * Two backend label vocabularies exist and both are mapped here:
+ *   - Anderson 2015 five-class: basal|light_ketosis|nutritional_ketosis|deep_ketosis|dka_risk
+ *   - app.services.signal_processing.classify_acetone (what the API/MQTT
+ *     pipeline actually sends today, confirmed against production logs):
+ *     clean|low|moderate|high|unreliable, at 5/30/80 mV boundaries. These
+ *     were previously NOT in this map at all, so every real reading labeled
+ *     low/moderate/high silently fell through to "unreliable" — fixed below.
+ *     Mapped conservatively (never escalates into safety_alert territory,
+ *     which starts at 75ppm/750mV — far above classify_acetone's 80mV "high"
+ *     floor) to match classify_acetone's own documented intent:
+ *       low      (5-30mV)  "no significant acetone"   → fed_resting
+ *       moderate (30-80mV) "mild ketosis / fat burning" → transitional
+ *       high     (>=80mV)  "strong ketosis"            → fat_oxidation
  * Frontend shows: fed_resting|transitional|fat_oxidation|extended_fast|safety_alert
  */
 export function backendLabelToZone(label: string | null | undefined): MetabolicZone {
@@ -33,6 +46,10 @@ export function backendLabelToZone(label: string | null | undefined): MetabolicZ
     nutritional_ketosis:  "fat_oxidation",
     deep_ketosis:         "extended_fast",
     dka_risk:             "safety_alert",
+    // app.services.signal_processing.classify_acetone's actual vocabulary
+    low:                  "fed_resting",
+    moderate:             "transitional",
+    high:                 "fat_oxidation",
     // pass-through if already 4-zone
     fed_resting:          "fed_resting",
     transitional:         "transitional",
