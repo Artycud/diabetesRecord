@@ -64,15 +64,18 @@ export default function DevicePage() {
   const myClaim = sharedDevices?.find((d) => d.claimed_by_me);
   const claimableDevices = sharedDevices?.filter((d) => !d.claimed_by_me) ?? [];
 
-  // Effective primary: owned first, then a shared device the user has claimed
-  const device = ownedDevice ?? (myClaim ? {
+  // Effective primary: an active claim wins over an owned device. Claiming is
+  // a deliberate "use this one now" action — it must not be shadowed by a
+  // device the user happens to own but isn't currently using (e.g. an old
+  // self-paired device that never came online).
+  const device = myClaim ? {
     id: myClaim.id,
     kind: myClaim.kind,
     active: myClaim.active,
     needs_recalibration: myClaim.needs_recalibration,
     last_calibrated_at: null,
     sensor_model: myClaim.sensor_model,
-  } : undefined);
+  } : ownedDevice;
 
   async function handleClaim(id: string) {
     try {
@@ -163,7 +166,7 @@ export default function DevicePage() {
             <div>
               <p className="text-sm font-semibold text-text-primary">
                 {device.sensor_model ?? "MetaBreath TGS1820"}
-                {myClaim && !ownedDevice && (
+                {myClaim && (
                   <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-mint-500/20 text-mint-500 font-medium align-middle">
                     shared
                   </span>
@@ -174,7 +177,7 @@ export default function DevicePage() {
                 <p className={`text-xs ${status.color}`}>{isLive ? "Connected · Live" : "Disconnected"}</p>
               </div>
             </div>
-            {!ownedDevice && myClaim && (
+            {myClaim && (
               <button
                 onClick={() => handleRelease(myClaim.id)}
                 className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded-lg bg-bg-raised"
@@ -221,8 +224,9 @@ export default function DevicePage() {
               )}
 
               {/* First-time WiFi setup instructions — only for OWNED devices that never came online.
-                  For claimed shared devices we skip this: the primary owner already provisioned WiFi. */}
-              {linkStatus === "waiting" && ownedDevice && (
+                  For claimed shared devices we skip this: the primary owner already provisioned WiFi,
+                  and an active claim is already displaying that device above, not the owned one. */}
+              {linkStatus === "waiting" && ownedDevice && !myClaim && (
                 <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 space-y-3">
                   <p className="text-xs text-blue-300 font-bold">ตั้งค่าอุปกรณ์ MetaBreath</p>
                   <div className="space-y-1">
@@ -250,8 +254,9 @@ export default function DevicePage() {
               )}
 
               {/* Owned device stopped sending data — give a real way out instead of
-                  a dead "Offline" screen: retry WiFi, or unlink and use a shared one. */}
-              {linkStatus === "offline" && ownedDevice && (
+                  a dead "Offline" screen: retry WiFi, or unlink and use a shared one.
+                  Skipped while an active claim is showing (that's a different device). */}
+              {linkStatus === "offline" && ownedDevice && !myClaim && (
                 <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-2">
                   <p className="text-xs text-amber-400 font-semibold">อุปกรณ์ไม่ได้เชื่อมต่อ</p>
                   <p className="text-[11px] text-text-disabled leading-relaxed">
