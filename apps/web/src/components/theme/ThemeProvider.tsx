@@ -58,7 +58,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setAccentState(a);
       document.documentElement.style.setProperty("--color-mint-500", ACCENT_COLORS[a]);
     }
-    if (c) setCardStyleState(normalizeCardStyle(c));
+    const resolvedStyle = c ? normalizeCardStyle(c) : "neumorphic";
+    setCardStyleState(resolvedStyle);
+    // Mirrors next-themes' data-theme attribute so globals.css can give
+    // every plain `bg-bg-elevated` element a shadow via a single selector
+    // instead of every component needing its own useThemeConfig() opt-in —
+    // most of the app (device/settings/me pages) never got that per-component
+    // treatment and read as completely flat as a result.
+    document.documentElement.setAttribute("data-card-style", resolvedStyle);
   }, []);
 
   const setAccent = (a: AccentColor) => {
@@ -70,6 +77,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setCardStyle = (s: CardStyle) => {
     setCardStyleState(s);
     localStorage.setItem("cardStyle", s);
+    document.documentElement.setAttribute("data-card-style", s);
   };
 
   return (

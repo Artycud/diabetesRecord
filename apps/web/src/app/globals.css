@@ -88,8 +88,8 @@
 [data-theme="system"] {
   background-color: #0b1535;
 
-  --neu-light: rgba(255,255,255,0.06);
-  --neu-dark:  rgba(0,0,0,0.35);
+  --neu-light: rgba(255,255,255,0.07);
+  --neu-dark:  rgba(0,0,0,0.4);
 
   --color-bg-primary:  #0b1535;
   --color-bg-surface:  #142552;
@@ -116,7 +116,7 @@
 
 [data-theme="system"] body {
   background-color: #0b1535;
-  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 14%, transparent) 0%, transparent 65%);
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 18%, transparent) 0%, transparent 65%);
   background-attachment: fixed;
 }
 
@@ -124,8 +124,8 @@
 [data-theme="dark"] {
   background-color: #0A0A0A;
 
-  --neu-light: rgba(255,255,255,0.04);
-  --neu-dark:  rgba(0,0,0,0.55);
+  --neu-light: rgba(255,255,255,0.05);
+  --neu-dark:  rgba(0,0,0,0.6);
 
   --color-bg-primary:  #0A0A0A;
   --color-bg-surface:  #141414;
@@ -152,19 +152,23 @@
 
 [data-theme="dark"] body {
   background-color: #0A0A0A;
-  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 16%, transparent) 0%, transparent 65%);
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 20%, transparent) 0%, transparent 65%);
   background-attachment: fixed;
 }
 
 /* ─── Light mode override ───────────────────────────── */
 [data-theme="light"] {
-  --neu-light: rgba(255,255,255,0.9);
-  --neu-dark:  rgba(163,177,198,0.45);
+  --neu-light: rgba(255,255,255,0.95);
+  --neu-dark:  rgba(163,177,198,0.6);
 
   --color-bg-primary:  #FAFAF7;
   --color-bg-surface:  #FFFFFF;
-  --color-bg-elevated: #F4F4F1;
-  --color-bg-raised:   #EEEDE8;
+  /* Widened from bg-primary (#FAFAF7) so cards read as a distinct surface
+     even before the shadow is considered — the old ~6-unit gap was so
+     close to the page background that neumorphism's shadow had to do all
+     the work, and washed out in bright/ambient light. */
+  --color-bg-elevated: #EFEEE9;
+  --color-bg-raised:   #E7E5DD;
   --color-text-primary:   #000000;
   --color-text-secondary: #1F1F1F;
   --color-text-muted:     #3D3D3A;
@@ -174,10 +178,10 @@
 
   /* Legacy aliases */
   --color-surface:   #FFFFFF;
-  --color-surface-2: #F4F4F1;
+  --color-surface-2: #EFEEE9;
   --color-border:    #D8D6CF;
   --color-muted:     #3D3D3A;
-  --color-muted-bg:  #F4F4F1;
+  --color-muted-bg:  #EFEEE9;
   --color-charcoal-500: #000000;
   --color-charcoal-600: #1F1F1F;
 }
@@ -191,9 +195,9 @@ body {
   background-color: var(--color-bg-primary);
   /* Ambient premium wash — reads var(--color-mint-500) directly, which
      ThemeProvider already repoints to whatever accent the user picked, so
-     this follows accent selection with no extra plumbing. Kept faint
-     (7% base, bumped per-theme below) — "slight," not a colored bg. */
-  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 7%, transparent) 0%, transparent 65%);
+     this follows accent selection with no extra plumbing. Intensity is
+     tuned per-theme below — still a wash, not a colored background. */
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 11%, transparent) 0%, transparent 65%);
   background-attachment: fixed;
   color: var(--color-text-primary);
   font-family: var(--font-sans);
@@ -255,9 +259,19 @@ body {
    formula tuned for the light theme's off-white bg looks wrong reused
    as-is on navy/dark. .neu-raised = idle/clickable, .neu-inset = pressed —
    the raised→inset flip on :active is what makes this read as tactile
-   instead of just "low contrast," so anything actionable should use both. */
-.neu-raised {
-  box-shadow: 6px 6px 12px var(--neu-dark), -6px -6px 12px var(--neu-light);
+   instead of just "low contrast," so anything actionable should use both.
+
+   The [data-card-style="neumorphic"] .bg-bg-elevated selector is the
+   important part: most of the app's surfaces (device/settings/me pages)
+   are plain `bg-bg-elevated` divs that were never migrated to <Card> or
+   given a `neu-raised` class one-by-one, so they rendered with zero
+   shadow — flat next to the few cards that did get it. This gives every
+   one of them the same shadow automatically, sitewide, from one rule,
+   using the data-card-style attribute ThemeProvider mirrors from the
+   picker (parallel to next-themes' own data-theme attribute). */
+.neu-raised,
+[data-card-style="neumorphic"] .bg-bg-elevated:not(input, textarea, select) {
+  box-shadow: 8px 8px 18px var(--neu-dark), -8px -8px 18px var(--neu-light);
   transition: box-shadow var(--motion-fast) var(--ease-standard);
 }
 .neu-inset {
@@ -265,10 +279,13 @@ body {
 }
 /* Anything actionable using .neu-raised (buttons, the active nav pill,
    toggles, checkboxes) automatically "pushes in" on press — this is what
-   makes neumorphism read as clickable/tactile instead of just low-contrast. */
+   makes neumorphism read as clickable/tactile instead of just low-contrast.
+   Extended to plain bg-bg-elevated buttons (back buttons, icon buttons)
+   picking up the blanket shadow above, so they get the same tactile feel. */
 button.neu-raised:active,
 .neu-raised[role="switch"]:active,
-.neu-raised[data-active="true"] {
+.neu-raised[data-active="true"],
+[data-card-style="neumorphic"] button.bg-bg-elevated:active {
   box-shadow: inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
 }
 
@@ -277,11 +294,11 @@ button.neu-raised:active,
    instead of competing with it. Slight by design; bumped a touch on
    darker themes where the same % reads fainter against a near-black base. */
 .card-gradient {
-  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 5%, transparent) 0%, transparent 55%);
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 8%, transparent) 0%, transparent 55%);
 }
 [data-theme="system"] .card-gradient,
 [data-theme="dark"] .card-gradient {
-  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 9%, transparent) 0%, transparent 55%);
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) 13%, transparent) 0%, transparent 55%);
 }
 
 /* ─── Premium CTA — the single primary action button (Breathing START) ───
