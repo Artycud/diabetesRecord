@@ -12,6 +12,9 @@ import { convertFromMv, useUnits } from "@/lib/units";
 import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone } from "@/lib/riskLabel";
 import { useTimezone } from "@/lib/timezone";
 import { randomDemoParams, demoValueAt, type DemoParams } from "@/lib/demoReading";
+import { BreathPulse } from "@/components/ui/BreathPulse";
+import { useThemeConfig } from "@/components/theme/ThemeProvider";
+import { twMerge } from "tailwind-merge";
 import { ContextSelector } from "./ContextSelector";
 import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
 
@@ -129,6 +132,7 @@ interface Props {
 
 export default function BreathSession({ liveReading, connected, deviceId, userId, onSessionSaved, isDemo = false }: Props) {
   const { format: fmtAcetone, label: unitLbl } = useUnits();
+  const { cardStyle } = useThemeConfig();
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);   // 0-100 within current phase
@@ -321,6 +325,9 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     setPhase("done");
     toast.success("บันทึกเซสชั่นแล้ว");
     onSavedRef.current?.();
+    // Streak/XP/quest check-in — unconditional for both real and Demo Mode
+    // sessions by design, so the habit loop counts identically either way.
+    try { await api.gamification.checkin(); } catch { /* non-critical */ }
     // Invalidate gamification so home/profile show fresh streak + XP
     qc.invalidateQueries({ queryKey: ["me", "xp"] });
     qc.invalidateQueries({ queryKey: ["me", "streak"] });
@@ -402,21 +409,35 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     return (
       <>
         <div className="flex flex-col items-center py-8">
-          <button
-            onClick={start}
-            className="h-28 w-28 rounded-full bg-mint-500/10 border-2 border-mint-500/40 flex flex-col items-center justify-center gap-2 hover:bg-mint-500/20 active:scale-95 transition-all duration-200"
-          >
-            <Wind
-              size={32}
-              className={connected ? "text-mint-500" : "text-text-muted"}
-              strokeWidth={1.6}
-            />
-            <span className={`text-xs font-semibold uppercase tracking-wide ${connected ? "text-mint-500" : "text-text-muted"}`}>
-              START
-            </span>
-          </button>
+          <div className="relative flex items-center justify-center">
+            {(connected || isDemo) && (
+              <div className="absolute pointer-events-none">
+                <BreathPulse size={148} />
+              </div>
+            )}
+            <button
+              onClick={start}
+              className={twMerge(
+                "relative h-28 w-28 rounded-full flex flex-col items-center justify-center gap-2 active:scale-95 transition-all duration-200",
+                cardStyle === "neumorphic"
+                  ? "bg-bg-elevated neu-raised"
+                  : cardStyle === "liquidGlass"
+                    ? "liquid-glass"
+                    : "bg-mint-500/10 border-2 border-mint-500/40 hover:bg-mint-500/20"
+              )}
+            >
+              <Wind
+                size={32}
+                className={connected || isDemo ? "text-mint-500" : "text-text-muted"}
+                strokeWidth={1.6}
+              />
+              <span className={`text-xs font-semibold uppercase tracking-wide ${connected || isDemo ? "text-mint-500" : "text-text-muted"}`}>
+                START
+              </span>
+            </button>
+          </div>
           <p className="text-xs text-text-muted mt-4">
-            {connected ? "กดเพื่อเริ่มการตรวจ" : "เชื่อมต่ออุปกรณ์ก่อนเริ่ม"}
+            {connected || isDemo ? "กดเพื่อเริ่มการตรวจ" : "เชื่อมต่ออุปกรณ์ก่อนเริ่ม"}
           </p>
         </div>
         {showChecklist && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Info, X } from "lucide-react";
 
 interface Props {
@@ -27,7 +28,13 @@ export function InfoButton({ title, children, ariaLabel = "ดูรายละ
         <Info size={16} strokeWidth={1.8} />
       </button>
 
-      {open && (
+      {/* Portaled to document.body — a fixed-position modal nested inside a
+          Liquid Glass Card (backdrop-filter) would otherwise get its
+          containing block hijacked by that ancestor per the CSS spec,
+          shrinking/clipping the modal to the card's bounds instead of the
+          viewport. Rendering outside the card's DOM subtree avoids this
+          regardless of which appearance mode is active. */}
+      {open && createPortal(
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -53,7 +60,8 @@ export function InfoButton({ title, children, ariaLabel = "ดูรายละ
               {children}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

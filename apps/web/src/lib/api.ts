@@ -200,6 +200,13 @@ export interface QuestOut {
   completed_at: string | null;
 }
 
+export interface CheckinOut {
+  xp_awarded: number;
+  total_xp: number;
+  streak: StreakOut;
+  newly_awarded_badges: string[];
+}
+
 // ─── Content ─────────────────────────────────────────
 export interface ArticleOut {
   slug: string;
@@ -647,6 +654,7 @@ export const api = {
     getStreak: () => request<StreakOut>("/me/streak"),
     getBadges: () => request<BadgeOut[]>("/me/badges"),
     getQuestsToday: () => request<QuestOut[]>("/me/quests/today"),
+    checkin: () => request<CheckinOut>("/me/checkin", { method: "POST" }),
   },
   content: {
     listArticles: () => request<ArticleOut[]>("/articles"),

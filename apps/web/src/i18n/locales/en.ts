@@ -113,7 +113,7 @@ export const en: Dict = {
     female: "Female",
     other: "Prefer not to say",
     doneTitle: "Ready to start",
-    doneSubtitle: "You can set up reminders anytime in your Profile.",
+    doneSubtitle: "We'll remind you right on your Health tab — no setup needed.",
     tip: "Tip: Log daily to build your streak and earn XP",
     tipTitle: "Your 3 Daily MetaBreath",
     tipTime1: "On waking",

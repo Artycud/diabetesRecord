@@ -111,7 +111,7 @@ export const th = {
     female: "หญิง",
     other: "ไม่ระบุเพศ",
     doneTitle: "พร้อมเริ่มแล้ว",
-    doneSubtitle: "ตั้งการแจ้งเตือนได้ทุกเมื่อในหน้า Profile",
+    doneSubtitle: "เราจะเตือนคุณที่หน้า Health ให้เอง — ไม่ต้องตั้งค่าอะไรเพิ่ม",
     tip: "เคล็ดลับ: บันทึกข้อมูลทุกวันเพื่อสะสม Streak และรับ XP",
     tipTitle: "3 ช่วงวัด MetaBreath ต่อวัน",
     tipTime1: "ตื่นนอน",

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
 import { useDemoMode } from "@/lib/demoMode";
+import { useThemeConfig } from "@/components/theme/ThemeProvider";
 
 const XP_PER_LEVEL = 100;
 
@@ -35,6 +36,7 @@ export default function MePage() {
   const router = useRouter();
   const { unit: acUnit } = useUnits();
   const { demoMode, setDemoMode } = useDemoMode();
+  const { cardStyle } = useThemeConfig();
 
   const { data: xp }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streak } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
@@ -199,10 +201,16 @@ export default function MePage() {
             </div>
             <span className="flex-1 text-sm text-text-muted text-left">Demo mode</span>
             <span
-              className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${demoMode ? "bg-mint-500" : "bg-bg-raised"}`}
+              className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${
+                demoMode
+                  ? "bg-mint-500"
+                  : cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : "bg-bg-raised"
+              }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                  cardStyle === "neumorphic" ? "neu-raised" : ""
+                } ${demoMode ? "translate-x-5" : "translate-x-0"}`}
               />
             </span>
           </button>

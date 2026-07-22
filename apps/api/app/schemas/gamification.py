@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime, date
 from uuid import UUID
-from typing import Optional
+from typing import List, Optional
 
 class XPOut(BaseModel):
     total: int
@@ -32,3 +32,9 @@ class QuestOut(BaseModel):
     progress: int
     target: int
     completed_at: Optional[datetime]
+
+class CheckinOut(BaseModel):
+    xp_awarded: int
+    total_xp: int
+    streak: StreakOut
+    newly_awarded_badges: List[str]
