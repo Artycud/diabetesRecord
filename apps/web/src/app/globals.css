@@ -51,6 +51,12 @@
      writes the resolved value here). Default 1 = the shipped intensity. */
   --gradient-intensity: 1;
 
+  /* Color the ambient wash/glass tint actually use — defaults to the raw
+     accent, overridden per-theme below. Separate from --color-mint-500
+     itself (which must stay the true, saturated accent for swatches/data)
+     so a theme can request a softer version just for background washes. */
+  --wash-color: var(--color-mint-500);
+
   /* ─── Semantic defaults (navy — same as System mode) ── */
   --color-bg-primary:  #0b1535;
   --color-bg-surface:  #142552;
@@ -122,7 +128,7 @@
   background-color: #0b1535;
 }
 [data-theme="system"] body::before {
-  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 18%, transparent) 0%, transparent 65%);
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--wash-color) 18%, transparent) 0%, transparent 65%);
 }
 
 /* ─── Dark mode = pure black ────────────────────────── */
@@ -159,13 +165,19 @@
   background-color: #0A0A0A;
 }
 [data-theme="dark"] body::before {
-  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 20%, transparent) 0%, transparent 65%);
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--wash-color) 20%, transparent) 0%, transparent 65%);
 }
 
 /* ─── Light mode override ───────────────────────────── */
 [data-theme="light"] {
   --neu-light: rgba(255,255,255,0.95);
   --neu-dark:  rgba(163,177,198,0.6);
+
+  /* The raw accent (vivid, saturated — right for swatches/data) read as
+     "too green, not medical" once used at wash strength against a near-
+     white page. Lightened toward white so the wash reads as a pale
+     clinical tint instead of the brand color itself. */
+  --wash-color: color-mix(in srgb, var(--color-mint-500), white 55%);
 
   --color-bg-primary:  #FAFAF7;
   --color-bg-surface:  #FFFFFF;
@@ -211,10 +223,11 @@ body {
    than body's own background so its opacity (the user's gradient
    intensity slider, Settings → Theme & appearance) can be scaled
    independently of page content — scaling body's own opacity would fade
-   the whole page, not just the wash. Reads var(--color-mint-500)
-   directly, which ThemeProvider already repoints to whatever accent the
-   user picked, so color follows accent selection with no extra plumbing;
-   per-theme intensity is tuned in each [data-theme] block above. */
+   the whole page, not just the wash. Reads var(--wash-color) — normally
+   the accent ThemeProvider repoints on --color-mint-500, but lightened
+   toward white in light mode (see that [data-theme="light"] block) so it
+   reads as a pale wash rather than the saturated brand color; per-theme
+   intensity is tuned in each [data-theme] block above. */
 body::before {
   content: "";
   position: fixed;
@@ -222,7 +235,7 @@ body::before {
   z-index: -1;
   pointer-events: none;
   opacity: var(--gradient-intensity, 1);
-  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--color-mint-500) 11%, transparent) 0%, transparent 65%);
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--wash-color) 11%, transparent) 0%, transparent 65%);
 }
 
 /* ─── Readability upgrades ──────────────────────────
@@ -271,6 +284,17 @@ body::before {
   animation: fade-rise-in var(--motion-slow) var(--ease-emphasized);
 }
 
+/* Breathing recording's liquid-fill meniscus (BreathSession.tsx) — a soft
+   surface highlight that gently rises/falls so the fill reads as liquid,
+   not a static color bar. */
+@keyframes liquid-bob {
+  0%, 100% { transform: translateY(-50%) scaleY(1);   opacity: 0.9; }
+  50%      { transform: translateY(-65%) scaleY(1.35); opacity: 0.6; }
+}
+.animate-liquid-bob {
+  animation: liquid-bob 2.2s ease-in-out infinite;
+}
+
 /* ─── Neumorphism — shell only, never applied to data/status/text ───
    Shadow pair is derived per-theme (see [data-theme] blocks above) since a
    formula tuned for the light theme's off-white bg looks wrong reused
@@ -285,9 +309,15 @@ body::before {
    shadow — flat next to the few cards that did get it. This gives every
    one of them the same shadow automatically, sitewide, from one rule,
    using the data-card-style attribute ThemeProvider mirrors from the
-   picker (parallel to next-themes' own data-theme attribute). */
+   picker (parallel to next-themes' own data-theme attribute).
+
+   :not(..., .neu-inset) matters: several toggle tracks/checkboxes/vessels
+   combine `bg-bg-elevated` with an explicit `.neu-inset` for a carved-in
+   look. The attribute selector below is more specific than `.neu-inset`
+   alone, so without this exclusion it silently won that fight and flipped
+   every one of them from concave to convex. */
 .neu-raised,
-[data-card-style="neumorphic"] .bg-bg-elevated:not(input, textarea, select) {
+[data-card-style="neumorphic"] .bg-bg-elevated:not(input, textarea, select, .neu-inset) {
   box-shadow: 8px 8px 18px var(--neu-dark), -8px -8px 18px var(--neu-light);
   transition: box-shadow var(--motion-fast) var(--ease-standard);
 }
@@ -314,11 +344,11 @@ button.neu-raised:active,
    percentage argument (not a separate opacity layer, since Card has no
    pseudo-element to spare here) — supported in evergreen browsers. */
 .card-gradient {
-  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) calc(8% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--wash-color) calc(8% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
 }
 [data-theme="system"] .card-gradient,
 [data-theme="dark"] .card-gradient {
-  background-image: linear-gradient(155deg, color-mix(in srgb, var(--color-mint-500) calc(13% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--wash-color) calc(13% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
 }
 
 /* ─── Premium CTA — the single primary action button (Breathing START) ───
@@ -374,13 +404,13 @@ button.neu-raised:active,
   position: relative;
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--color-mint-500) 18%, transparent) 0%,
-    color-mix(in srgb, var(--color-mint-500) 4%, transparent) 45%,
-    color-mix(in srgb, var(--color-mint-500) 9%, transparent) 100%
+    color-mix(in srgb, var(--wash-color) 18%, transparent) 0%,
+    color-mix(in srgb, var(--wash-color) 4%, transparent) 45%,
+    color-mix(in srgb, var(--wash-color) 9%, transparent) 100%
   );
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  border: 1px solid color-mix(in srgb, var(--color-mint-500) 20%, rgba(255,255,255,0.3));
+  border: 1px solid color-mix(in srgb, var(--wash-color) 20%, rgba(255,255,255,0.3));
   box-shadow:
     8px 8px 18px var(--neu-dark),
     -8px -8px 18px var(--neu-light),

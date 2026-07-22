@@ -111,10 +111,9 @@ const SW = 5;
 const RING_R = (SZ - SW) / 2;
 const CIRC = 2 * Math.PI * RING_R;
 
-// Inner ring — real-time blow intensity, nested inside the outer time ring.
-const INNER_SW = 11;
-const INNER_R = RING_R - 16;
-const INNER_CIRC = 2 * Math.PI * INNER_R;
+// Recording-phase liquid vessel — bigger than the calibration ring for
+// presence, since it's the single focal point of the "blow now" moment.
+const FILL_SZ = 156;
 
 interface Props {
   liveReading: LiveReading | null;
@@ -514,42 +513,52 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
     const zone = backendLabelToZone(effectiveReading?.label ?? null);
     const zoneStyle = LABEL_STYLE[zone] ?? LABEL_STYLE.unreliable;
-    const innerDashOffset = INNER_CIRC * (1 - intensity);
+    // Fill height tracks elapsed time (0-100 over the 5s window), not live
+    // intensity — this guarantees the vessel always reaches the top exactly
+    // as recording completes, real hardware or demo, strong blow or weak.
+    // The old dual-ring design tied its inner ring purely to live pressure,
+    // so a shallow/simulated blow (or one that stayed in the gray-slate
+    // fed_resting zone) could sit static and unfilled for the whole 5s,
+    // reading as broken rather than "in progress." Intensity still drives
+    // the surface's liveliness (brightness/saturation + a bobbing meniscus)
+    // so it stays reactive without risking a session that never fills.
+    const fillPct = Math.min(100, Math.max(0, progress));
 
     return (
       <div className="flex flex-col items-center py-6 gap-4">
-        <div className="relative" style={{ width: SZ, height: SZ }}>
-          <svg width={SZ} height={SZ} className="rotate-[-90deg]">
-            <defs>
-              <linearGradient id="blowIntensityGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={zoneStyle.grad[0]} />
-                <stop offset="100%" stopColor={zoneStyle.grad[1]} />
-              </linearGradient>
-            </defs>
-            {/* Outer: flat 5s countdown, demoted to a subtle secondary cue */}
-            <circle cx={SZ/2} cy={SZ/2} r={RING_R} fill="none" stroke="currentColor" className="text-mint-500/10" strokeWidth={3} />
-            <circle
-              cx={SZ/2} cy={SZ/2} r={RING_R}
-              fill="none" stroke="currentColor" className="text-mint-500/40"
-              strokeWidth={3} strokeLinecap="round"
-              strokeDasharray={CIRC} strokeDashoffset={dashOffset}
-            />
-            {/* Inner: real-time blow intensity from live pressure, gradient tracks zone */}
-            <circle cx={SZ/2} cy={SZ/2} r={INNER_R} fill="none" stroke="currentColor" className="text-bg-raised" strokeWidth={INNER_SW} />
-            <circle
-              cx={SZ/2} cy={SZ/2} r={INNER_R}
-              fill="none" stroke="url(#blowIntensityGrad)"
-              strokeWidth={INNER_SW} strokeLinecap="round"
-              strokeDasharray={INNER_CIRC} strokeDashoffset={innerDashOffset}
-              style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)" }}
-            />
-          </svg>
+        <div
+          className={twMerge(
+            "relative rounded-full overflow-hidden",
+            cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : cardStyle === "liquidGlass" ? "liquid-glass" : "bg-bg-elevated border-2 border-border-soft"
+          )}
+          style={{ width: FILL_SZ, height: FILL_SZ }}
+        >
+          {/* Liquid fill */}
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center"
-            style={{ transform: `scale(${1 + intensity * 0.03})`, transition: "transform 0.15s ease-out" }}
+            className="absolute inset-x-0 bottom-0"
+            style={{
+              height: `${fillPct}%`,
+              background: `linear-gradient(180deg, ${zoneStyle.grad[1]} 0%, ${zoneStyle.grad[0]} 100%)`,
+              filter: `brightness(${1 + intensity * 0.25}) saturate(${1 + intensity * 0.3})`,
+              transition: "background 0.5s ease, filter 0.15s ease-out",
+            }}
           >
-            <span className="text-3xl font-bold text-mint-500 leading-none">{secsLeft}</span>
-            <span className="text-[10px] text-text-muted mt-1">{fmtAcetone(liveMv)} {unitLbl}</span>
+            {/* Meniscus — soft highlight riding the surface, gently bobbing
+                so the liquid reads as alive rather than a static color bar. */}
+            <div
+              className="absolute inset-x-0 top-0 h-4 -translate-y-1/2 animate-liquid-bob"
+              style={{ background: "radial-gradient(ellipse 60% 100% at 50% 50%, rgba(255,255,255,0.5), transparent 70%)" }}
+            />
+          </div>
+
+          {/* Center readout — dark chip keeps this legible over any fill color/level */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rounded-2xl bg-black/25 px-3 py-1.5 flex flex-col items-center">
+              <span className="text-3xl font-bold text-white leading-none" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>
+                {secsLeft}
+              </span>
+              <span className="text-[10px] text-white/85 mt-1">{fmtAcetone(liveMv)} {unitLbl}</span>
+            </div>
           </div>
         </div>
 

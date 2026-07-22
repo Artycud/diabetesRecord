@@ -10,12 +10,17 @@ export interface DemoParams {
   targetKpa: number;
 }
 
-// Randomized once per recording. Mostly lands ~1-3ppm (10-30mV) — matches
-// the same "mostly 1-3ppm" calibration used for the hardware-fault
-// workaround, for narrative consistency between the two demo paths.
+// Randomized once per recording. Deliberately lands solidly inside the
+// transitional/fat_oxidation zones (2-6ppm, 20-60mV) rather than the
+// 1-3ppm range used for the hardware-fault workaround: that range straddles
+// the fed_resting/transitional boundary (2ppm) almost exactly, so roughly
+// half of all demo sessions peaked *below* it and spent the whole 5s in
+// fed_resting's gray/slate zone color — reading as a broken gray ring
+// instead of a satisfying colorful one. A demo exists purely to show what
+// a good breath test looks like, so it should never land in that flat zone.
 export function randomDemoParams(): DemoParams {
   return {
-    targetMv: 10 + Math.random() * 20,
+    targetMv: 20 + Math.random() * 40,
     targetKpa: 4 + Math.random() * 4,
   };
 }
