@@ -10,11 +10,11 @@
  */
 
 export type MetabolicZone =
-  | "fed_resting"    // 0.3–2 ppm  : Fed / resting baseline
-  | "transitional"   // 2–8 ppm    : Short fast / light exercise / mild carb restriction
-  | "fat_oxidation"  // 8–40 ppm   : Active fat oxidation (extended fast / continuous keto)
-  | "extended_fast"  // 40–75 ppm  : Extended fasting / strict keto — monitor symptoms
-  | "safety_alert"   // ≥ 75 ppm   : Layer 1 ceiling — DKA range, consult doctor
+  | "fed_resting"    // 0.5–2 ppm  : Rest Zone — fed / resting baseline
+  | "transitional"   // 2–4 ppm    : Fat-Burn Zone — mild fat oxidation onset
+  | "fat_oxidation"  // 4–30 ppm   : Deep Burn Zone — active fat oxidation / keto
+  | "extended_fast"  // 30–75 ppm  : Peak Zone — extended fast / strict keto
+  | "safety_alert"   // ≥ 75 ppm   : Caution Zone — DKA range, consult doctor
   | "clean"          // ambient air
   | "unreliable";    // low quality / sensor issue
 
@@ -65,8 +65,8 @@ export function backendLabelToZone(label: string | null | undefined): MetabolicZ
 /** Zone thresholds in ppm (acetone_delta) */
 export const ZONE_THRESHOLDS: [number, MetabolicZone][] = [
   [2,  "fed_resting"],
-  [8,  "transitional"],
-  [40, "fat_oxidation"],
+  [4,  "transitional"],
+  [30, "fat_oxidation"],
   [75, "extended_fast"],
 ];
 
@@ -117,10 +117,10 @@ export const LABEL_EN: Record<string, string> = {
 };
 
 export const LABEL_RANGE: Record<string, string> = {
-  fed_resting:  "0.3–2 ppm",
-  transitional: "2–8 ppm",
-  fat_oxidation:"8–40 ppm",
-  extended_fast:"40–75 ppm",
+  fed_resting:  "0.5–2 ppm",
+  transitional: "2–4 ppm",
+  fat_oxidation:"4–30 ppm",
+  extended_fast:"30–75 ppm",
   safety_alert: "≥ 75 ppm",
 };
 
