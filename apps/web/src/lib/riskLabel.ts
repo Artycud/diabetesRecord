@@ -96,6 +96,51 @@ export const LABEL_STYLE: Record<string, LabelStyle> = {
   unreliable:   { color: "#6B7280", grad: ["#4A4A4A", "#7A7A7A"], tailwind: "text-text-muted" },
 };
 
+// Zone-boundary colors as an ordered ramp (ppm -> color), reusing
+// LABEL_STYLE's own base colors so this never drifts out of sync with the
+// zone palette. Distinct from LABEL_STYLE's per-zone lookup, which is a
+// discrete jump at each threshold — fine for static labels/badges, but
+// visibly "cuts" when applied to a value that's continuously rising (e.g.
+// live during a breath test): crossing 2ppm would instantly snap slate to
+// emerald instead of easing through it.
+const COLOR_RAMP: [number, string][] = [
+  [0,  LABEL_STYLE.fed_resting.color],
+  [2,  LABEL_STYLE.transitional.color],
+  [4,  LABEL_STYLE.fat_oxidation.color],
+  [30, LABEL_STYLE.extended_fast.color],
+  [75, LABEL_STYLE.safety_alert.color],
+];
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex([r, g, b]: [number, number, number]): string {
+  return "#" + [r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("");
+}
+
+/** Continuously interpolated color for a live ppm value — smoothly blends
+ *  between adjacent zone-boundary colors instead of snapping at thresholds
+ *  the way LABEL_STYLE's discrete lookup does. Intended for anything
+ *  tracking a value in real time (e.g. the breathing recording vessel's
+ *  fill color), not for static zone badges/labels. */
+export function rampColor(ppm: number): string {
+  const v = Number.isFinite(ppm) ? Math.max(0, ppm) : 0;
+  if (v <= COLOR_RAMP[0][0]) return COLOR_RAMP[0][1];
+  for (let i = 1; i < COLOR_RAMP.length; i++) {
+    const [hi, hiColor] = COLOR_RAMP[i];
+    const [lo, loColor] = COLOR_RAMP[i - 1];
+    if (v <= hi) {
+      const t = (v - lo) / (hi - lo);
+      const a = hexToRgb(loColor);
+      const b = hexToRgb(hiColor);
+      return rgbToHex([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+    }
+  }
+  return COLOR_RAMP[COLOR_RAMP.length - 1][1];
+}
+
 export const LABEL_TH: Record<string, string> = {
   clean:        "อากาศสะอาด",
   fed_resting:  "พักฟื้น / หลังกิน",

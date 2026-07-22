@@ -9,7 +9,7 @@ import type { AcetoneLabel, LiveReading } from "@/lib/useDeviceStream";
 import { api } from "@/lib/api";
 import type { ContextTag } from "@/lib/api";
 import { convertFromMv, useUnits } from "@/lib/units";
-import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone } from "@/lib/riskLabel";
+import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone, rampColor } from "@/lib/riskLabel";
 import { useTimezone } from "@/lib/timezone";
 import { randomDemoParams, demoValueAt, type DemoParams } from "@/lib/demoReading";
 import { BreathPulse } from "@/components/ui/BreathPulse";
@@ -106,14 +106,13 @@ const beepEnd       = () => beep(600, 500, 0.3);     // recording done
 
 type Phase = "idle" | "calibrating" | "recording" | "done";
 
-const SZ = 112;
+// 128px matches the idle START button (h-32 w-32) exactly, so the focal
+// circle stays the same size across idle -> calibrating -> recording
+// instead of visibly growing/shrinking as the phase changes.
+const SZ = 128;
 const SW = 5;
 const RING_R = (SZ - SW) / 2;
 const CIRC = 2 * Math.PI * RING_R;
-
-// Recording-phase liquid vessel — bigger than the calibration ring for
-// presence, since it's the single focal point of the "blow now" moment.
-const FILL_SZ = 156;
 
 interface Props {
   liveReading: LiveReading | null;
@@ -511,8 +510,6 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     const yMin = mvVals.length > 1 ? Math.min(...mvVals) - 5 : 0;
     const yMax = mvVals.length > 1 ? Math.max(...mvVals) + 5 : 50;
 
-    const zone = backendLabelToZone(effectiveReading?.label ?? null);
-    const zoneStyle = LABEL_STYLE[zone] ?? LABEL_STYLE.unreliable;
     // Fill height tracks elapsed time (0-100 over the 5s window), not live
     // intensity — this guarantees the vessel always reaches the top exactly
     // as recording completes, real hardware or demo, strong blow or weak.
@@ -523,6 +520,13 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     // the surface's liveliness (brightness/saturation + a bobbing meniscus)
     // so it stays reactive without risking a session that never fills.
     const fillPct = Math.min(100, Math.max(0, progress));
+    // Continuously-interpolated color (rampColor), not LABEL_STYLE's
+    // discrete per-zone lookup — the discrete version recomputes every
+    // frame from `effectiveReading`, but only ever holds one of ~6 fixed
+    // colors, so crossing a zone threshold (e.g. 2ppm) was a hard color
+    // cut. rampColor blends continuously with the actual rising value, so
+    // the fill eases through the palette instead of snapping between it.
+    const currentColor = rampColor(convertFromMv(liveMv, "ppm"));
 
     return (
       <div className="flex flex-col items-center py-6 gap-4">
@@ -531,16 +535,16 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
             "relative rounded-full overflow-hidden",
             cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : cardStyle === "liquidGlass" ? "liquid-glass" : "bg-bg-elevated border-2 border-border-soft"
           )}
-          style={{ width: FILL_SZ, height: FILL_SZ }}
+          style={{ width: SZ, height: SZ }}
         >
           {/* Liquid fill */}
           <div
             className="absolute inset-x-0 bottom-0"
             style={{
               height: `${fillPct}%`,
-              background: `linear-gradient(180deg, ${zoneStyle.grad[1]} 0%, ${zoneStyle.grad[0]} 100%)`,
+              background: `linear-gradient(180deg, color-mix(in srgb, ${currentColor}, white 30%) 0%, color-mix(in srgb, ${currentColor}, black 12%) 100%)`,
               filter: `brightness(${1 + intensity * 0.25}) saturate(${1 + intensity * 0.3})`,
-              transition: "background 0.5s ease, filter 0.15s ease-out",
+              transition: "filter 0.15s ease-out",
             }}
           >
             {/* Meniscus — soft highlight riding the surface, gently bobbing
