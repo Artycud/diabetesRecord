@@ -1,6 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
@@ -8,7 +10,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Palette, Globe, LogOut, ChevronRight, Ruler,
-  Flame, Trophy, Star, Shield, FlaskConical,
+  Flame, Trophy, Star, Shield, FlaskConical, Radar,
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
 import { useDemoMode } from "@/lib/demoMode";
@@ -34,6 +36,7 @@ export default function MePage() {
   const { user, logout } = useAuth();
   const { t, locale, setLocale } = useT();
   const router = useRouter();
+  const qc = useQueryClient();
   const { unit: acUnit } = useUnits();
   const { demoMode, setDemoMode } = useDemoMode();
   const { cardStyle } = useThemeConfig();
@@ -41,6 +44,25 @@ export default function MePage() {
   const { data: xp }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streak } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
   const { data: badges } = useQuery({ queryKey: ["me", "badges"], queryFn: api.gamification.getBadges });
+  const { data: devices } = useQuery({ queryKey: ["sensor", "devices"], queryFn: api.sensor.listDevices });
+  // "Simulation" toggle applies to the user's own primary device — same
+  // one Home/Breathing already default to (devices?.[0]).
+  const primaryDevice = devices?.[0];
+  const fullSimEnabled = !!primaryDevice?.simulate_pressure;
+  const [simPending, setSimPending] = useState(false);
+
+  async function toggleFullSimulation() {
+    if (!primaryDevice || simPending) return;
+    setSimPending(true);
+    try {
+      await api.sensor.setSimulation(primaryDevice.id, !fullSimEnabled);
+      qc.invalidateQueries({ queryKey: ["sensor", "devices"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "อัปเดตไม่สำเร็จ");
+    } finally {
+      setSimPending(false);
+    }
+  }
 
   const goalKey = user?.profile?.goal_type ?? "monitor";
   const pct = xp ? Math.round((xp.xp_in_level / XP_PER_LEVEL) * 100) : 0;
@@ -197,7 +219,9 @@ export default function MePage() {
             role="switch"
             aria-checked={demoMode}
             onClick={() => setDemoMode(!demoMode)}
-            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors"
+            className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors ${
+              primaryDevice ? "border-b border-border-soft" : ""
+            }`}
           >
             <div className="h-8 w-8 rounded-lg bg-bg-raised flex items-center justify-center">
               <FlaskConical size={15} className="text-text-muted" />
@@ -217,6 +241,47 @@ export default function MePage() {
               />
             </span>
           </button>
+
+          {/* Simulation — self-service escalation of the acetone-only
+              hardware-fault workaround (already running for a broken gas
+              sensor) to also fake pressure, for when the pressure sensor
+              is broken too. Only shown for a user with an actual device —
+              there's nothing to apply it to otherwise. Same low-key
+              styling as Demo mode; only visible difference is the label
+              explaining what's being simulated when on. */}
+          {primaryDevice && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={fullSimEnabled}
+              disabled={simPending}
+              onClick={toggleFullSimulation}
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors disabled:opacity-60"
+            >
+              <div className="h-8 w-8 rounded-lg bg-bg-raised flex items-center justify-center">
+                <Radar size={15} className="text-text-muted" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm text-text-muted">Simulation</p>
+                {fullSimEnabled && (
+                  <p className="text-[10px] text-text-disabled mt-0.5">Acetone + pressure both simulated</p>
+                )}
+              </div>
+              <span
+                className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${
+                  fullSimEnabled
+                    ? "bg-mint-500"
+                    : cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : "bg-bg-raised"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                    cardStyle === "neumorphic" ? "neu-raised" : ""
+                  } ${fullSimEnabled ? "translate-x-5" : "translate-x-0"}`}
+                />
+              </span>
+            </button>
+          )}
         </div>
       </div>
 

@@ -402,6 +402,8 @@ export interface DeviceOut {
   needs_recalibration: boolean;
   last_calibrated_at: string | null;
   sensor_model: string | null;
+  simulate_acetone: boolean;
+  simulate_pressure: boolean;
 }
 
 export interface DailyStat {
@@ -717,6 +719,14 @@ export const api = {
       ),
     unlinkDevice: (deviceId: string) =>
       request<void>(`/sensor/device/${deviceId}`, { method: "DELETE" }),
+    // Self-service escalation of simulate_acetone (hardware-fault workaround)
+    // to also fake pressure — for when the device's pressure sensor is
+    // broken too, not just the gas sensor. Owner-only, no admin needed.
+    setSimulation: (deviceId: string, enabled: boolean) =>
+      request<DeviceOut>(`/sensor/device/${deviceId}/simulation`, {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      }),
     startRecording: (deviceId: string) =>
       request<{ session_id: string; expires_in: number }>(
         `/sensor/device/${deviceId}/recording/start`,

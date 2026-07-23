@@ -233,6 +233,55 @@ async def list_devices(user: User = Depends(get_current_user), db: AsyncSession 
     return result.all()
 
 
+# ─── Full hardware-fault simulation (self-service) ──────────────────────────
+# simulate_acetone already exists as an admin-only toggle (POST /admin/
+# device/{id}/simulate-acetone). This is the user-facing escalation: for a
+# device whose pressure sensor is ALSO broken, not just the gas sensor —
+# the owner flips it themselves rather than needing an admin. Ownership-
+# gated like unlink_device below, not _get_accessible_device, since this
+# changes a persistent hardware-config flag, not a session-scoped action.
+
+class SetSimulationRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/device/{device_id}/simulation", response_model=DeviceOut)
+async def set_full_simulation(
+    device_id: UUID,
+    body: SetSimulationRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle full simulation (both acetone AND pressure) for the caller's
+    own device. Off: leaves simulate_acetone exactly as it already was —
+    only simulate_pressure is cleared. On: forces simulate_acetone on too,
+    since "full simulation" means neither sensor is trusted."""
+    result = await db.exec(
+        select(Device).where(Device.id == device_id, Device.user_id == user.id)
+    )
+    device = result.first()
+    if not device:
+        raise HTTPException(404, "Device not found or not owned by user")
+
+    if body.enabled:
+        device.simulate_acetone = True
+        device.simulate_pressure = True
+    else:
+        device.simulate_pressure = False
+
+    db.add(device)
+    await db.commit()
+    await db.refresh(device)
+
+    # Drop any in-memory sim state so the next reading starts clean rather
+    # than continuing mid-curve from before the toggle flipped.
+    from app.services import acetone_simulator, pressure_simulator
+    acetone_simulator.reset(device.id)
+    pressure_simulator.reset(device.id)
+
+    return device
+
+
 @router.delete("/device/{device_id}", status_code=204)
 async def unlink_device(
     device_id: UUID,

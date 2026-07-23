@@ -16,6 +16,8 @@ depends on metabolic state (fasting, diet, exercise), not exhale force, so
 each detected blow instead draws its target from a fixed probability
 distribution (_TARGET_BANDS) — mimicking session-to-session variation in a
 real user's actual ketone level rather than deterministic device engineering.
+The resting baseline between blows is drawn the same way (_IDLE_BANDS),
+freshly each time a blow ends, instead of returning to one exact number.
 
 Safety bound (non-negotiable): `CAP_MV` must stay far under the real DKA
 "safety_alert" ceiling used by the frontend (apps/web/src/lib/riskLabel.ts,
@@ -57,15 +59,20 @@ _TARGET_BANDS: list[tuple[float, float, float]] = [
     (0.01, 5.0, 10.0),   # rare — fat-oxidation entry
 ]
 
+# Resting-baseline distribution, drawn once each time a blow *ends* (and
+# once at first use) — same idea as _TARGET_BANDS but for what "not
+# currently blowing" settles to. Mostly a low, unremarkable resting value;
+# sometimes a touch higher, matching real idle sensor variance rather than
+# returning to one exact fixed number every time.
+_IDLE_BANDS: list[tuple[float, float, float]] = [
+    (0.70, 0.1, 0.3),
+    (0.30, 0.3, 0.5),
+]
+
 # Hard ceiling — reached only by the rare top band above. 110 mV is still
 # ~6.8x under the real 750 mV safety_alert ceiling, so this workaround can
 # never itself simulate a DKA-range reading.
 CAP_MV = 110.0
-# Baseline the reading decays back to once a blow ends (and sits at before
-# the first blow). 5 mV = 0.5 ppm — the bottom of the app's own fed_resting
-# range (riskLabel.ts LABEL_RANGE) — rather than dropping to ~0, so "not
-# currently blowing" still reads as a plausible resting baseline, not silence.
-IDLE_MV = 5.0
 
 # Real gas cells adsorb faster than they desorb — rise quicker than decay.
 TAU_RISE_S = 1.4
@@ -75,27 +82,49 @@ TAU_DECAY_S = 4.5
 NOISE_STD_MV = 1.0
 
 
-def _draw_target_mv() -> float:
-    """Pick this blow's target reading from _TARGET_BANDS."""
+def _draw_from_bands(bands: list[tuple[float, float, float]]) -> float:
+    """Weighted-random ppm draw from a (weight, low, high) band list, in mV."""
     r = random.random()
     cum = 0.0
-    for weight, lo_ppm, hi_ppm in _TARGET_BANDS:
+    for weight, lo_ppm, hi_ppm in bands:
         cum += weight
         if r < cum:
             return random.uniform(lo_ppm, hi_ppm) * MV_PER_PPM
     # Floating-point safety net only — weights sum to 1.0 already.
-    lo_ppm, hi_ppm = _TARGET_BANDS[-1][1], _TARGET_BANDS[-1][2]
+    lo_ppm, hi_ppm = bands[-1][1], bands[-1][2]
     return random.uniform(lo_ppm, hi_ppm) * MV_PER_PPM
+
+
+def _draw_target_mv() -> float:
+    """Pick this blow's target reading from _TARGET_BANDS."""
+    return _draw_from_bands(_TARGET_BANDS)
+
+
+def _draw_idle_mv() -> float:
+    """Pick this idle period's resting baseline from _IDLE_BANDS."""
+    return _draw_from_bands(_IDLE_BANDS)
 
 
 @dataclass
 class _SimState:
-    value_mv: float = IDLE_MV
+    """Always constructed fresh (one per device, on first `step()` call) via
+    the no-arg defaults below — __post_init__ draws the actual starting
+    baseline, since a plain field default can't call a random function."""
+    value_mv: float = 0.0
     blowing: bool = False
     last_ts: float = 0.0
     # Drawn fresh each time a blow starts; held steady for that blow's
     # duration so the reading doesn't relabel itself mid-breath.
-    target_mv: float = IDLE_MV
+    target_mv: float = 0.0
+    # Drawn fresh each time a blow ends (and once at first use); held
+    # steady until the next blow starts.
+    idle_mv: float = 0.0
+
+    def __post_init__(self):
+        drawn = _draw_idle_mv()
+        self.value_mv = drawn
+        self.target_mv = drawn
+        self.idle_mv = drawn
 
 
 _STATE: dict[UUID, _SimState] = {}
@@ -119,8 +148,9 @@ def step(device_id: UUID, pressure_kpa: Optional[float], now_ts: float) -> float
         s.target_mv = min(CAP_MV, _draw_target_mv())
     elif s.blowing and p < BLOW_OFF_KPA:
         s.blowing = False
+        s.idle_mv = _draw_idle_mv()  # fresh resting baseline for this idle period
 
-    target = s.target_mv if s.blowing else IDLE_MV
+    target = s.target_mv if s.blowing else s.idle_mv
     tau = TAU_RISE_S if s.blowing else TAU_DECAY_S
 
     s.value_mv += (target - s.value_mv) * (1 - math.exp(-dt / tau))

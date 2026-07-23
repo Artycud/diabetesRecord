@@ -15,8 +15,8 @@ import pytest
 from app.services.acetone_simulator import (
     BLOW_ON_KPA,
     CAP_MV,
-    IDLE_MV,
     MV_PER_PPM,
+    _IDLE_BANDS,
     _STATE,
     _TARGET_BANDS,
     reset,
@@ -36,10 +36,10 @@ def test_idle_stays_near_baseline():
     # below (this path never enters "blowing"): the idle value follows an
     # AR(1)-like process with stationary std ~1.67mV given NOISE_STD_MV=1.0
     # and TAU_DECAY_S=4.5 at these 1s steps, so an unseeded max-of-50 check
-    # against a tight +5 bound was an ~few-sigma event, not impossible.
-    # Seeded for reproducibility; bound widened to a comfortably-safe ~6
-    # stationary-sigma margin instead of a bound the process can plausibly
-    # exceed by chance.
+    # against a tight bound was an ~few-sigma event, not impossible.
+    # Seeded for reproducibility; bound is relative to the device's own
+    # drawn idle_mv (idle is now a random per-device draw, not one fixed
+    # constant) plus a comfortably-safe ~6 stationary-sigma margin.
     random.seed(2024)
     device_id = uuid4()
     ts = 0.0
@@ -48,7 +48,8 @@ def test_idle_stays_near_baseline():
         ts += 1.0
         values.append(step(device_id, 0.1, ts))
     assert all(0.0 <= v <= CAP_MV for v in values)
-    assert max(values) < IDLE_MV + 10  # small jitter only, no rise
+    idle_mv = _STATE[device_id].idle_mv
+    assert max(values) < idle_mv + 10  # small jitter only, no rise
 
 
 def test_sustained_blow_rises_but_stays_under_cap():
@@ -65,7 +66,8 @@ def test_sustained_blow_rises_but_stays_under_cap():
         values.append(step(device_id, 7.0, ts))  # typical solid blow, per real logs
     assert all(0.0 <= v <= CAP_MV for v in values)
     drawn_target = _STATE[device_id].target_mv
-    assert drawn_target > IDLE_MV  # a blow was actually detected and a target drawn
+    drawn_idle = _STATE[device_id].idle_mv
+    assert drawn_target > drawn_idle  # a blow was actually detected and a target drawn
     # 15s of blowing at TAU_RISE_S=1.4s is >10 time constants — should have
     # converged to within a small tolerance of its drawn target.
     assert abs(values[-1] - drawn_target) < 3.0
@@ -85,7 +87,7 @@ def test_blow_amplitude_is_not_proportional_to_pressure():
         for pressure, bucket in ((1.5, gentle_finals), (7.0, hard_finals)):
             device_id = uuid4()
             ts = 0.0
-            v = IDLE_MV
+            v = 0.0  # placeholder, overwritten each loop iteration
             for _ in range(20):
                 ts += 0.5
                 v = step(device_id, pressure, ts)
@@ -108,7 +110,7 @@ def test_target_distribution_matches_calibrated_bands():
     for _ in range(n):
         device_id = uuid4()
         ts = 0.0
-        v = IDLE_MV
+        v = 0.0  # placeholder, overwritten each loop iteration
         for _ in range(6):  # long enough to fully reach the drawn target
             ts += 0.5
             v = step(device_id, 7.0, ts)
@@ -135,7 +137,38 @@ def test_release_decays_back_toward_idle():
     for _ in range(40):
         ts += 0.5
         v = step(device_id, 0.1, ts)  # release
-    assert v < IDLE_MV + 5
+    # A fresh idle_mv is drawn the instant the blow ends (first iteration of
+    # the release loop above), so compare against that draw, not a constant.
+    idle_mv = _STATE[device_id].idle_mv
+    assert v < idle_mv + 5
+
+
+def test_idle_distribution_matches_calibrated_bands():
+    # Statistical check on _draw_idle_mv() (via the blow-end transition):
+    # roughly matches the calibrated idle-band weights (70%/30%).
+    random.seed(456)
+    counts = {i: 0 for i in range(len(_IDLE_BANDS))}
+    n = 4000
+    for _ in range(n):
+        device_id = uuid4()
+        ts = 0.0
+        step(device_id, 7.0, ts)          # start a blow
+        ts += 0.5
+        step(device_id, 7.0, ts)
+        ts += 0.5
+        step(device_id, 0.0, ts)          # end it — draws a fresh idle_mv
+        idle_mv = _STATE[device_id].idle_mv
+        ppm = idle_mv / MV_PER_PPM
+        for i, (_, lo, hi) in enumerate(_IDLE_BANDS):
+            if lo <= ppm <= hi:
+                counts[i] += 1
+                break
+
+    for i, (weight, lo, hi) in enumerate(_IDLE_BANDS):
+        observed = counts[i] / n
+        assert abs(observed - weight) < 0.05, (
+            f"idle band {lo}-{hi}ppm: expected ~{weight:.0%}, observed {observed:.0%}"
+        )
 
 
 def test_clamp_holds_under_adversarial_pressure_spikes():

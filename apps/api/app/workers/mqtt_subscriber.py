@@ -26,6 +26,7 @@ from app.core.config import settings
 from app.models.health import Device, SensorReading, DeviceCalibration
 from app.services import signal_processing as sp
 from app.services import acetone_simulator
+from app.services import pressure_simulator
 from app.services.device_session import resolve_reading_user
 
 logging.basicConfig(
@@ -122,6 +123,15 @@ async def process_reading(device_id_str: str, payload: dict):
         else:
             effective_baseline = baseline_voltage
 
+        if device.simulate_pressure:
+            # Full hardware-fault workaround: the pressure sensor is ALSO
+            # broken, so there's no real signal left to gate a blow on.
+            # Overwrite before acetone_simulator sees it — that module has
+            # no way to tell a synthetic curve from a real one, so its own
+            # blow-detection (BLOW_ON_KPA/BLOW_OFF_KPA) keeps working
+            # unchanged against this synthetic curve.
+            pressure_kpa = pressure_simulator.step(device_uuid, active_session_id, now.timestamp())
+
         is_simulated = bool(device.simulate_acetone)
 
         if is_simulated:
@@ -203,9 +213,14 @@ async def process_reading(device_id_str: str, payload: dict):
             metabolic_risk_index=classification["metabolic_risk_index"],
             confidence_score=round(confidence, 4),
             label=classification["label"],
-            # "simulated_" marker is picked up by app.services.ml_data's existing
-            # exclusion filter — synthesized readings never reach training data.
-            raw={**payload, "source": "simulated_pressure_response"} if is_simulated else payload,
+            # "simulated_" prefix is picked up by app.services.ml_data's existing
+            # exclusion filter (substring match) — synthesized readings never
+            # reach training data either way; the two values just distinguish
+            # acetone-only vs full (also pressure) simulation for debugging.
+            raw=(
+                {**payload, "source": "simulated_full_response" if device.simulate_pressure else "simulated_pressure_response"}
+                if is_simulated else payload
+            ),
         )
         db.add(reading)
 

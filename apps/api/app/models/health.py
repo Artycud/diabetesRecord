@@ -27,6 +27,13 @@ class Device(SQLModel, table=True):
     # a pressure-driven synthetic value (see app.services.acetone_simulator)
     # instead of the real (broken) voltage delta. Toggle off once hardware is fixed.
     simulate_acetone: bool = Field(default=False)
+    # Full hardware-fault workaround: BOTH the gas sensor and the pressure
+    # sensor are dead, so ingestion also substitutes a synthetic pressure
+    # curve (see app.services.pressure_simulator) instead of the real
+    # (broken) reading — with no real signal at all to gate acetone's own
+    # blow detection on. Self-service toggle (own device, not admin-only),
+    # see POST /sensor/device/{id}/simulation.
+    simulate_pressure: bool = Field(default=False)
 
 class SensorReading(SQLModel, table=True):
     """TimescaleDB hypertable — partitioned by time. Migration adds create_hypertable call.
