@@ -61,7 +61,11 @@ _TARGET_BANDS: list[tuple[float, float, float]] = [
 # ~6.8x under the real 750 mV safety_alert ceiling, so this workaround can
 # never itself simulate a DKA-range reading.
 CAP_MV = 110.0
-IDLE_MV = 1.0
+# Baseline the reading decays back to once a blow ends (and sits at before
+# the first blow). 5 mV = 0.5 ppm — the bottom of the app's own fed_resting
+# range (riskLabel.ts LABEL_RANGE) — rather than dropping to ~0, so "not
+# currently blowing" still reads as a plausible resting baseline, not silence.
+IDLE_MV = 5.0
 
 # Real gas cells adsorb faster than they desorb — rise quicker than decay.
 TAU_RISE_S = 1.4
