@@ -42,7 +42,18 @@ from uuid import UUID
 # the *only* role pressure plays now: detecting that a blow is happening,
 # never how strong the resulting acetone reading is.
 BLOW_ON_KPA = 1.0
-BLOW_OFF_KPA = 0.4
+BLOW_OFF_KPA = 0.6
+
+# Belt-and-suspenders: real hardware's post-blow "idle" pressure isn't
+# reliably below BLOW_OFF_KPA (observed in production: a device's pressure
+# payload sat pinned at 0.58 kPa continuously after a blow — above the old
+# 0.4 threshold — so the pressure-based off-transition below never fired
+# and the reading stayed pinned at its blow target indefinitely). No fixed
+# threshold can be trusted to always be below whatever a given unit's real
+# post-blow reading happens to be, so this is the actual guarantee: no real
+# breath test runs anywhere near this long, so force the blow to end after
+# MAX_BLOW_DURATION_S regardless of what pressure is doing.
+MAX_BLOW_DURATION_S = 8.0
 
 # mV <-> ppm conversion — matches the frontend's own MV_PER_PPM
 # (apps/web/src/lib/units.tsx) and classify_acetone's 5/30/80 mV zone
@@ -139,6 +150,8 @@ class _SimState:
     # Drawn fresh each time a blow starts; held steady for that blow's
     # duration so the reading doesn't relabel itself mid-breath.
     target_mv: float = 0.0
+    # When the current blow started — used by MAX_BLOW_DURATION_S's timeout.
+    blow_start_ts: float = 0.0
     # Current idle wander-point (what value_mv decays toward while idle),
     # the band it's currently wandering within, and when each was last
     # (re)drawn — see IDLE_BAND_REFRESH_S/IDLE_WANDER_REFRESH_S.
@@ -161,6 +174,16 @@ class _SimState:
 _STATE: dict[UUID, _SimState] = {}
 
 
+def _end_blow(s: _SimState, now_ts: float) -> None:
+    """Transition out of blowing — fresh idle band + point starting now, not
+    a leftover from however long ago the pre-blow idle period last refreshed."""
+    s.blowing = False
+    s.idle_band = _pick_idle_band_mv()
+    s.idle_mv = random.uniform(*s.idle_band)
+    s.idle_band_ts = now_ts
+    s.idle_wander_ts = now_ts
+
+
 def step(device_id: UUID, pressure_kpa: Optional[float], now_ts: float) -> float:
     """Advance one device's synthetic acetone signal by one MQTT sample.
 
@@ -176,15 +199,10 @@ def step(device_id: UUID, pressure_kpa: Optional[float], now_ts: float) -> float
 
     if not s.blowing and p > BLOW_ON_KPA:
         s.blowing = True
+        s.blow_start_ts = now_ts
         s.target_mv = min(CAP_MV, _draw_target_mv())
-    elif s.blowing and p < BLOW_OFF_KPA:
-        s.blowing = False
-        # Fresh idle band + point the instant a blow ends, not a leftover
-        # from however long ago the pre-blow idle period last refreshed.
-        s.idle_band = _pick_idle_band_mv()
-        s.idle_mv = random.uniform(*s.idle_band)
-        s.idle_band_ts = now_ts
-        s.idle_wander_ts = now_ts
+    elif s.blowing and (p < BLOW_OFF_KPA or now_ts - s.blow_start_ts > MAX_BLOW_DURATION_S):
+        _end_blow(s, now_ts)
 
     if not s.blowing:
         if now_ts - s.idle_band_ts >= IDLE_BAND_REFRESH_S:
