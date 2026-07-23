@@ -21,6 +21,13 @@ from app.models.health import (
 )
 from app.services import ml_inference
 
+# mV -> ppm — matches apps/web/src/lib/units.tsx's MV_PER_PPM and
+# classify_acetone's mV zone boundaries. SensorReading.acetone_delta is
+# stored in mV; converted here so the reference ranges quoted in the system
+# prompt/tool_explain_reading (which are all in ppm) actually match what
+# gets handed to the model.
+MV_PER_PPM = 10.0
+
 
 # ─── Tool schemas (Anthropic tool_use format) ────────────────────────────────
 
@@ -37,9 +44,11 @@ TOOL_SCHEMAS = [
     {
         "name": "get_recent_readings",
         "description": (
-            "ดึงค่า sensor lมหายใจล่าสุด (acetone_delta, label, confidence, quality) "
-            "ของผู้ใช้ ย้อนหลัง N วัน ใช้ตอบคำถาม เช่น 'ค่าตอนนี้เป็นยังไง' "
-            "หรือเมื่อจะเปรียบเทียบ/สรุปแนวโน้มระยะสั้น"
+            "ดึงค่า sensor ลมหายใจล่าสุด (acetone_ppm, label, confidence, quality) "
+            "ของผู้ใช้ ย้อนหลัง N วัน พร้อม last_3_tests (3 ครั้งล่าสุด) และ "
+            "comparison_to_7day_avg (เทียบค่าเฉลี่ย 3 ครั้งล่าสุดกับค่าเฉลี่ย 7 วัน — "
+            "สูงกว่า/ต่ำกว่ากี่ %) ใช้ตอบคำถาม เช่น 'ค่าตอนนี้เป็นยังไง' เสมอเรียกอันนี้ก่อน "
+            "แล้วใช้ comparison_to_7day_avg ในคำตอบ อย่าตอบแค่ค่าล่าสุดเฉย ๆ"
         ),
         "input_schema": {
             "type": "object",
@@ -176,21 +185,56 @@ async def tool_get_recent_readings(
     res = await db.exec(stmt)
     rows = res.all()[:limit]
 
+    readings_out = [
+        {
+            "time": r.time.isoformat() if r.time else None,
+            "acetone_ppm": round(r.acetone_delta / MV_PER_PPM, 2) if r.acetone_delta is not None else None,
+            "label": r.label,
+            "confidence": r.confidence_score,
+            "quality_score": r.quality_score,
+        }
+        for r in rows
+    ]
+
+    # Separate, always-7-day window for the comparison baseline — regardless
+    # of whatever `days` was requested, so "last few tests vs. the past
+    # week" stays a stable reference frame instead of shifting with it.
+    since_7d = datetime.utcnow() - timedelta(days=7)
+    week_stmt = (
+        select(SensorReading.acetone_delta)
+        .where(
+            SensorReading.user_id == user.id,
+            SensorReading.time >= since_7d,
+            SensorReading.acetone_delta.is_not(None),
+        )
+    )
+    if dev:
+        week_stmt = week_stmt.where(SensorReading.device_id == dev)
+    week_res = await db.exec(week_stmt)
+    week_ppm_values = [v / MV_PER_PPM for v in week_res.all()]
+
+    last_3 = readings_out[:3]
+    comparison = None
+    last_3_ppm = [r["acetone_ppm"] for r in last_3 if r["acetone_ppm"] is not None]
+    if last_3_ppm and week_ppm_values:
+        avg_last_3 = round(sum(last_3_ppm) / len(last_3_ppm), 2)
+        avg_7day = round(sum(week_ppm_values) / len(week_ppm_values), 2)
+        pct_change = round((avg_last_3 - avg_7day) / avg_7day * 100, 1) if avg_7day else None
+        comparison = {
+            "avg_last_3_tests_ppm": avg_last_3,
+            "avg_7day_ppm": avg_7day,
+            "n_readings_7day": len(week_ppm_values),
+            "pct_change_vs_7day_avg": pct_change,
+        }
+
     return {
         "device_id": str(dev) if dev else None,
         "device_currently_connected": dev is not None,
         "n_readings": len(rows),
         "window_days": days,
-        "readings": [
-            {
-                "time": r.time.isoformat() if r.time else None,
-                "acetone_delta": r.acetone_delta,
-                "label": r.label,
-                "confidence": r.confidence_score,
-                "quality_score": r.quality_score,
-            }
-            for r in rows
-        ],
+        "readings": readings_out,
+        "last_3_tests": last_3,
+        "comparison_to_7day_avg": comparison,
     }
 
 
