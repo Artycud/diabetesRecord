@@ -17,7 +17,8 @@ each detected blow instead draws its target from a fixed probability
 distribution (_TARGET_BANDS) — mimicking session-to-session variation in a
 real user's actual ketone level rather than deterministic device engineering.
 The resting baseline between blows is drawn the same way (_IDLE_BANDS),
-freshly each time a blow ends, instead of returning to one exact number.
+but wanders within a band for IDLE_BAND_REFRESH_S rather than snapping to
+one exact number — see IDLE_BAND_REFRESH_S/IDLE_WANDER_REFRESH_S below.
 
 Safety bound (non-negotiable): `CAP_MV` must stay far under the real DKA
 "safety_alert" ceiling used by the frontend (apps/web/src/lib/riskLabel.ts,
@@ -59,15 +60,24 @@ _TARGET_BANDS: list[tuple[float, float, float]] = [
     (0.01, 5.0, 10.0),   # rare — fat-oxidation entry
 ]
 
-# Resting-baseline distribution, drawn once each time a blow *ends* (and
-# once at first use) — same idea as _TARGET_BANDS but for what "not
-# currently blowing" settles to. Mostly a low, unremarkable resting value;
-# sometimes a touch higher, matching real idle sensor variance rather than
-# returning to one exact fixed number every time.
+# Resting-baseline distribution — same idea as _TARGET_BANDS but for what
+# "not currently blowing" settles to. Mostly a low, unremarkable resting
+# value; sometimes a touch higher. Unlike _TARGET_BANDS (one point per
+# blow), idle picks a *band* (see IDLE_BAND_REFRESH_S below) and wanders
+# within it, rather than a single fixed point — a real idle sensor doesn't
+# hold one exact value indefinitely, but it also shouldn't visibly
+# re-randomize every couple of seconds.
 _IDLE_BANDS: list[tuple[float, float, float]] = [
     (0.70, 0.1, 0.3),
     (0.30, 0.3, 0.5),
 ]
+
+# How long to stay within one idle band before picking a new one, and how
+# often to move to a new point *within* the current band while there.
+# Together: "settle near a value for ~20s, wandering a bit, then drift to
+# a new one" instead of a fresh random number every sample.
+IDLE_BAND_REFRESH_S = 20.0
+IDLE_WANDER_REFRESH_S = 4.0
 
 # Hard ceiling — reached only by the rare top band above. 110 mV is still
 # ~6.8x under the real 750 mV safety_alert ceiling, so this workaround can
@@ -78,8 +88,14 @@ CAP_MV = 110.0
 TAU_RISE_S = 1.4
 TAU_DECAY_S = 4.5
 
-# Matches the ~1-2 mV jitter observed in real production sensor logs.
+# Matches the ~1-2 mV jitter observed in real production sensor logs —
+# appropriate for the blow signal (up to 100mV), but was also being used
+# for idle (only 1-5mV), where the same 1mV std is 20-100% of the whole
+# signal and reads as constant re-randomizing. Idle gets its own much
+# smaller jitter; the "settling near a range" motion comes from the
+# band/wander mechanism above, not from noise.
 NOISE_STD_MV = 1.0
+NOISE_STD_IDLE_MV = 0.1
 
 
 def _draw_from_bands(bands: list[tuple[float, float, float]]) -> float:
@@ -100,9 +116,16 @@ def _draw_target_mv() -> float:
     return _draw_from_bands(_TARGET_BANDS)
 
 
-def _draw_idle_mv() -> float:
-    """Pick this idle period's resting baseline from _IDLE_BANDS."""
-    return _draw_from_bands(_IDLE_BANDS)
+def _pick_idle_band_mv() -> tuple[float, float]:
+    """Weighted-random band selection from _IDLE_BANDS, returned in mV."""
+    r = random.random()
+    cum = 0.0
+    for weight, lo_ppm, hi_ppm in _IDLE_BANDS:
+        cum += weight
+        if r < cum:
+            return (lo_ppm * MV_PER_PPM, hi_ppm * MV_PER_PPM)
+    lo_ppm, hi_ppm = _IDLE_BANDS[-1][1], _IDLE_BANDS[-1][2]
+    return (lo_ppm * MV_PER_PPM, hi_ppm * MV_PER_PPM)
 
 
 @dataclass
@@ -116,15 +139,23 @@ class _SimState:
     # Drawn fresh each time a blow starts; held steady for that blow's
     # duration so the reading doesn't relabel itself mid-breath.
     target_mv: float = 0.0
-    # Drawn fresh each time a blow ends (and once at first use); held
-    # steady until the next blow starts.
+    # Current idle wander-point (what value_mv decays toward while idle),
+    # the band it's currently wandering within, and when each was last
+    # (re)drawn — see IDLE_BAND_REFRESH_S/IDLE_WANDER_REFRESH_S.
     idle_mv: float = 0.0
+    idle_band: tuple[float, float] = (0.0, 0.0)
+    idle_band_ts: float = 0.0
+    idle_wander_ts: float = 0.0
 
     def __post_init__(self):
-        drawn = _draw_idle_mv()
-        self.value_mv = drawn
-        self.target_mv = drawn
-        self.idle_mv = drawn
+        band = _pick_idle_band_mv()
+        point = random.uniform(*band)
+        self.value_mv = point
+        self.target_mv = point
+        self.idle_mv = point
+        self.idle_band = band
+        self.idle_band_ts = self.last_ts
+        self.idle_wander_ts = self.last_ts
 
 
 _STATE: dict[UUID, _SimState] = {}
@@ -148,13 +179,29 @@ def step(device_id: UUID, pressure_kpa: Optional[float], now_ts: float) -> float
         s.target_mv = min(CAP_MV, _draw_target_mv())
     elif s.blowing and p < BLOW_OFF_KPA:
         s.blowing = False
-        s.idle_mv = _draw_idle_mv()  # fresh resting baseline for this idle period
+        # Fresh idle band + point the instant a blow ends, not a leftover
+        # from however long ago the pre-blow idle period last refreshed.
+        s.idle_band = _pick_idle_band_mv()
+        s.idle_mv = random.uniform(*s.idle_band)
+        s.idle_band_ts = now_ts
+        s.idle_wander_ts = now_ts
+
+    if not s.blowing:
+        if now_ts - s.idle_band_ts >= IDLE_BAND_REFRESH_S:
+            s.idle_band = _pick_idle_band_mv()
+            s.idle_mv = random.uniform(*s.idle_band)
+            s.idle_band_ts = now_ts
+            s.idle_wander_ts = now_ts
+        elif now_ts - s.idle_wander_ts >= IDLE_WANDER_REFRESH_S:
+            s.idle_mv = random.uniform(*s.idle_band)
+            s.idle_wander_ts = now_ts
 
     target = s.target_mv if s.blowing else s.idle_mv
     tau = TAU_RISE_S if s.blowing else TAU_DECAY_S
+    noise_std = NOISE_STD_MV if s.blowing else NOISE_STD_IDLE_MV
 
     s.value_mv += (target - s.value_mv) * (1 - math.exp(-dt / tau))
-    s.value_mv += random.gauss(0.0, NOISE_STD_MV)
+    s.value_mv += random.gauss(0.0, noise_std)
     s.value_mv = max(0.0, min(CAP_MV, s.value_mv))  # hard clamp, always, last
 
     s.last_ts = now_ts
