@@ -96,9 +96,17 @@ async def process_reading(device_id_str: str, payload: dict):
             log.warning("Unknown or inactive device: %s — skipping", device_id_str)
             return
 
-        # Shared device: always process; normal device: require active session
-        if not device.is_shared and not active_session_id:
-            return
+        # Shared device: always persist; normal device: persist only during
+        # an active recording session. This used to be a full early `return`
+        # for the whole function, which also silently dropped the live
+        # websocket push between sessions — the frontend's "live" gauge
+        # (and, for simulate_acetone/simulate_pressure devices, the idle
+        # decay both simulators compute) would freeze at whatever the last
+        # recorded value was and never update again, since no messages ever
+        # reached the point that publishes to `readings:{user_id}`. Now
+        # only DB persistence is gated; live processing/publishing always
+        # runs so the gauge keeps updating (and decaying) continuously.
+        should_persist = device.is_shared or bool(active_session_id)
 
         device_uuid = device.id
 
@@ -194,35 +202,37 @@ async def process_reading(device_id_str: str, payload: dict):
             "confidence_score": round(confidence, 4),
         }
 
-        reading = SensorReading(
-            time=now,
-            device_id=device_uuid,
-            user_id=reading_user_id,
-            session_id=session_label,
-            ambient_voc=baseline_voltage,
-            breath_voc=sensor_voltage,
-            acetone_delta=round(acetone_delta_mv, 4),
-            pressure_mean=pressure_kpa,
-            pressure_std=None,
-            breath_duration=None,
-            temp_c=temp_c,
-            humidity_pct=humidity,
-            quality_score=round(q_score, 2),
-            reliability_score=round(r_score, 2),
-            environment_penalty=env_pen,
-            metabolic_risk_index=classification["metabolic_risk_index"],
-            confidence_score=round(confidence, 4),
-            label=classification["label"],
-            # "simulated_" prefix is picked up by app.services.ml_data's existing
-            # exclusion filter (substring match) — synthesized readings never
-            # reach training data either way; the two values just distinguish
-            # acetone-only vs full (also pressure) simulation for debugging.
-            raw=(
-                {**payload, "source": "simulated_full_response" if device.simulate_pressure else "simulated_pressure_response"}
-                if is_simulated else payload
-            ),
-        )
-        db.add(reading)
+        if should_persist:
+            reading = SensorReading(
+                time=now,
+                device_id=device_uuid,
+                user_id=reading_user_id,
+                session_id=session_label,
+                ambient_voc=baseline_voltage,
+                breath_voc=sensor_voltage,
+                acetone_delta=round(acetone_delta_mv, 4),
+                pressure_mean=pressure_kpa,
+                pressure_std=None,
+                breath_duration=None,
+                temp_c=temp_c,
+                humidity_pct=humidity,
+                quality_score=round(q_score, 2),
+                reliability_score=round(r_score, 2),
+                environment_penalty=env_pen,
+                metabolic_risk_index=classification["metabolic_risk_index"],
+                confidence_score=round(confidence, 4),
+                label=classification["label"],
+                # "simulated_" prefix is picked up by app.services.ml_data's existing
+                # exclusion filter (substring match) — synthesized readings never
+                # reach training data either way; the two values just distinguish
+                # acetone-only vs full (also pressure) simulation for debugging.
+                raw=(
+                    {**payload, "source": "simulated_full_response" if device.simulate_pressure else "simulated_pressure_response"}
+                    if is_simulated else payload
+                ),
+            )
+            db.add(reading)
+            await db.commit()
 
         try:
             r2 = aioredis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
@@ -230,8 +240,6 @@ async def process_reading(device_id_str: str, payload: dict):
             await r2.aclose()
         except Exception as e:
             log.debug("Redis publish failed (non-critical): %s", e)
-
-        await db.commit()
 
         log.info(
             "device=%s Δ=%.1f mV label=%s p=%.2f kPa T=%s H=%s q=%.0f [→ %s]",
