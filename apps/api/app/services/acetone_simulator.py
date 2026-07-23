@@ -42,7 +42,7 @@ from uuid import UUID
 # the *only* role pressure plays now: detecting that a blow is happening,
 # never how strong the resulting acetone reading is.
 BLOW_ON_KPA = 1.0
-BLOW_OFF_KPA = 0.6
+BLOW_OFF_KPA = 0.5
 
 # Belt-and-suspenders: real hardware's post-blow "idle" pressure isn't
 # reliably below BLOW_OFF_KPA (observed in production: a device's pressure
