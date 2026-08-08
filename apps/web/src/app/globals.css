@@ -65,13 +65,6 @@
 
   --color-border-soft:   #D8D6CF;
   --color-border-strong: #B0AEA5;
-  /* Card edges specifically (not structural dividers like CardFooter's top
-     border or list-row separators, which keep --color-border-soft). Apple
-     Health separates cards from the page via the bg-primary/bg-surface
-     color step + shadow alone, no visible line — transparent here, then
-     redefined in [data-theme="dark"] where there's no shadow to do that
-     job instead. */
-  --color-border-card:   transparent;
 
   --color-cat-breath:  #01D19B;
   --color-cat-heart:   #FF3B4A;
@@ -113,7 +106,6 @@
      that job, so it needs to read clearly against near-black surfaces. */
   --color-border-soft:   #3A3A3C;
   --color-border-strong: #55555A;
-  --color-border-card:   #3A3A3C;
 
   --color-surface:   #1C1C1E;
   --color-surface-2: #2C2C2E;

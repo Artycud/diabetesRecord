@@ -17,7 +17,7 @@ export function CategoryCard({
   icon, title, value, sub, href, iconBg = "#00C896", iconColor = "#0A0A0A", comingSoon,
 }: CategoryCardProps) {
   const inner = (
-    <div className="rounded-2xl p-4 flex flex-col gap-3 h-full border border-border-card bg-bg-surface card-shadow">
+    <div className="rounded-2xl p-4 flex flex-col gap-3 h-full border border-border-soft bg-bg-surface card-shadow">
 
       <div
         className="h-9 w-9 rounded-xl flex items-center justify-center text-base"

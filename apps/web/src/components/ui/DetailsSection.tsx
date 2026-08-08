@@ -23,7 +23,7 @@ export function DetailsSection({ title, children, defaultOpen = false, className
     <div className={className}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between rounded-2xl border border-border-card bg-bg-surface card-shadow px-4 py-3 text-left"
+        className="w-full flex items-center justify-between rounded-2xl border border-border-soft bg-bg-surface px-4 py-3 text-left"
       >
         <span className="text-sm font-medium text-text-primary">{title}</span>
         <ChevronDown
