@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Sarabun, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -28,6 +28,12 @@ export const metadata: Metadata = {
   title: "MetaBreath",
   description: "Wellness companion for keto / IF / exercise",
   icons: { icon: "/favicon.ico" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

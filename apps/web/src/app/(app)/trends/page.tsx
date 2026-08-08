@@ -24,11 +24,15 @@ import { parseServerTime } from "@/lib/time";
 import { backendLabelToZone, LABEL_STYLE, LABEL_TH } from "@/lib/riskLabel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Wind, Utensils, Dumbbell, Scale, Eye, EyeOff } from "lucide-react";
+import { Wind, Utensils, Dumbbell, Scale, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { EmptyChartIllustration } from "@/components/brand/empty-chart";
 import { TrendClassCard } from "@/components/cards/TrendClassCard";
 import { BaselineCard } from "@/components/cards/BaselineCard";
 import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
+import { TrendMetricCard } from "@/components/cards/TrendMetricCard";
+import { HistoryRow } from "@/components/cards/HistoryRow";
+import { DetailsSection } from "@/components/ui/DetailsSection";
+import { SuggestedQuestionChip } from "@/components/ai/SuggestedQuestionChip";
 import { twMerge } from "tailwind-merge";
 
 function EmptyChart({ label }: { label: string }) {
@@ -73,7 +77,10 @@ export default function TrendsPage() {
   const { formatDate: tzFormatDate, formatTime: tzFormatTime } = useTimezone();
   const [days, setDays] = useState(7);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-  const [showLifestyleOverlay, setShowLifestyleOverlay] = useState(true);
+  // Off by default — the feature stays available but shouldn't compete with
+  // the chart itself on first view (see the Eye/EyeOff toggle below).
+  const [showLifestyleOverlay, setShowLifestyleOverlay] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(false);
   useDeviceStream(user?.id);
 
   // ppm → the user's currently selected display unit, via the same fixed
@@ -322,7 +329,7 @@ export default function TrendsPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-12 md:pt-6 pb-6 space-y-5">
+    <div className="max-w-2xl mx-auto px-4 pt-12 md:pt-6 pb-tabbar space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-text-primary tracking-tight">{t("trends.title")}</h1>
         <div className="mt-3 inline-flex gap-1 rounded-xl bg-bg-elevated border border-border-soft p-1">
@@ -343,130 +350,104 @@ export default function TrendsPage() {
         </div>
       </div>
 
-      {/* Long-term trend classifier (Phase 3 LSTM Trend) */}
-      {effectiveDevice && <TrendClassCard deviceId={effectiveDevice} sessions={14} />}
-
-      {/* Personal baseline (Task D1) — "your own normal" alongside the
-          population Anderson zones shown further down on the acetone chart. */}
-      {effectiveDevice && <BaselineCard deviceId={effectiveDevice} />}
-
-      {/* AI interpretation of the latest reading vs. personal baseline (Task D2) */}
-      {effectiveDevice && <AiInterpretCard deviceId={effectiveDevice} />}
+      {/* Interpretive detail — trend classification, personal baseline, and
+          the AI take are supporting context for the charts below, not the
+          primary content of a trends page, so they're collapsed by default. */}
+      {effectiveDevice && (
+        <DetailsSection title="Details">
+          <TrendClassCard deviceId={effectiveDevice} sessions={14} />
+          <BaselineCard deviceId={effectiveDevice} />
+          <AiInterpretCard deviceId={effectiveDevice} />
+          <SuggestedQuestionChip question="ทำไมแนวโน้มของฉันถึงเป็นแบบนี้?" deviceId={effectiveDevice} />
+        </DetailsSection>
+      )}
 
       {/* Ketone chart */}
-      <Card>
-        <CardContent className="pt-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-text-primary tracking-tight">{t("trends.ketoneTitle")}</h2>
-              <p className="text-xs text-muted mt-0.5">mmol/L</p>
-            </div>
-            {ketoneData.length > 0 && (
-              <Badge variant="mint">
-                {t("trends.avg")}{" "}
-                {(ketoneData.reduce((s, d) => s + d.value, 0) / ketoneData.length).toFixed(2)}{" "}
-                mmol/L
-              </Badge>
-            )}
-          </div>
-
-          {kLoading ? (
-            <ChartSkeleton />
-          ) : ketoneData.length === 0 ? (
-            <EmptyChart label={t("trends.emptyKetone")} />
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={ketoneData} margin={{ left: -20, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
-                <YAxis domain={[0, "auto"]} tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} mmol/L`, t("trends.ketoneTitle")]} />
-                <ReferenceLine y={0.5} stroke="#00C896" strokeDasharray="4 3" label={{ value: t("trends.ketosis"), fontSize: 10, fill: "#009B74" }} />
-                <Line type="monotone" dataKey="value" stroke="#00C896" strokeWidth={2} dot={{ fill: "#00C896", r: 3 }} activeDot={{ r: 5 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+      <TrendMetricCard
+        title={t("trends.ketoneTitle")}
+        unit="mmol/L"
+        valueLabel={t("trends.avg")}
+        value={ketoneData.length > 0 ? (ketoneData.reduce((s, d) => s + d.value, 0) / ketoneData.length).toFixed(2) : null}
+      >
+        {kLoading ? (
+          <ChartSkeleton />
+        ) : ketoneData.length === 0 ? (
+          <EmptyChart label={t("trends.emptyKetone")} />
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={ketoneData} margin={{ left: -20, right: 8 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
+              <YAxis domain={[0, "auto"]} tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} mmol/L`, t("trends.ketoneTitle")]} />
+              <ReferenceLine y={0.5} stroke="#00C896" strokeDasharray="4 3" label={{ value: t("trends.ketosis"), fontSize: 10, fill: "#009B74" }} />
+              <Line type="monotone" dataKey="value" stroke="#00C896" strokeWidth={2} dot={{ fill: "#00C896", r: 3 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </TrendMetricCard>
 
       {/* Weight chart */}
-      <Card>
-        <CardContent className="pt-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-text-primary tracking-tight">{t("trends.weightTitle")}</h2>
-              <p className="text-xs text-muted mt-0.5">kg</p>
-            </div>
-            {weightData.length > 0 && (
-              <Badge variant="peach">
-                {t("trends.latest")} {weightData[weightData.length - 1].value} kg
-              </Badge>
-            )}
-          </div>
-
-          {wLoading ? (
-            <ChartSkeleton />
-          ) : weightData.length === 0 ? (
-            <EmptyChart label={t("trends.emptyWeight")} />
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={weightData} margin={{ left: -20, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
-                <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} kg`, t("trends.weightTitle")]} />
-                <Line type="monotone" dataKey="value" stroke="#B08D57" strokeWidth={2} dot={{ fill: "#B08D57", r: 3 }} activeDot={{ r: 5 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+      <TrendMetricCard
+        title={t("trends.weightTitle")}
+        unit="kg"
+        valueLabel={t("trends.latest")}
+        value={weightData.length > 0 ? String(weightData[weightData.length - 1].value) : null}
+      >
+        {wLoading ? (
+          <ChartSkeleton />
+        ) : weightData.length === 0 ? (
+          <EmptyChart label={t("trends.emptyWeight")} />
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={weightData} margin={{ left: -20, right: 8 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
+              <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: tickColor }} stroke={axisColor} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} kg`, t("trends.weightTitle")]} />
+              <Line type="monotone" dataKey="value" stroke="#B08D57" strokeWidth={2} dot={{ fill: "#B08D57", r: 3 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </TrendMetricCard>
 
       {/* Breath Acetone history */}
       {effectiveDevice && (
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Wind size={14} className="text-mint-500" strokeWidth={1.6} />
-                  <h2 className="font-semibold text-text-primary tracking-tight">Breath Acetone</h2>
-                </div>
-                <p className="text-xs text-muted mt-0.5">{acUnitLbl} — TGS1820</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {acetoneData.length > 0 && (
-                  <Badge variant="mint">
-                    เฉลี่ย {(acetoneData.reduce((s, d) => s + d.value, 0) / acetoneData.length).toFixed(acDecimals)} {acUnitLbl}
-                  </Badge>
-                )}
-                {overlayItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowLifestyleOverlay((v) => !v)}
-                    aria-pressed={showLifestyleOverlay}
-                    title={t("trends.overlay.toggle")}
-                    className="h-7 w-7 rounded-lg flex items-center justify-center text-muted hover:text-text-primary hover:bg-bg-raised transition-colors shrink-0"
-                  >
-                    {showLifestyleOverlay ? <Eye size={14} /> : <EyeOff size={14} />}
-                  </button>
-                )}
-                {(devices?.length ?? 0) > 1 && (
-                  <select
-                    value={effectiveDevice ?? ""}
-                    onChange={(e) => setSelectedDevice(e.target.value || null)}
-                    className="text-xs border border-border-soft rounded-lg px-2 py-1 text-text-primary bg-bg-elevated focus:outline-none"
-                  >
-                    {devices!.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.id.slice(0, 8)}… {d.active ? "●" : "○"}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-
+        <TrendMetricCard
+          icon={<Wind size={14} className="text-mint-500" strokeWidth={1.6} />}
+          title="Breath Acetone"
+          unit={acUnitLbl}
+          valueLabel={t("trends.avg")}
+          value={acetoneData.length > 0 ? (acetoneData.reduce((s, d) => s + d.value, 0) / acetoneData.length).toFixed(acDecimals) : null}
+          actions={
+            <>
+              {overlayItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowLifestyleOverlay((v) => !v)}
+                  aria-pressed={showLifestyleOverlay}
+                  title={t("trends.overlay.toggle")}
+                  className="h-7 w-7 rounded-lg flex items-center justify-center text-muted hover:text-text-primary hover:bg-bg-raised transition-colors shrink-0"
+                >
+                  {showLifestyleOverlay ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+              )}
+              {(devices?.length ?? 0) > 1 && (
+                <select
+                  value={effectiveDevice ?? ""}
+                  onChange={(e) => setSelectedDevice(e.target.value || null)}
+                  className="text-xs border border-border-soft rounded-lg px-2 py-1 text-text-primary bg-bg-elevated focus:outline-none"
+                >
+                  {devices!.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.id.slice(0, 8)}… {d.active ? "●" : "○"}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
+          }
+        >
             {sLoading ? (
               <ChartSkeleton />
             ) : acetoneData.length === 0 ? (
@@ -475,7 +456,7 @@ export default function TrendsPage() {
               <>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={acetoneData} margin={{ left: -20, right: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={gridColor} />
                     <XAxis
                       dataKey="date"
                       tick={{ fontSize: 11, fill: tickColor }}
@@ -568,18 +549,27 @@ export default function TrendsPage() {
                   </div>
                 )}
 
-                <div className="flex gap-3 mt-3 flex-wrap">
-                  {legendZones.map(({ key, color, text }) => (
-                    <div key={key} className="flex items-center gap-1.5 text-xs text-muted">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-                      {text}
-                    </div>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setLegendOpen((v) => !v)}
+                  className="flex items-center gap-1 mt-3 text-xs text-mint-500 font-medium"
+                >
+                  Zone details
+                  <ChevronDown size={12} className={twMerge("transition-transform duration-200", legendOpen && "rotate-180")} />
+                </button>
+                {legendOpen && (
+                  <div className="flex gap-3 mt-2 flex-wrap animate-fade-rise-in">
+                    {legendZones.map(({ key, color, text }) => (
+                      <div key={key} className="flex items-center gap-1.5 text-xs text-muted">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+                        {text}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
-          </CardContent>
-        </Card>
+        </TrendMetricCard>
       )}
 
       {/* Daily stats table */}
@@ -605,59 +595,30 @@ export default function TrendsPage() {
               <EmptyChart label="ยังไม่มีการเป่าในช่วงนี้" />
             )}
             {(dailyStats?.length ?? 0) > 0 && (
-              <div className="overflow-x-auto -mx-4 px-4">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border-soft text-muted">
-                      <th className="text-left  py-2 font-semibold">
-                        {dailyStatsGranularity === "day" ? "วันที่" : dailyStatsGranularity === "week" ? "สัปดาห์ของ" : "เดือน"}
-                      </th>
-                      <th className="text-right py-2 font-semibold">ครั้ง</th>
-                      <th className="text-right py-2 font-semibold">เฉลี่ย</th>
-                      <th className="text-right py-2 font-semibold">สูงสุด</th>
-                      {hasTemp     && <th className="text-right py-2 font-semibold">อุณหภูมิ</th>}
-                      {hasHumidity && <th className="text-right py-2 font-semibold">ความชื้น</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dailyStats!.map((d) => {
-                      const avg = d.avg_acetone_delta;
-                      const max = d.max_acetone_delta;
-                      const zoneColor = zoneColorOf(d.dominant_label);
-                      const dateFmtOpts: Intl.DateTimeFormatOptions =
-                        dailyStatsGranularity === "month"
-                          ? { month: "short", year: "numeric" }
-                          : { day: "numeric", month: "short" };
-                      return (
-                        <tr key={d.date} className="border-b border-border-soft/60 hover:bg-bg-raised transition-colors">
-                          <td className="py-2.5 text-text-primary font-medium">
-                            <div className="flex items-center gap-1.5">
-                              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: zoneColor }} />
-                              {new Date(d.date).toLocaleDateString(dateLocale, dateFmtOpts)}
-                            </div>
-                          </td>
-                          <td className="py-2.5 text-right text-text-primary font-mono">{d.count}</td>
-                          <td className="py-2.5 text-right text-text-primary font-mono font-semibold">
-                            {avg != null ? convertFromMv(avg, acUnit).toFixed(acDecimals) : "—"}
-                          </td>
-                          <td className="py-2.5 text-right text-muted font-mono">
-                            {max != null ? convertFromMv(max, acUnit).toFixed(acDecimals) : "—"}
-                          </td>
-                          {hasTemp && (
-                            <td className="py-2.5 text-right text-muted font-mono">
-                              {d.avg_temp_c != null ? `${d.avg_temp_c.toFixed(1)}°C` : "—"}
-                            </td>
-                          )}
-                          {hasHumidity && (
-                            <td className="py-2.5 text-right text-muted font-mono">
-                              {d.avg_humidity_pct != null ? `${d.avg_humidity_pct.toFixed(0)}%` : "—"}
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="-mx-2 space-y-0.5">
+                {dailyStats!.map((d) => {
+                  const avg = d.avg_acetone_delta;
+                  const max = d.max_acetone_delta;
+                  const zoneColor = zoneColorOf(d.dominant_label);
+                  const dateFmtOpts: Intl.DateTimeFormatOptions =
+                    dailyStatsGranularity === "month"
+                      ? { month: "short", year: "numeric" }
+                      : { day: "numeric", month: "short" };
+                  const envBits = [
+                    hasTemp && d.avg_temp_c != null ? `${d.avg_temp_c.toFixed(1)}°C` : null,
+                    hasHumidity && d.avg_humidity_pct != null ? `${d.avg_humidity_pct.toFixed(0)}%` : null,
+                  ].filter(Boolean);
+                  return (
+                    <HistoryRow
+                      key={d.date}
+                      leadingColor={zoneColor}
+                      title={new Date(d.date).toLocaleDateString(dateLocale, dateFmtOpts)}
+                      subtitle={`${d.count} ครั้ง${envBits.length ? " · " + envBits.join(" · ") : ""}`}
+                      primary={avg != null ? `${convertFromMv(avg, acUnit).toFixed(acDecimals)} ${acUnitLbl}` : "—"}
+                      secondary={max != null ? `สูงสุด ${convertFromMv(max, acUnit).toFixed(acDecimals)} ${acUnitLbl}` : undefined}
+                    />
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -684,75 +645,29 @@ export default function TrendsPage() {
           )}
 
           {(sessions?.length ?? 0) > 0 && (
-            <div className="overflow-x-auto -mx-4 px-4">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border-soft text-muted">
-                    <th className="text-left  py-2 font-semibold">เวลา</th>
-                    <th className="text-right py-2 font-semibold">น</th>
-                    <th className="text-right py-2 font-semibold">เฉลี่ย</th>
-                    <th className="text-right py-2 font-semibold">สูงสุด</th>
-                    <th className="text-right py-2 font-semibold">แรงเป่า</th>
-                    <th className="text-right py-2 font-semibold">ระดับ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessions!.map((s) => {
-                    const zone = s.dominant_label ?? "unreliable";
-                    const zoneColor = zoneColorOf(zone);
-                    return (
-                      <tr
-                        key={s.session_id}
-                        className="border-b border-border-soft/60 hover:bg-bg-raised transition-colors"
-                      >
-                        <td className="py-2.5 text-text-primary font-medium">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="h-2 w-2 rounded-full shrink-0"
-                              style={{ background: zoneColor }}
-                            />
-                            <div className="leading-tight">
-                              <div>{tzFormatDate(s.started_at)}</div>
-                              <div className="text-[10px] text-muted">
-                                {tzFormatTime(s.started_at)}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2.5 text-right text-text-primary font-mono">
-                          {s.n_samples}
-                        </td>
-                        <td className="py-2.5 text-right text-text-primary font-mono font-semibold">
-                          {s.mean_acetone_delta != null
-                            ? convertFromMv(s.mean_acetone_delta, acUnit).toFixed(acDecimals)
-                            : "—"}
-                        </td>
-                        <td className="py-2.5 text-right text-muted font-mono">
-                          {s.peak_acetone_delta != null
-                            ? convertFromMv(s.peak_acetone_delta, acUnit).toFixed(acDecimals)
-                            : "—"}
-                        </td>
-                        <td className="py-2.5 text-right text-muted font-mono">
-                          {s.avg_pressure_kpa != null
-                            ? `${s.avg_pressure_kpa.toFixed(1)}`
-                            : "—"}
-                        </td>
-                        <td className="py-2.5 text-right">
-                          <span
-                            className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full"
-                            style={{
-                              background: `${zoneColor}22`,
-                              color: zoneColor,
-                            }}
-                          >
-                            {zone}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="-mx-2 space-y-0.5">
+              {sessions!.map((s) => {
+                const zone = s.dominant_label ?? "unreliable";
+                const zoneColor = zoneColorOf(zone);
+                return (
+                  <HistoryRow
+                    key={s.session_id}
+                    leadingColor={zoneColor}
+                    title={tzFormatDate(s.started_at)}
+                    subtitle={`${tzFormatTime(s.started_at)} · ${s.n_samples} น. · ${zone}`}
+                    primary={
+                      s.mean_acetone_delta != null
+                        ? `${convertFromMv(s.mean_acetone_delta, acUnit).toFixed(acDecimals)} ${acUnitLbl}`
+                        : "—"
+                    }
+                    secondary={
+                      s.peak_acetone_delta != null
+                        ? `สูงสุด ${convertFromMv(s.peak_acetone_delta, acUnit).toFixed(acDecimals)} ${acUnitLbl}`
+                        : undefined
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </CardContent>

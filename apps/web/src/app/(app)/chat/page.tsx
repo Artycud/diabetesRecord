@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
@@ -22,14 +23,16 @@ const SUGGESTIONS = [
   "ทำไมค่าถึงขึ้นลงมาก วันนี้ผมกิน keto อยู่นะ",
 ];
 
-export default function ChatPage() {
+function ChatContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | undefined>();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const autoSentRef = useRef(false);
 
   const { data: devices } = useQuery({
     queryKey: ["devices"],
@@ -51,6 +54,15 @@ export default function ChatPage() {
         p.name.toLowerCase().includes(slashQuery)
       )
     : [];
+
+  // A contextual entry point (e.g. SuggestedQuestionChip on Home/Breathing/
+  // Trends) deep-links here with ?q=<question>&device=<id> — preselect the
+  // device it was asking about and prefer that device param over the
+  // "pick the active device" default below.
+  useEffect(() => {
+    const deviceParam = searchParams.get("device");
+    if (deviceParam) setSelectedDevice(deviceParam);
+  }, [searchParams]);
 
   useEffect(() => {
     if (devices && devices.length > 0 && !selectedDevice) {
@@ -115,6 +127,16 @@ export default function ChatPage() {
     }
   }
 
+  // Auto-send a prefilled question from a contextual entry point, once.
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q && !autoSentRef.current) {
+      autoSentRef.current = true;
+      send(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -125,21 +147,21 @@ export default function ChatPage() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen max-w-2xl mx-auto">
+    <div className="flex flex-col h-screen max-w-2xl mx-auto">
       {/* Header */}
-      <div className="shrink-0 px-4 py-4 border-b border-border-soft bg-white flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-mint-50 border border-mint-100 flex items-center justify-center">
-          <Bot size={18} className="text-mint-600" strokeWidth={1.5} />
+      <div className="shrink-0 px-4 py-4 border-b border-border-soft bg-bg-surface flex items-center gap-3">
+        <div className="h-9 w-9 rounded-xl bg-mint-500/10 border border-mint-500/20 flex items-center justify-center">
+          <Bot size={18} className="text-mint-500" strokeWidth={1.5} />
         </div>
         <div className="flex-1">
-          <p className="font-semibold text-charcoal-500 text-sm">MetaBreath AI</p>
-          <p className="text-[11px] text-muted">ที่ปรึกษาสุขภาพ metabolic</p>
+          <p className="font-semibold text-text-primary text-sm">MetaBreath AI</p>
+          <p className="text-[11px] text-text-muted">ที่ปรึกษาสุขภาพ metabolic</p>
         </div>
         {devices && devices.length > 0 && (
           <select
             value={selectedDevice ?? ""}
             onChange={(e) => setSelectedDevice(e.target.value || undefined)}
-            className="text-xs border border-border-soft rounded-lg px-2 py-1.5 text-charcoal-500 bg-surface-2 focus:outline-none focus:ring-1 focus:ring-mint-400"
+            className="text-xs border border-border-soft rounded-lg px-2 py-1.5 text-text-primary bg-bg-elevated focus:outline-none focus:ring-1 focus:ring-mint-400"
           >
             <option value="">ไม่มีอุปกรณ์</option>
             {devices.map((d) => (
@@ -152,15 +174,15 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-gray-50">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-bg-primary">
         {!hasMessages && (
           <div className="flex flex-col items-center justify-center h-full gap-6 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-mint-50 border border-mint-100 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-mint-500/10 border border-mint-500/20 flex items-center justify-center">
               <Wind size={28} className="text-mint-500" strokeWidth={1.3} />
             </div>
             <div>
-              <p className="font-semibold text-charcoal-500">ถามเรื่อง metabolic health ของคุณ</p>
-              <p className="text-sm text-muted mt-1 max-w-xs">
+              <p className="font-semibold text-text-primary">ถามเรื่อง metabolic health ของคุณ</p>
+              <p className="text-sm text-text-muted mt-1 max-w-xs">
                 AI จะตอบโดยอิงข้อมูล breath acetone และ ketone ของคุณ
               </p>
             </div>
@@ -169,7 +191,7 @@ export default function ChatPage() {
                 <button
                   key={s}
                   onClick={() => send(s)}
-                  className="text-left text-sm bg-white border border-border-soft rounded-xl px-4 py-3 text-charcoal-500 hover:border-mint-300 hover:bg-mint-50 transition-colors"
+                  className="text-left text-sm bg-bg-surface border border-border-soft rounded-xl px-4 py-3 text-text-primary hover:border-mint-500/40 hover:bg-mint-500/10 transition-colors"
                 >
                   {s}
                 </button>
@@ -181,27 +203,27 @@ export default function ChatPage() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             {msg.role === "assistant" && (
-              <div className="w-7 h-7 rounded-lg bg-mint-100 flex items-center justify-center shrink-0 mr-2 mt-0.5">
-                <Bot size={14} className="text-mint-600" strokeWidth={1.5} />
+              <div className="w-7 h-7 rounded-lg bg-mint-500/15 flex items-center justify-center shrink-0 mr-2 mt-0.5">
+                <Bot size={14} className="text-mint-500" strokeWidth={1.5} />
               </div>
             )}
             <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
               msg.role === "user"
-                ? "bg-slate-900 text-white rounded-tr-sm"
+                ? "bg-mint-500 text-white rounded-tr-sm"
                 : msg.refusal
-                ? "bg-amber-50 text-amber-800 border border-amber-200 rounded-tl-sm"
-                : "bg-white border border-border-soft text-charcoal-500 rounded-tl-sm"
+                ? "bg-warning/10 text-warning border border-warning/20 rounded-tl-sm"
+                : "bg-bg-surface border border-border-soft text-text-primary rounded-tl-sm"
             }`}>
               {msg.role === "assistant" ? (
                 <div>
                   {msg.toolStatus && (
-                    <div className="text-[11px] text-mint-600 italic mb-1 flex items-center gap-1">
+                    <div className="text-[11px] text-mint-500 italic mb-1 flex items-center gap-1">
                       <span className="w-1 h-1 rounded-full bg-mint-500 animate-pulse" />
                       {msg.toolStatus}
                     </div>
                   )}
                   {msg.content ? (
-                    <div className="prose prose-sm max-w-none [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_hr]:my-2 [&_hr]:border-border-soft [&_strong]:font-semibold [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px] [&_a]:text-mint-600 [&_a]:underline">
+                    <div className="prose prose-sm max-w-none [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_hr]:my-2 [&_hr]:border-border-soft [&_strong]:font-semibold [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_code]:bg-bg-raised [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px] [&_a]:text-mint-500 [&_a]:underline">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {msg.content}
                       </ReactMarkdown>
@@ -232,17 +254,17 @@ export default function ChatPage() {
       </div>
 
       {/* Disclaimer */}
-      <div className="shrink-0 px-4 py-1.5 bg-amber-50 border-t border-amber-100">
-        <p className="text-[10px] text-amber-700 text-center">
+      <div className="shrink-0 px-4 py-1.5 bg-warning/10 border-t border-warning/20">
+        <p className="text-[10px] text-warning text-center">
           AI ให้ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์
         </p>
       </div>
 
       {/* Slash command menu */}
       {slashOpen && filteredPrompts.length > 0 && (
-        <div className="shrink-0 px-4 pb-1 bg-white">
-          <div className="border border-border-soft rounded-xl overflow-hidden bg-white shadow-sm">
-            <div className="text-[10px] uppercase tracking-wide text-muted px-3 pt-2 pb-1">
+        <div className="shrink-0 px-4 pb-1 bg-bg-surface">
+          <div className="border border-border-soft rounded-xl overflow-hidden bg-bg-surface shadow-sm">
+            <div className="text-[10px] uppercase tracking-wide text-text-muted px-3 pt-2 pb-1">
               Slash commands
             </div>
             {filteredPrompts.slice(0, 6).map((p) => (
@@ -252,13 +274,13 @@ export default function ChatPage() {
                   setInput("");
                   send(p.text);
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-mint-50 border-t border-border-soft/70"
+                className="w-full text-left px-3 py-2 hover:bg-mint-500/10 border-t border-border-soft/70"
               >
-                <div className="text-sm font-medium text-charcoal-500">
+                <div className="text-sm font-medium text-text-primary">
                   /{p.name}{p.title && p.title !== p.name ? ` — ${p.title}` : ""}
                 </div>
                 {p.description && (
-                  <div className="text-[11px] text-muted leading-snug mt-0.5">
+                  <div className="text-[11px] text-text-muted leading-snug mt-0.5">
                     {p.description}
                   </div>
                 )}
@@ -268,8 +290,12 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Input */}
-      <div className="shrink-0 px-4 py-3 border-t border-border-soft bg-white">
+      {/* Input — extra bottom padding for the iOS home-indicator area, since
+          this route hides the bottom tab bar (see (app)/layout.tsx). */}
+      <div
+        className="shrink-0 px-4 pt-3 border-t border-border-soft bg-bg-surface"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      >
         <div className="flex gap-2 items-end">
           <textarea
             ref={inputRef}
@@ -278,7 +304,7 @@ export default function ChatPage() {
             onKeyDown={handleKey}
             placeholder="พิมพ์คำถาม... (Enter ส่ง, Shift+Enter ขึ้นบรรทัด)"
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-border-soft px-4 py-2.5 text-sm text-charcoal-500 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-mint-300 transition max-h-32 overflow-y-auto"
+            className="flex-1 resize-none rounded-xl border border-border-soft bg-bg-primary px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-mint-300 transition max-h-32 overflow-y-auto"
             style={{ minHeight: "42px" }}
             onInput={(e) => {
               const t = e.currentTarget;
@@ -296,5 +322,13 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center text-text-muted text-sm">กำลังโหลด...</div>}>
+      <ChatContent />
+    </Suspense>
   );
 }

@@ -13,7 +13,6 @@ import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone, rampColor } f
 import { useTimezone } from "@/lib/timezone";
 import { randomDemoParams, demoValueAt, type DemoParams } from "@/lib/demoReading";
 import { BreathPulse } from "@/components/ui/BreathPulse";
-import { useThemeConfig } from "@/components/theme/ThemeProvider";
 import { twMerge } from "tailwind-merge";
 import { ContextSelector } from "./ContextSelector";
 import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
@@ -159,7 +158,6 @@ interface Props {
 
 export default function BreathSession({ liveReading, connected, deviceId, userId, onSessionSaved, isDemo = false }: Props) {
   const { format: fmtAcetone, label: unitLbl } = useUnits();
-  const { cardStyle } = useThemeConfig();
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);   // 0-100 within current phase
@@ -511,12 +509,8 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
               className={twMerge(
                 "relative h-32 w-32 rounded-full flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all duration-200",
                 connected || isDemo
-                  ? "btn-premium"
-                  : cardStyle === "neumorphic"
-                    ? "bg-bg-elevated neu-inset"
-                    : cardStyle === "liquidGlass"
-                      ? "liquid-glass"
-                      : "bg-bg-elevated border-2 border-border-soft"
+                  ? "bg-mint-500 shadow-sm"
+                  : "bg-bg-elevated border-2 border-border-soft"
               )}
             >
               <Wind
@@ -618,10 +612,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
       <div className="flex flex-col items-center py-6 gap-4">
         <PhaseAnnouncer text="กำลังบันทึกการเป่า" />
         <div
-          className={twMerge(
-            "relative rounded-full overflow-hidden",
-            cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : cardStyle === "liquidGlass" ? "liquid-glass" : "bg-bg-elevated border-2 border-border-soft"
-          )}
+          className="relative rounded-full overflow-hidden bg-bg-elevated border-2 border-border-soft"
           style={{ width: SZ, height: SZ }}
         >
           {/* Liquid fill */}
@@ -757,7 +748,9 @@ function DoneCard({
 
   return (
     <div className="py-2">
-      <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
+      {/* Session-complete is the app's highest-stakes "did this work" moment —
+          a restrained pop-in beat rather than the result just appearing flat. */}
+      <div className="bg-bg-elevated rounded-2xl p-4 space-y-3 animate-pop-in">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-text-primary">ผลการตรวจ</p>
           <span className={`text-sm font-bold ${lColor}`}>{lText}</span>

@@ -70,7 +70,7 @@ export default function HealthReportPage() {
         {report && (
           <button
             onClick={() => window.print()}
-            className="btn-premium flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shrink-0 active:scale-95 transition-transform"
+            className="bg-mint-500 hover:bg-mint-600 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shrink-0 active:scale-95 transition-transform"
           >
             <Printer size={14} />
             {t("report.print")}
@@ -106,7 +106,7 @@ export default function HealthReportPage() {
       {report && !isError && (
         <>
           {!report.device_id && (
-            <Card forceAppearance="flat" className="border border-warning/20 bg-warning/5">
+            <Card className="border border-warning/20 bg-warning/5">
               <CardContent className="py-3 text-sm text-warning">{t("report.noDevice")}</CardContent>
             </Card>
           )}

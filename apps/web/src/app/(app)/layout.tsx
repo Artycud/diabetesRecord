@@ -2,15 +2,20 @@
 
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { PillNav } from "@/components/nav/PillNav";
-import { FloatingAIButton } from "@/components/nav/FloatingAIButton";
+import { TabBar } from "@/components/nav/TabBar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { t } = useT();
+
+  // /chat is a focused, full-screen conversation surface — hiding the tab
+  // bar there avoids fighting its own height calc against a fixed bottom
+  // bar, and mirrors how iOS apps treat a "conversation" as its own stack.
+  const hideTabBar = pathname?.startsWith("/chat");
 
   useEffect(() => {
     if (loading) return;
@@ -33,11 +38,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen bg-bg-primary">
-      <PillNav />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
-      <FloatingAIButton />
+      {!hideTabBar && <TabBar />}
     </div>
   );
 }

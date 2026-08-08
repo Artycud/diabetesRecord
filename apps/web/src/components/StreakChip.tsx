@@ -5,7 +5,7 @@ import { twMerge } from "tailwind-merge";
 
 interface StreakChipProps {
   current: number | undefined;
-  /** Compact = icon+number only, for PillNav. Full = home greeting header. */
+  /** Compact = icon+number only. Full = home greeting header (current usage). */
   compact?: boolean;
   className?: string;
 }

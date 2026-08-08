@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { twMerge } from "tailwind-merge";
-import { useThemeConfig } from "@/components/theme/ThemeProvider";
 
 interface CategoryCardProps {
   icon: string;
@@ -18,18 +16,9 @@ interface CategoryCardProps {
 export function CategoryCard({
   icon, title, value, sub, href, iconBg = "#00C896", iconColor = "#0A0A0A", comingSoon,
 }: CategoryCardProps) {
-  const { cardStyle } = useThemeConfig();
   const inner = (
-    <div
-      className={twMerge(
-        "rounded-2xl p-4 flex flex-col gap-3 h-full",
-        cardStyle === "neumorphic"
-          ? "bg-bg-elevated neu-raised"
-          : cardStyle === "liquidGlass"
-            ? "liquid-glass"
-            : "bg-bg-elevated"
-      )}
-    >
+    <div className="rounded-2xl p-4 flex flex-col gap-3 h-full border border-border-soft bg-bg-surface card-shadow">
+
       <div
         className="h-9 w-9 rounded-xl flex items-center justify-center text-base"
         style={{ backgroundColor: iconBg + "20", color: iconBg }}

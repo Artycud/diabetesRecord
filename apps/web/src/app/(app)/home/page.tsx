@@ -9,18 +9,20 @@ import { useDeviceStream } from "@/lib/useDeviceStream";
 import { parseServerTime } from "@/lib/time";
 import { useUnits } from "@/lib/units";
 import { AcetoneRing } from "@/components/cards/AcetoneRing";
-import { FlexibilityBar } from "@/components/FlexibilityBar";
-import { LABEL_TH, backendLabelToZone } from "@/lib/riskLabel";
+import { flexScoreStyle } from "@/lib/riskLabel";
 import { TodayMetricCard } from "@/components/cards/TodayMetricCard";
 import { CategoryCard } from "@/components/cards/CategoryCard";
 import { TrendClassCard } from "@/components/cards/TrendClassCard";
 import { BaselineCard } from "@/components/cards/BaselineCard";
+import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
 import { InfoButton } from "@/components/ui/InfoButton";
 import { StatNumber } from "@/components/ui/StatNumber";
 import { Card } from "@/components/ui/card";
+import { DetailsSection } from "@/components/ui/DetailsSection";
+import { SuggestedQuestionChip } from "@/components/ai/SuggestedQuestionChip";
 import { StreakChip } from "@/components/StreakChip";
 import { DailyCheckBanner } from "@/components/DailyCheckBanner";
-import { useThemeConfig } from "@/components/theme/ThemeProvider";
+import { PlusMenu } from "@/components/nav/PlusMenu";
 import Link from "next/link";
 import { ChevronRight, Check, Trophy } from "lucide-react";
 
@@ -30,7 +32,6 @@ export default function HomePage() {
   const name = user?.profile?.display_name ?? user?.username ?? "—";
   const { reading: liveReading } = useDeviceStream(user?.id);
   const { format: fmtAcetone, label: unitLbl } = useUnits();
-  const { cardStyle } = useThemeConfig();
   const [questsOpen, setQuestsOpen] = useState(false);
 
   const liveConnected = !!liveReading &&
@@ -69,7 +70,6 @@ export default function HomePage() {
 
   const heroValue = today?.max_acetone_delta ?? liveReading?.acetone_delta_mv ?? null;
   const heroLabel = today?.dominant_label ?? liveReading?.label ?? null;
-  const heroCount = today?.count ?? 0;
 
   const questDone  = quests?.filter((q) => q.completed_at).length ?? 0;
   const questTotal = quests?.length ?? 0;
@@ -79,9 +79,11 @@ export default function HomePage() {
   // refetch (see BreathSession.tsx finalize()) is what makes this update live.
   const justCrossedMilestone = !!streak && [7, 30, 100].includes(streak.current);
 
+  const flexStyle = flexData ? flexScoreStyle(flexData.score) : null;
+
   return (
-    <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-5">
-      {/* Greeting */}
+    <div className="max-w-md mx-auto px-4 pt-5 pb-tabbar space-y-5">
+      {/* Header — quiet, no chrome competing with the hero below */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-text-muted">{dateStr}</p>
@@ -89,46 +91,16 @@ export default function HomePage() {
             {t("health.greeting")}, {name}
           </h1>
         </div>
-        <StreakChip current={streak?.current} className="shrink-0" />
+        <div className="flex items-center gap-2 shrink-0">
+          <StreakChip current={streak?.current} compact />
+          <PlusMenu />
+        </div>
       </div>
 
-      {/* Daily check-in nudge — the single most important action of the day */}
-      <DailyCheckBanner
-        checkedInToday={checkedInToday}
-        hasDevice={!!deviceId}
-        celebrate={checkedInToday && justCrossedMilestone}
-      />
-
-      {/* Flexibility Score — Layer 3 hero */}
-      <Card padding="lg">
-        <div className="flex items-start justify-between mb-4">
-          <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">
-            Metabolic Flexibility
-          </p>
-          <InfoButton title="Metabolic Flexibility Score" ariaLabel="รายละเอียด Metabolic Flexibility">
-            <p>
-              คะแนน <b>0–100</b> ที่บอกว่าระบบเผาผลาญของคุณ <b>ยืดหยุ่น</b> แค่ไหน — สลับระหว่างเผาน้ำตาลกับเผาไขมันได้ดีเพียงใด
-            </p>
-            <p className="text-text-muted">
-              คำนวณจาก breath session ใน <b>14 วันย้อนหลัง</b> (ต้องมีอย่างน้อย 3 sessions)
-            </p>
-            <div className="bg-bg-elevated rounded-xl p-3 space-y-2">
-              <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">3 มิติที่ประกอบเป็นคะแนน</p>
-              <ul className="text-xs space-y-1.5">
-                <li>• <b>Amplitude (40 pts)</b> — ค่า acetone ครอบคลุมหลายโซนไหม (fed_resting → transitional → fat_oxidation) ยิ่งกว้าง ยิ่งสูง</li>
-                <li>• <b>Return Speed (35 pts)</b> — ค่ากลับ baseline เร็วแค่ไหนหลังพีค</li>
-                <li>• <b>Appropriateness (25 pts)</b> — ค่า match กับ context ที่เลือก (fasting/post_meal/post_exercise/evening) ไหม</li>
-              </ul>
-            </div>
-            <p className="text-xs text-text-muted">
-              เป็น <b>monitoring signal</b> ไม่ใช่การวินิจฉัยทางการแพทย์
-            </p>
-          </InfoButton>
-        </div>
-        <FlexibilityBar data={flexData} loading={!!deviceId && flexLoading} hasDevice={!!deviceId} />
-      </Card>
-
-      {/* Acetone ring — secondary snapshot */}
+      {/* Hero — "how am I doing right now": the one thing this screen leads
+          with. Acetone ring promoted to the primary hero (was second, below
+          Flexibility); Flexibility itself demotes to a compact inline stat
+          here, with its full breakdown living on /trends. */}
       <Card padding="lg" className="flex flex-col items-center gap-3 relative">
         <div className="absolute top-3 right-3">
           <InfoButton title="Breath Acetone · สูงสุดวันนี้" ariaLabel="รายละเอียด Breath Acetone">
@@ -156,13 +128,13 @@ export default function HomePage() {
         <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">
           BREATH ACETONE · สูงสุดวันนี้
         </p>
-        <AcetoneRing value={heroValue} label={heroLabel} size={160} />
+        <AcetoneRing value={heroValue} label={heroLabel} size={216} />
         <div className="flex items-center gap-2">
           <div className={`h-2 w-2 rounded-full ${liveConnected ? "bg-mint-500 animate-pulse" : "bg-text-disabled"}`} />
           <span className="text-xs text-text-muted">
             {liveConnected ? (
               <>Live · MetaBreath {liveReading && `(${fmtAcetone(liveReading.acetone_delta_mv)} ${unitLbl})`}</>
-            ) : heroCount > 0 ? (
+            ) : deviceId ? (
               <>{t("health.connectDevice") ?? "อุปกรณ์ไม่ได้เชื่อมต่อ"}</>
             ) : (
               <Link href="/me/device" className="underline text-mint-500">
@@ -171,48 +143,74 @@ export default function HomePage() {
             )}
           </span>
         </div>
+
+        {/* Flexibility — compact inline teaser; full breakdown on /trends */}
+        {deviceId && !flexLoading && flexData && flexStyle && (
+          <Link
+            href="/trends"
+            className="flex items-center gap-1.5 rounded-full bg-bg-raised px-3 py-1.5 mt-1"
+          >
+            <span className="text-xs text-text-muted">Flex</span>
+            <span className="text-sm font-bold" style={{ color: flexStyle.color }}>
+              {flexData.score}
+            </span>
+            <ChevronRight size={12} className="text-text-disabled" />
+          </Link>
+        )}
       </Card>
 
-      {/* Long-term trend classifier (Phase 3 LSTM) */}
-      {deviceId && <TrendClassCard deviceId={deviceId} sessions={14} />}
+      {/* Daily check-in nudge — the clearest CTA, right under the hero it's about */}
+      <DailyCheckBanner
+        checkedInToday={checkedInToday}
+        hasDevice={!!deviceId}
+        celebrate={checkedInToday && justCrossedMilestone}
+      />
 
-      {/* Personal baseline — quick daily glance (Task D1); full detail + chart
-          overlay lives on /trends. */}
-      {deviceId && <BaselineCard deviceId={deviceId} />}
-
-      {/* Quests — streak now lives in the greeting header, not duplicated here */}
-      <Card padding="md" className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-mint-500/15 flex items-center justify-center shrink-0">
-          <Trophy size={18} className="text-mint-500" />
+      {/* AI, integrated — a short interpretation of today's reading plus one
+          contextual way to ask more, not a floating chatbot. */}
+      {deviceId && (
+        <div className="space-y-2">
+          <AiInterpretCard deviceId={deviceId} refreshKey={today?.count ?? 0} />
+          <SuggestedQuestionChip question="ทำไมค่า acetone วันนี้ถึงเป็นแบบนี้?" deviceId={deviceId} />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-text-muted uppercase tracking-wider font-medium">Quests today</p>
+      )}
+
+      {/* Secondary/interpretive detail — collapsed by default so it doesn't
+          compete with the hero and AI insight above. */}
+      {deviceId && (
+        <DetailsSection title="Details">
+          <TrendClassCard deviceId={deviceId} sessions={14} />
+          <BaselineCard deviceId={deviceId} />
+        </DetailsSection>
+      )}
+
+      {/* Quests — one slim status row, not a competing feature card */}
+      <Card padding="md">
+        <button
+          onClick={() => setQuestsOpen((v) => !v)}
+          className="w-full flex items-center gap-3"
+          disabled={questTotal === 0}
+        >
+          <Trophy size={16} className="text-mint-500 shrink-0" />
           {quests ? (
-            <StatNumber value={`${questDone}/${questTotal}`} size="sm" />
+            <span className="flex-1 text-left text-sm text-text-primary">
+              <StatNumber value={`${questDone}/${questTotal}`} size="sm" /> quests today
+            </span>
           ) : (
-            <div className="h-6 w-14 bg-bg-raised rounded-lg animate-pulse mt-0.5" />
+            <div className="flex-1 h-4 bg-bg-raised rounded animate-pulse" />
           )}
-        </div>
-        {xp && (
-          <div className="text-right shrink-0">
-            <p className="text-[10px] text-text-muted">Lv.{xp.level}</p>
-            <p className="text-xs font-semibold text-gold-500">{xp.total.toLocaleString()} XP</p>
-          </div>
-        )}
-        {questTotal > 0 && (
-          <button
-            onClick={() => setQuestsOpen((v) => !v)}
-            className="p-2 -m-2 rounded-xl hover:bg-bg-raised transition-colors shrink-0"
-            aria-label="Toggle quest details"
-          >
-            <ChevronRight size={16} className={`text-text-disabled transition-transform duration-200 ${questsOpen ? "rotate-90" : ""}`} />
-          </button>
-        )}
+          {xp && (
+            <span className="text-xs font-semibold text-gold-500 shrink-0">Lv.{xp.level} · {xp.total.toLocaleString()} XP</span>
+          )}
+          {questTotal > 0 && (
+            <ChevronRight size={14} className={`text-text-disabled transition-transform duration-200 shrink-0 ${questsOpen ? "rotate-90" : ""}`} />
+          )}
+        </button>
       </Card>
 
       {/* Quests expanded panel */}
       {questsOpen && quests && quests.length > 0 && (
-        <div className="bg-bg-elevated rounded-2xl p-4 space-y-3 -mt-2">
+        <div className="bg-bg-elevated rounded-2xl p-4 space-y-3 -mt-2 animate-fade-rise-in">
           <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">Quest วันนี้</p>
           {/* Quests without a wired completion path (only breath-check + article
               currently progress) are muted rather than hidden — honest about
@@ -226,11 +224,7 @@ export default function HomePage() {
                 <div key={q.id} className={`flex items-center gap-3 ${!isTrackable && !q.completed_at ? "opacity-40" : ""}`}>
                   <div
                     className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                      q.completed_at
-                        ? "bg-mint-500"
-                        : cardStyle === "neumorphic"
-                          ? "bg-bg-elevated neu-inset"
-                          : "border-2 border-border-strong"
+                      q.completed_at ? "bg-mint-500" : "border-2 border-border-strong"
                     }`}
                   >
                     {q.completed_at && <Check size={10} className="text-white" strokeWidth={3} />}
@@ -258,40 +252,13 @@ export default function HomePage() {
         <TodayMetricCard kind="calories" />
       </div>
 
-      {/* Category cards */}
+      {/* Coming-soon categories — Breathing/Trend dropped here since they now
+          duplicate bottom-tab destinations. */}
       <div>
-        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Health</p>
+        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Coming soon</p>
         <div className="grid grid-cols-2 gap-3">
-          <CategoryCard
-            icon="🌬"
-            title="Breathing"
-            value={heroValue != null ? `${fmtAcetone(heroValue)} ${unitLbl}` : "—"}
-            sub={heroLabel ? (LABEL_TH[backendLabelToZone(heroLabel)] ?? heroLabel) : "ไม่มีข้อมูล"}
-            href="/breathing"
-            iconBg="#00C896"
-          />
-          <CategoryCard
-            icon="📈"
-            title="Trend"
-            value="7-day"
-            sub="ดูแนวโน้ม"
-            href="/trends"
-            iconBg="#3B82F6"
-          />
-          <CategoryCard
-            icon="💤"
-            title="Sleep"
-            value="—"
-            iconBg="#A855F7"
-            comingSoon
-          />
-          <CategoryCard
-            icon="❤️"
-            title="Heart Rate"
-            value="—"
-            iconBg="#FF3B4A"
-            comingSoon
-          />
+          <CategoryCard icon="💤" title="Sleep" value="—" iconBg="#A855F7" comingSoon />
+          <CategoryCard icon="❤️" title="Heart Rate" value="—" iconBg="#FF3B4A" comingSoon />
         </div>
       </div>
 

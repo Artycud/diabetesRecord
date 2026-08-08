@@ -14,6 +14,8 @@ import { useT } from "@/lib/i18n";
 import BreathSession from "@/components/BreathSession";
 import { AcetoneZoneCard } from "@/components/cards/AcetoneZoneCard";
 import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
+import { Card } from "@/components/ui/card";
+import { SuggestedQuestionChip } from "@/components/ai/SuggestedQuestionChip";
 
 export default function BreathingPage() {
   const { user } = useAuth();
@@ -73,20 +75,20 @@ export default function BreathingPage() {
   const connected = recStatus?.online ?? false;
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-5">
+    <div className="max-w-md mx-auto px-4 pt-5 pb-tabbar space-y-5">
       {/* Device status card removed — same info + release button lives on /me/device now.
           Users without any device still see the "Add device" prompt via the empty state below.
           Both this and the shared-pool prompt below are irrelevant once Demo Mode is on. */}
       {!demoMode && !primaryDevice && (
-        <div className="bg-bg-elevated rounded-2xl p-4 flex items-center justify-between">
+        <Card padding="md" className="flex items-center justify-between">
           <p className="text-sm text-text-muted">{t("breathing.noDevice")}</p>
           <Link href="/me/device/add" className="text-xs text-mint-500 font-medium">{t("breathing.addDevice")}</Link>
-        </div>
+        </Card>
       )}
 
       {/* Shared device pool — show only when I don't own AND haven't claimed */}
       {!demoMode && !ownedDevice && !myClaim && sharedDevices && sharedDevices.length > 0 && (
-        <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
+        <Card padding="md" className="space-y-3">
           <div className="flex items-center gap-2">
             <Radio size={16} className="text-mint-500" strokeWidth={1.6} />
             <p className="text-sm font-semibold text-text-primary">เครื่องที่ใช้ร่วมกันได้</p>
@@ -97,7 +99,7 @@ export default function BreathingPage() {
               <SharedDeviceCard key={d.id} device={d} onClaimed={() => refetchPool()} />
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Breath session — START button → 5-second count → result card */}
@@ -121,7 +123,10 @@ export default function BreathingPage() {
           every page load, so it reads as "here's what just happened"
           rather than a permanent fixture. */}
       {lastSavedAt && primaryDevice && (
-        <AiInterpretCard deviceId={primaryDevice.id} refreshKey={lastSavedAt} />
+        <div className="space-y-2 animate-pop-in">
+          <AiInterpretCard deviceId={primaryDevice.id} refreshKey={lastSavedAt} />
+          <SuggestedQuestionChip question="ครั้งหน้าควรทำอะไรให้ต่างไป?" deviceId={primaryDevice.id} />
+        </div>
       )}
 
       {/* Trends shortcut */}

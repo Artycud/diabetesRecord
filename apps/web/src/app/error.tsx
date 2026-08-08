@@ -31,7 +31,7 @@ export default function RootError({
       </div>
       <button
         onClick={reset}
-        className="btn-premium flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white active:scale-95 transition-transform"
+        className="bg-mint-500 hover:bg-mint-600 flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white active:scale-95 transition-transform"
       >
         <RefreshCw size={14} />
         ลองใหม่
