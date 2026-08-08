@@ -72,14 +72,2154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/logs/ketone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ketone */
+        get: operations["list_ketone_logs_ketone_get"];
+        put?: never;
+        /** Create Ketone */
+        post: operations["create_ketone_logs_ketone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/logs/weight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Weight */
+        get: operations["list_weight_logs_weight_get"];
+        put?: never;
+        /** Create Weight */
+        post: operations["create_weight_logs_weight_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/logs/meal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Meal */
+        get: operations["list_meal_logs_meal_get"];
+        put?: never;
+        /** Create Meal */
+        post: operations["create_meal_logs_meal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/logs/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Activity */
+        get: operations["list_activity_logs_activity_get"];
+        put?: never;
+        /** Create Activity */
+        post: operations["create_activity_logs_activity_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Profile */
+        patch: operations["update_profile_profile_patch"];
+        trace?: never;
+    };
+    "/me/xp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Xp */
+        get: operations["my_xp_me_xp_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/streak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Streak */
+        get: operations["my_streak_me_streak_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/badges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Badges */
+        get: operations["my_badges_me_badges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/quests/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quests Today */
+        get: operations["quests_today_me_quests_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Checkin
+         * @description Called once per completed breath-test session (real or Demo Mode —
+         *     BreathSession.tsx's finalize() calls this unconditionally for both, so
+         *     the check-in habit loop and its streak/XP are identical either way).
+         *
+         *     Safe to call more than once in the same day: touch_streak() is already
+         *     idempotent for "already active today," and XP/quest progress here are
+         *     only awarded on the first call of the day (mirrors the ArticleRead
+         *     existence guard in POST /articles/{slug}/complete).
+         */
+        post: operations["checkin_me_checkin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Articles */
+        get: operations["list_articles_articles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/articles/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Article */
+        get: operations["get_article_articles__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/articles/{slug}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Article */
+        post: operations["complete_article_articles__slug__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/vapid-public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vapid Public */
+        get: operations["vapid_public_push_vapid_public_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Subscribe */
+        post: operations["subscribe_push_subscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reminders */
+        get: operations["list_reminders_reminders_get"];
+        put?: never;
+        /** Create Reminder */
+        post: operations["create_reminder_reminders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reminders/{reminder_id}/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Toggle Reminder */
+        patch: operations["toggle_reminder_reminders__reminder_id__toggle_patch"];
+        trace?: never;
+    };
+    "/reminders/{reminder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Reminder */
+        delete: operations["delete_reminder_reminders__reminder_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/provision/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Provision Token
+         * @description Generate a short-lived (10 min) token for ESP32 BLE provisioning.
+         *     Web app calls this then sends the token to ESP32 via BLE.
+         *     ESP32 uses it to call POST /sensor/device/pair without the user having to type anything.
+         */
+        post: operations["get_provision_token_sensor_provision_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pair Device
+         * @description Pair a new MetaBreath device with the user account.
+         *     Returns MQTT credentials and topic for the ESP32 firmware to use.
+         *
+         *     When `mac` is given, the device is registered under the topic the real
+         *     firmware actually publishes to (metabreath/<MAC>/reading) — idempotent,
+         *     and safe to re-run (e.g. user retries setup) as long as the MAC still
+         *     belongs to this user or has no owner yet.
+         */
+        post: operations["pair_device_sensor_device_pair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Devices */
+        get: operations["list_devices_sensor_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/simulation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Full Simulation
+         * @description Toggle full simulation (both acetone AND pressure) for the caller's
+         *     own device. Off: leaves simulate_acetone exactly as it already was —
+         *     only simulate_pressure is cleared. On: forces simulate_acetone on too,
+         *     since "full simulation" means neither sensor is trusted.
+         */
+        post: operations["set_full_simulation_sensor_device__device_id__simulation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink Device
+         * @description Soft-delete the caller's owned device so they can pick a shared one.
+         */
+        delete: operations["unlink_device_sensor_device__device_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/devices/pool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Shared Devices
+         * @description All is_shared=True devices, with their current active claimer (if any).
+         *
+         *     Filter out ghosts: only include devices whose ESP32 has been publishing
+         *     recently (heartbeat present in Redis) OR that have a MAC-shaped mqtt_topic.
+         *     This hides orphan UUID-based dev records that no physical device maps to.
+         */
+        get: operations["list_shared_devices_sensor_devices_pool_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Shared Device
+         * @description Claim a shared device for the caller. Silently ends any prior session.
+         *
+         *     All readings arriving while the session is active belong to the caller.
+         */
+        post: operations["claim_shared_device_sensor_device__device_id__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release Shared Device
+         * @description End the caller's active session on this device. No-op if none.
+         */
+        post: operations["release_shared_device_sensor_device__device_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Readings */
+        get: operations["get_readings_sensor_readings_get"];
+        put?: never;
+        /** Ingest Reading */
+        post: operations["ingest_reading_sensor_readings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description One row per recording session (grouped by session_id).
+         */
+        get: operations["list_sessions_sensor_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/daily-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Daily Stats
+         * @description Per-period aggregate for the CURRENT user's readings on this device.
+         *     Shared-device semantics: each user sees their own recordings only —
+         *     the WHERE clause filters user_id, so no cross-user leak even without an active claim.
+         *
+         *     `days` now goes up to 365 (previously capped at 90) to match the
+         *     `/sensor/sessions` history limit — long-term history is more useful for
+         *     a "history" feature, not less, so the readings/daily-stats endpoints
+         *     were the ones raised rather than lowering sessions to 90.
+         */
+        get: operations["get_daily_stats_sensor_daily_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/baseline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Personal Baseline
+         * @description Per-user physiological baseline (trimmed mean + range) computed from the
+         *     caller's own acetone_delta history — distinct from device hardware
+         *     calibration. Returns `insufficient_data: true` with all numeric fields
+         *     null when the user doesn't have enough history yet (e.g. a fresh demo
+         *     account), rather than a misleading number from 1-2 readings.
+         */
+        get: operations["get_personal_baseline_sensor_baseline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Health Report
+         * @description Doctor/health-facing report aggregating: trend classification (existing
+         *     LSTM trend classifier), personal baseline (Task 2), recent session
+         *     history, and a lifestyle log summary — one payload for the frontend to
+         *     render as a printable page. `Profile.assigned_doctor_id` is included so
+         *     a "share with doctor" UI has something real to point at.
+         */
+        get: operations["get_health_report_sensor_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/calibrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Calibrate Device */
+        post: operations["calibrate_device_sensor_device__device_id__calibrate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Calibration History */
+        get: operations["get_calibration_history_sensor_device__device_id__calibration_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/calibration/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Calibration Report */
+        get: operations["calibration_report_sensor_device__device_id__calibration_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/firmware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Configured Firmware
+         * @description Generate a device-specific Arduino .ino file with WiFi + MQTT credentials
+         *     pre-filled. User downloads and flashes via Arduino IDE.
+         */
+        post: operations["generate_configured_firmware_sensor_device__device_id__firmware_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/reset-wifi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Device Wifi
+         * @description Send WiFi reset command to device via MQTT.
+         *     Device will erase saved credentials, restart, and re-enter AP mode.
+         */
+        post: operations["reset_device_wifi_sensor_device__device_id__reset_wifi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/recording/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Recording
+         * @description Begin capturing MQTT readings to DB for this device.
+         */
+        post: operations["start_recording_sensor_device__device_id__recording_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/recording/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Recording
+         * @description Stop capturing MQTT readings to DB.
+         */
+        post: operations["stop_recording_sensor_device__device_id__recording_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sensor/device/{device_id}/recording/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recording Status
+         * @description Check whether a recording session is currently active + device online status.
+         */
+        get: operations["recording_status_sensor_device__device_id__recording_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thresholds
+         * @description Expose the Anderson (2015) five-pattern zone boundaries, trend labels,
+         *     and the confidence/reliability gates used by ml_inference — so the
+         *     frontend renders zone bands, chart reference lines, etc. from the same
+         *     numbers the backend actually classifies with, instead of a hand-copied
+         *     duplicate that can drift out of sync.
+         */
+        get: operations["get_thresholds_ai_thresholds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/interpret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interpret Reading
+         * @description Generate a SHORT (1-3 sentence) natural-language interpretation of one
+         *     reading (or the user's latest, if `time` is omitted) — a one-shot blurb,
+         *     not a multi-turn chat. Compares against the user's personal baseline
+         *     (Task 2) when available, falling back to the fixed Anderson thresholds
+         *     otherwise. Goes through the same llm_guardrail sanitisation as /ai/chat
+         *     — this is still a health-adjacent AI output.
+         */
+        post: operations["interpret_reading_ai_interpret_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/predict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Predict */
+        post: operations["predict_ai_predict_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trend */
+        get: operations["get_trend_ai_trend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Prompts
+         * @description Return prompts registered on the MCP server so the UI can show a slash
+         *     command menu. Text is pulled from each prompt's default rendering.
+         */
+        get: operations["list_prompts_ai_prompts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chat */
+        post: operations["chat_ai_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/chat/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat Stream
+         * @description Server-Sent Events variant of /chat. Streams text deltas + tool status.
+         */
+        post: operations["chat_stream_ai_chat_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/predict/lstm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Predict Lstm
+         * @description Predict risk from a sequence of readings using LSTM temporal model.
+         */
+        post: operations["predict_lstm_ai_predict_lstm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/predict/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Predict Trend Classification
+         * @description Classify the direction of the user's ΔVOC trend over recent sessions.
+         *
+         *     Runs in PARALLEL to /ai/predict (per-reading classification) — the two
+         *     endpoints answer different questions:
+         *       - /ai/predict           : "What Anderson class is this single reading?"
+         *       - /ai/predict/trend     : "How is the user's baseline changing over time?"
+         *     Output labels: stable | increasing | decreasing | abnormal | None
+         */
+        post: operations["predict_trend_classification_ai_predict_trend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/drift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Drift
+         * @description Check sensor drift from calibration history.
+         */
+        get: operations["check_drift_ai_drift_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/flexibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Flexibility
+         * @description Compute Metabolic Flexibility Score (0-100) from recent breath sessions.
+         */
+        post: operations["get_flexibility_ai_flexibility_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pilot/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Session */
+        post: operations["create_session_pilot_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pilot/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions */
+        get: operations["list_sessions_pilot_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pilot/correlation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Correlation
+         * @description Compute Pearson r between acetone_delta (from linked SensorReading)
+         *     and blood_ketone_mmol (gold standard from pilot session).
+         */
+        get: operations["get_correlation_pilot_correlation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pilot/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Csv
+         * @description Download all pilot sessions as CSV.
+         */
+        get: operations["export_csv_pilot_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Admin
+         * @description Check if the admin password is correct (used by frontend gate).
+         */
+        post: operations["verify_admin_admin_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete User */
+        delete: operations["delete_user_admin_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/doctors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Doctors */
+        get: operations["list_doctors_admin_doctors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set User Role */
+        post: operations["set_user_role_admin_users__user_id__role_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/assign-doctor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Doctor */
+        post: operations["assign_doctor_admin_users__user_id__assign_doctor_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/device/ensure/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ensure Manual Device */
+        post: operations["ensure_manual_device_admin_device_ensure__user_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/device/mac": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Mac Device
+         * @description ลงทะเบียน ESP32 ด้วย MAC address — ทีมทำครั้งเดียวต่ออุปกรณ์
+         *     MAC จะถูกใช้เป็น MQTT topic: metabreath/<MAC>/reading
+         */
+        post: operations["register_mac_device_admin_device_mac_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/device/{device_id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assign Device To User
+         * @description โอน device ที่มีอยู่แล้วให้ user อื่น (admin only)
+         */
+        post: operations["assign_device_to_user_admin_device__device_id__assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/device/{device_id}/simulate-acetone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Simulate Acetone
+         * @description Toggle pressure-driven synthetic acetone for a device whose gas sensor
+         *     is broken. Instant, no redeploy — flip back off the moment hardware is fixed.
+         */
+        post: operations["set_simulate_acetone_admin_device__device_id__simulate_acetone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reading": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Reading */
+        post: operations["submit_reading_admin_reading_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/user/{user_id}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * User Dashboard
+         * @description Return everything the admin dashboard needs for a single user.
+         */
+        get: operations["user_dashboard_admin_user__user_id__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ketone-agreement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ketone Agreement
+         * @description Compare breath acetone (device) against paired urine-strip ketone (ground truth).
+         *
+         *     Urine bands are ordinal, so agreement uses Spearman rank correlation — NOT
+         *     Pearson. Breath measures acetone, urine measures acetoacetate, so strong-but-
+         *     imperfect agreement is the expected, honest result.
+         */
+        get: operations["ketone_agreement_admin_ketone_agreement_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityLogCreate */
+        ActivityLogCreate: {
+            /** Kind */
+            kind: string;
+            /** Duration Min */
+            duration_min: number;
+            /** Kcal */
+            kcal?: number | null;
+        };
+        /** ActivityLogOut */
+        ActivityLogOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Kind */
+            kind: string;
+            /** Duration Min */
+            duration_min: number;
+            /** Kcal */
+            kcal: number | null;
+        };
+        /** AdminDeviceOut */
+        AdminDeviceOut: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Sensor Model */
+            sensor_model: string | null;
+            /** Active */
+            active: boolean;
+            /** Needs Recalibration */
+            needs_recalibration: boolean;
+            /** Last Calibrated At */
+            last_calibrated_at: string | null;
+            /**
+             * Simulate Acetone
+             * @default false
+             */
+            simulate_acetone: boolean;
+        };
+        /** AdminReadingCreate */
+        AdminReadingCreate: {
+            /** Device Id */
+            device_id: string;
+            /** Time */
+            time?: string | null;
+            /** Ambient Voc */
+            ambient_voc?: number | null;
+            /** Breath Voc */
+            breath_voc?: number | null;
+            /** Pressure Mean */
+            pressure_mean?: number | null;
+            /** Pressure Std */
+            pressure_std?: number | null;
+            /** Breath Duration */
+            breath_duration?: number | null;
+            /** Temp C */
+            temp_c?: number | null;
+            /** Humidity Pct */
+            humidity_pct?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** AdminReadingOut */
+        AdminReadingOut: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Device Id */
+            device_id: string;
+            /** Ambient Voc */
+            ambient_voc: number | null;
+            /** Breath Voc */
+            breath_voc: number | null;
+            /** Acetone Delta */
+            acetone_delta: number | null;
+            /** Quality Score */
+            quality_score: number | null;
+            /** Reliability Score */
+            reliability_score: number | null;
+            /** Environment Penalty */
+            environment_penalty: number | null;
+            /** Metabolic Risk Index */
+            metabolic_risk_index: number | null;
+            /** Confidence Score */
+            confidence_score: number | null;
+            /** Label */
+            label: string | null;
+        };
+        /** AdminReadingSummary */
+        AdminReadingSummary: {
+            /** Total Readings */
+            total_readings: number;
+            /** Last Reading At */
+            last_reading_at: string | null;
+            /** Last Label */
+            last_label: string | null;
+            /** Last Acetone Delta */
+            last_acetone_delta: number | null;
+            /** Last Quality Score */
+            last_quality_score: number | null;
+        };
+        /** AdminUserOut */
+        AdminUserOut: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string | null;
+            /** Role */
+            role: string;
+            /** Assigned Doctor Id */
+            assigned_doctor_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Devices */
+            devices: components["schemas"]["AdminDeviceOut"][];
+            reading_summary: components["schemas"]["AdminReadingSummary"];
+        };
+        /** AdminVerifyRequest */
+        AdminVerifyRequest: {
+            /** Password */
+            password: string;
+        };
+        /** AgreementMatrixRow */
+        AgreementMatrixRow: {
+            /** Breath Label */
+            breath_label: string;
+            /** Counts */
+            counts: {
+                [key: string]: unknown;
+            };
+        };
+        /** ArticleCompleteOut */
+        ArticleCompleteOut: {
+            /** Xp Awarded */
+            xp_awarded: number;
+            /** Total Xp */
+            total_xp: number;
+        };
+        /** ArticleDetailOut */
+        ArticleDetailOut: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Category */
+            category: string;
+            /** Cover Url */
+            cover_url: string | null;
+            /** Reading Min */
+            reading_min: number;
+            /** Tags */
+            tags: unknown[] | null;
+            /** Published At */
+            published_at: string | null;
+            /** Xp Reward */
+            xp_reward: number;
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+            /** Content */
+            content: string | null;
+        };
+        /** ArticleOut */
+        ArticleOut: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Category */
+            category: string;
+            /** Cover Url */
+            cover_url: string | null;
+            /** Reading Min */
+            reading_min: number;
+            /** Tags */
+            tags: unknown[] | null;
+            /** Published At */
+            published_at: string | null;
+            /** Xp Reward */
+            xp_reward: number;
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+        };
+        /** AssignDeviceRequest */
+        AssignDeviceRequest: {
+            /** User Id */
+            user_id: string;
+        };
+        /** AssignDoctorRequest */
+        AssignDoctorRequest: {
+            /** Doctor Id */
+            doctor_id?: string | null;
+        };
+        /** BadgeOut */
+        BadgeOut: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Icon */
+            icon: string;
+            /** Description */
+            description: string;
+            /**
+             * Awarded At
+             * Format: date-time
+             */
+            awarded_at: string;
+        };
+        /** BaselineOut */
+        BaselineOut: {
+            /** Insufficient Data */
+            insufficient_data: boolean;
+            /** Sample Count */
+            sample_count: number;
+            /** Computed From Days */
+            computed_from_days: number;
+            /** Baseline Mean Mv */
+            baseline_mean_mv: number | null;
+            /** Baseline Range Mv */
+            baseline_range_mv: number[] | null;
+            /** Baseline Mean Ppm */
+            baseline_mean_ppm: number | null;
+            /** Baseline Range Ppm */
+            baseline_range_ppm: number[] | null;
+            /** Method */
+            method: string;
+            /** Device Id */
+            device_id?: string | null;
+        };
+        /** BlandAltman */
+        BlandAltman: {
+            /** N */
+            n: number;
+            /** Bias */
+            bias: number | null;
+            /** Sd */
+            sd: number | null;
+            /** Loa Lower */
+            loa_lower: number | null;
+            /** Loa Upper */
+            loa_upper: number | null;
+            /** Unit */
+            unit: string;
+            /** Interpretation */
+            interpretation: string;
+            /** Points */
+            points: components["schemas"]["BlandAltmanPoint"][];
+        };
+        /** BlandAltmanPoint */
+        BlandAltmanPoint: {
+            /** Mean */
+            mean: number;
+            /** Diff */
+            diff: number;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
+        /** CalibrationCreate */
+        CalibrationCreate: {
+            /**
+             * Baseline Voc
+             * @description TGS1820 baseline voltage in V (0–3.3)
+             */
+            baseline_voc: number;
+            /** Baseline Temp */
+            baseline_temp?: number | null;
+            /** Baseline Humidity */
+            baseline_humidity?: number | null;
+            /**
+             * Baseline Pressure
+             * @description Breath pressure at baseline (kPa)
+             */
+            baseline_pressure?: number | null;
+            /**
+             * Method
+             * @default clean_air
+             */
+            method: string | null;
+            /** Reference Device */
+            reference_device?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** CalibrationOut */
+        CalibrationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Calibrated At
+             * Format: date-time
+             */
+            calibrated_at: string;
+            /** Baseline Voc */
+            baseline_voc: number;
+            /** Baseline Temp */
+            baseline_temp: number | null;
+            /** Baseline Humidity */
+            baseline_humidity: number | null;
+            /** Baseline Pressure */
+            baseline_pressure: number | null;
+            /** Gain Factor */
+            gain_factor: number;
+            /** Offset */
+            offset: number;
+            /** Drift Score */
+            drift_score: number;
+            /** Method */
+            method: string | null;
+            /** Reference Device */
+            reference_device: string | null;
+            /** Notes */
+            notes: string | null;
+        };
+        /** CalibrationReportOut */
+        CalibrationReportOut: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Report Generated At
+             * Format: date-time
+             */
+            report_generated_at: string;
+            /** Lod Ppm */
+            lod_ppm: number;
+            /** Repeatability Cv Pct */
+            repeatability_cv_pct: number;
+            /** Drift Slope Ppm Per Day */
+            drift_slope_ppm_per_day: number;
+            /** Cross Sensitivity Note */
+            cross_sensitivity_note: string;
+            /** N Calibrations */
+            n_calibrations: number;
+            /** Latest Drift Score */
+            latest_drift_score: number;
+            /** Needs Recalibration */
+            needs_recalibration: boolean;
+            /** Reference Comparison */
+            reference_comparison?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ChatRequest */
+        ChatRequest: {
+            /** Message */
+            message: string;
+            /** Device Id */
+            device_id?: string | null;
+        };
+        /** ChatResponse */
+        ChatResponse: {
+            /** Reply */
+            reply: string;
+            /** Refusal */
+            refusal: boolean;
+            /** Disclaimer Appended */
+            disclaimer_appended: boolean;
+        };
+        /** CheckinOut */
+        CheckinOut: {
+            /** Xp Awarded */
+            xp_awarded: number;
+            /** Total Xp */
+            total_xp: number;
+            streak: components["schemas"]["StreakOut"];
+            /** Newly Awarded Badges */
+            newly_awarded_badges: string[];
+        };
+        /** ClaimResponse */
+        ClaimResponse: {
+            /** Device Id */
+            device_id: string;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Displaced Username */
+            displaced_username?: string | null;
+        };
+        /** CorrelationOut */
+        CorrelationOut: {
+            /** N */
+            n: number;
+            /** Pearson R */
+            pearson_r: number | null;
+            /** P Value */
+            p_value: number | null;
+            /** Interpretation */
+            interpretation: string;
+            /** Adjusted R */
+            adjusted_r: number | null;
+            /** Confounders Removed */
+            confounders_removed: string[];
+        };
+        /** DailyStat */
+        DailyStat: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Granularity
+             * @default day
+             */
+            granularity: string;
+            /** Count */
+            count: number;
+            /** Avg Acetone Delta */
+            avg_acetone_delta: number | null;
+            /** Max Acetone Delta */
+            max_acetone_delta: number | null;
+            /** Min Acetone Delta */
+            min_acetone_delta: number | null;
+            /** Avg Temp C */
+            avg_temp_c: number | null;
+            /** Avg Humidity Pct */
+            avg_humidity_pct: number | null;
+            /** Dominant Label */
+            dominant_label: string | null;
+        };
+        /** DashboardDevice */
+        DashboardDevice: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Sensor Model */
+            sensor_model: string | null;
+            /** Active */
+            active: boolean;
+            /** Needs Recalibration */
+            needs_recalibration: boolean;
+            /** Last Calibrated At */
+            last_calibrated_at: string | null;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Baseline Voc */
+            baseline_voc: number | null;
+            /** Drift Score */
+            drift_score: number | null;
+            /** Total Readings */
+            total_readings: number;
+        };
+        /** DashboardKPI */
+        DashboardKPI: {
+            /** Total Readings */
+            total_readings: number;
+            /** Active Days */
+            active_days: number;
+            /** Avg Acetone Delta */
+            avg_acetone_delta: number | null;
+            /** Avg Quality Score */
+            avg_quality_score: number | null;
+            /** Avg Reliability Score */
+            avg_reliability_score: number | null;
+            /** Last Reading At */
+            last_reading_at: string | null;
+        };
+        /** DashboardKetoneLog */
+        DashboardKetoneLog: {
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Ketone Type */
+            ketone_type: string;
+            /** Value Mmol */
+            value_mmol: number | null;
+            /** Urine Category */
+            urine_category: string | null;
+            /** Source */
+            source: string | null;
+        };
+        /** DashboardReading */
+        DashboardReading: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Device Id */
+            device_id: string;
+            /** Ambient Voc */
+            ambient_voc?: number | null;
+            /** Breath Voc */
+            breath_voc?: number | null;
+            /** Acetone Delta */
+            acetone_delta?: number | null;
+            /** Voc Ppb */
+            voc_ppb?: number | null;
+            /** Ketone Mmol */
+            ketone_mmol?: number | null;
+            /** Temp C */
+            temp_c?: number | null;
+            /** Humidity Pct */
+            humidity_pct?: number | null;
+            /** Pressure Mean */
+            pressure_mean?: number | null;
+            /** Pressure Std */
+            pressure_std?: number | null;
+            /** Breath Duration */
+            breath_duration?: number | null;
+            /** Quality Score */
+            quality_score?: number | null;
+            /** Reliability Score */
+            reliability_score?: number | null;
+            /** Environment Penalty */
+            environment_penalty?: number | null;
+            /** Slope */
+            slope?: number | null;
+            /** Time To Peak */
+            time_to_peak?: number | null;
+            /** Recovery Rate */
+            recovery_rate?: number | null;
+            /** Label */
+            label?: string | null;
+            /** Metabolic Risk Index */
+            metabolic_risk_index?: number | null;
+            /** Confidence Score */
+            confidence_score?: number | null;
+            /** Raw */
+            raw?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Mqtt Topic */
+            mqtt_topic: string | null;
+            /** Active */
+            active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Needs Recalibration */
+            needs_recalibration: boolean;
+            /** Last Calibrated At */
+            last_calibrated_at: string | null;
+            /** Firmware Version */
+            firmware_version: string | null;
+            /** Sensor Model */
+            sensor_model: string | null;
+            /** Simulate Acetone */
+            simulate_acetone: boolean;
+            /** Simulate Pressure */
+            simulate_pressure: boolean;
+        };
+        /** DevicePairRequest */
+        DevicePairRequest: {
+            /**
+             * Kind
+             * @default breath
+             */
+            kind: string;
+            /**
+             * Sensor Model
+             * @default TGS1820
+             */
+            sensor_model: string;
+            /** Firmware Version */
+            firmware_version?: string | null;
+            /** Mac */
+            mac?: string | null;
+        };
+        /** DevicePairResponse */
+        DevicePairResponse: {
+            /** Device Id */
+            device_id: string;
+            /** Mqtt Topic */
+            mqtt_topic: string;
+            /** Mqtt User */
+            mqtt_user: string;
+            /** Mqtt Pass */
+            mqtt_pass: string;
+            /** Mqtt Broker */
+            mqtt_broker: string;
+            /** Mqtt Port */
+            mqtt_port: number;
+            /** Secret */
+            secret: string;
+            /** Message */
+            message: string;
+        };
+        /** DoctorOut */
+        DoctorOut: {
+            /** Id */
+            id: string;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string | null;
+        };
+        /** DriftResponse */
+        DriftResponse: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Drift Detected */
+            drift_detected: boolean;
+            /** Severity */
+            severity: string;
+            /** Confidence */
+            confidence: number;
+            /** Recommendation */
+            recommendation: string;
+            /** Drift Pct */
+            drift_pct: number | null;
+            /** Baseline Voc */
+            baseline_voc?: number | null;
+            /** Latest Voc */
+            latest_voc?: number | null;
+            /** N Calibrations Used */
+            n_calibrations_used: number;
+        };
+        /** FirmwareConfigRequest */
+        FirmwareConfigRequest: {
+            /** Wifi Ssid */
+            wifi_ssid: string;
+            /** Wifi Password */
+            wifi_password: string;
+        };
+        /** FiveClassThreshold */
+        FiveClassThreshold: {
+            /** Label */
+            label: string;
+            /** Upper Bound Ppm */
+            upper_bound_ppm: number | null;
+        };
+        /** FlexibilityBreakdown */
+        FlexibilityBreakdown: {
+            /** Amplitude */
+            amplitude: number;
+            /** Return Speed */
+            return_speed: number;
+            /** Appropriateness */
+            appropriateness: number;
+        };
+        /** FlexibilityRequest */
+        FlexibilityRequest: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Context Tag */
+            context_tag?: string | null;
+            /** Fasting Hours */
+            fasting_hours?: number | null;
+            /**
+             * Days
+             * @default 14
+             */
+            days: number;
+        };
+        /** FlexibilityResponse */
+        FlexibilityResponse: {
+            /** Score */
+            score: number;
+            /** Zone */
+            zone: string;
+            breakdown: components["schemas"]["FlexibilityBreakdown"];
+            /** Trend */
+            trend: string;
+            /** N Sessions */
+            n_sessions: number;
+            /** Message Th */
+            message_th: string;
+            /** Context Tag */
+            context_tag?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InterpretRequest */
+        InterpretRequest: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Time */
+            time?: string | null;
+        };
+        /** InterpretResponse */
+        InterpretResponse: {
+            /** Text */
+            text: string;
+            /** Refusal */
+            refusal: boolean;
+            /** Based On */
+            based_on: {
+                [key: string]: unknown;
+            };
+        };
+        /** KetoneAgreementOut */
+        KetoneAgreementOut: {
+            /** N */
+            n: number;
+            /** Spearman R */
+            spearman_r: number | null;
+            /** Interpretation */
+            interpretation: string;
+            /** Pairs */
+            pairs: components["schemas"]["KetonePair"][];
+            /** Agreement Matrix */
+            agreement_matrix: components["schemas"]["AgreementMatrixRow"][];
+            bland_altman: components["schemas"]["BlandAltman"];
+        };
+        /** KetoneLogCreate */
+        KetoneLogCreate: {
+            /** Value Mmol */
+            value_mmol?: number | null;
+            /**
+             * Source
+             * @default manual
+             */
+            source: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Ketone Type
+             * @default blood
+             */
+            ketone_type: string;
+            /** Urine Category */
+            urine_category?: string | null;
+            /** Urine Mg Dl */
+            urine_mg_dl?: number | null;
+            /** Paired Reading Time */
+            paired_reading_time?: string | null;
+            /** Paired Device Id */
+            paired_device_id?: string | null;
+        };
+        /** KetoneLogOut */
+        KetoneLogOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Value Mmol */
+            value_mmol: number;
+            /** Source */
+            source: string;
+            /** Note */
+            note: string | null;
+            /** Ketone Type */
+            ketone_type: string;
+            /** Urine Category */
+            urine_category: string | null;
+            /** Urine Mg Dl */
+            urine_mg_dl: number | null;
+            /** Paired Reading Time */
+            paired_reading_time: string | null;
+            /** Paired Device Id */
+            paired_device_id: string | null;
+        };
+        /** KetonePair */
+        KetonePair: {
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Acetone Delta */
+            acetone_delta: number;
+            /** Breath Label */
+            breath_label: string | null;
+            /** Urine Category */
+            urine_category: string;
+            /** Urine Rank */
+            urine_rank: number;
+            /** Urine Mmol */
+            urine_mmol: number;
+            /** Breath Mmol Est */
+            breath_mmol_est: number;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -87,6 +2227,200 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** LstmPredictRequest */
+        LstmPredictRequest: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Sequence */
+            sequence?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** LstmPredictResponse */
+        LstmPredictResponse: {
+            /** Label */
+            label: string | null;
+            /** Metabolic Risk Index */
+            metabolic_risk_index: number | null;
+            /** Confidence Score */
+            confidence_score: number;
+            /** Model Used */
+            model_used: string;
+            /** Recalibration Needed */
+            recalibration_needed: boolean;
+            /** Sequence Length */
+            sequence_length: number;
+            /** Fallback Reason */
+            fallback_reason?: string | null;
+        };
+        /** MacDeviceRequest */
+        MacDeviceRequest: {
+            /** Mac */
+            mac: string;
+            /** User Email */
+            user_email: string;
+        };
+        /** MealLogCreate */
+        MealLogCreate: {
+            /** Name */
+            name: string;
+            /** Kcal */
+            kcal?: number | null;
+            /** Carbs G */
+            carbs_g?: number | null;
+        };
+        /** MealLogOut */
+        MealLogOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Name */
+            name: string;
+            /** Kcal */
+            kcal: number | null;
+            /** Carbs G */
+            carbs_g: number | null;
+        };
+        /** PilotSessionCreate */
+        PilotSessionCreate: {
+            /** Cohort */
+            cohort: string;
+            /** Day Number */
+            day_number: number;
+            /** Timepoint */
+            timepoint: string;
+            /** Bmi */
+            bmi?: number | null;
+            /** Waist Cm */
+            waist_cm?: number | null;
+            /** Age */
+            age?: number | null;
+            /** Sex */
+            sex?: string | null;
+            /** Fasting Hours */
+            fasting_hours?: number | null;
+            /** Food Type */
+            food_type?: string | null;
+            /** Activity Min */
+            activity_min?: number | null;
+            /** Sleep Hours */
+            sleep_hours?: number | null;
+            /** Homa Ir */
+            homa_ir?: number | null;
+            /** Blood Glucose */
+            blood_glucose?: number | null;
+            /** Blood Ketone Mmol */
+            blood_ketone_mmol?: number | null;
+            /** Sensor Reading Time */
+            sensor_reading_time?: string | null;
+            /** Sensor Device Id */
+            sensor_device_id?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** PilotSessionOut */
+        PilotSessionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Cohort */
+            cohort: string;
+            /** Day Number */
+            day_number: number;
+            /** Timepoint */
+            timepoint: string;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /** Bmi */
+            bmi: number | null;
+            /** Waist Cm */
+            waist_cm: number | null;
+            /** Age */
+            age: number | null;
+            /** Sex */
+            sex: string | null;
+            /** Fasting Hours */
+            fasting_hours: number | null;
+            /** Food Type */
+            food_type: string | null;
+            /** Activity Min */
+            activity_min: number | null;
+            /** Sleep Hours */
+            sleep_hours: number | null;
+            /** Homa Ir */
+            homa_ir: number | null;
+            /** Blood Glucose */
+            blood_glucose: number | null;
+            /** Blood Ketone Mmol */
+            blood_ketone_mmol: number | null;
+            /** Sensor Reading Time */
+            sensor_reading_time: string | null;
+            /** Sensor Device Id */
+            sensor_device_id: string | null;
+            /** Notes */
+            notes: string | null;
+        };
+        /** PredictRequest */
+        PredictRequest: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Acetone Delta */
+            acetone_delta?: number | null;
+            /** Quality Score */
+            quality_score?: number | null;
+            /** Reliability Score */
+            reliability_score?: number | null;
+            /** Breath Duration */
+            breath_duration?: number | null;
+            /** Slope */
+            slope?: number | null;
+            /** Time To Peak */
+            time_to_peak?: number | null;
+            /** Recovery Rate */
+            recovery_rate?: number | null;
+            /** Temp C */
+            temp_c?: number | null;
+            /** Humidity Pct */
+            humidity_pct?: number | null;
+        };
+        /** PredictResponse */
+        PredictResponse: {
+            /** Label */
+            label: string | null;
+            /** Metabolic Risk Index */
+            metabolic_risk_index: number | null;
+            /** Confidence Score */
+            confidence_score: number;
+            /** Model Used */
+            model_used: string;
+            /** Recalibration Needed */
+            recalibration_needed: boolean;
+            /** Acetone Delta */
+            acetone_delta: number | null;
         };
         /** ProfileOut */
         ProfileOut: {
@@ -98,6 +2432,81 @@ export interface components {
             goal_type: string;
             /** Onboarded At */
             onboarded_at: string | null;
+        };
+        /** ProfileUpdate */
+        ProfileUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Height Cm */
+            height_cm?: number | null;
+            /** Weight Kg */
+            weight_kg?: number | null;
+            /** Dob */
+            dob?: string | null;
+            /** Sex */
+            sex?: string | null;
+            /** Goal Type */
+            goal_type?: string | null;
+            /** Onboarded At */
+            onboarded_at?: string | null;
+        };
+        /** PromptInfo */
+        PromptInfo: {
+            /** Name */
+            name: string;
+            /** Title */
+            title: string | null;
+            /** Description */
+            description: string | null;
+            /** Text */
+            text: string;
+        };
+        /** PromptsResponse */
+        PromptsResponse: {
+            /** Prompts */
+            prompts: components["schemas"]["PromptInfo"][];
+        };
+        /** ProvisionTokenOut */
+        ProvisionTokenOut: {
+            /** Token */
+            token: string;
+            /** Expires In */
+            expires_in: number;
+            /** Api Base */
+            api_base: string;
+        };
+        /** PushSubscribeIn */
+        PushSubscribeIn: {
+            /** Endpoint */
+            endpoint: string;
+            /** P256Dh */
+            p256dh: string;
+            /** Auth */
+            auth: string;
+            /** Ua */
+            ua?: string | null;
+        };
+        /** QuestOut */
+        QuestOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Xp Reward */
+            xp_reward: number;
+            /** Progress */
+            progress: number;
+            /** Target */
+            target: number;
+            /** Completed At */
+            completed_at: string | null;
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -116,12 +2525,285 @@ export interface components {
             /** Password */
             password: string;
             /** Display Name */
-            display_name: string;
+            display_name?: string | null;
             /**
              * Goal Type
              * @default monitor
              */
             goal_type: string;
+        };
+        /** ReminderCreate */
+        ReminderCreate: {
+            /** Kind */
+            kind: string;
+            /** Schedule */
+            schedule: string;
+            /** Message */
+            message?: string | null;
+        };
+        /** ReminderOut */
+        ReminderOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Schedule */
+            schedule: string;
+            /** Message */
+            message: string | null;
+            /** Next Fire At */
+            next_fire_at: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ReportUser */
+        ReportUser: {
+            /** Display Name */
+            display_name: string | null;
+            /** Assigned Doctor Id */
+            assigned_doctor_id?: string | null;
+        };
+        /** RoleUpdateRequest */
+        RoleUpdateRequest: {
+            /** Role */
+            role: string;
+        };
+        /** SensorReadingCreate */
+        SensorReadingCreate: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Sensor Voltage
+             * @description TGS1820 direct read (V)
+             */
+            sensor_voltage?: number | null;
+            /**
+             * Baseline Voltage
+             * @description TGS1820 clean-air baseline (V)
+             */
+            baseline_voltage?: number | null;
+            /**
+             * Acetone Delta Mv
+             * @description (sensor - baseline) * 1000 (mV)
+             */
+            acetone_delta_mv?: number | null;
+            /**
+             * Pressure Kpa
+             * @description XGZP6847A breath pressure (kPa)
+             */
+            pressure_kpa?: number | null;
+            /** Ambient Voc */
+            ambient_voc?: number | null;
+            /** Breath Voc */
+            breath_voc?: number | null;
+            /** Pressure Mean */
+            pressure_mean?: number | null;
+            /** Pressure Std */
+            pressure_std?: number | null;
+            /** Breath Duration */
+            breath_duration?: number | null;
+            /** Voc Ppb */
+            voc_ppb?: number | null;
+            /** Ketone Mmol */
+            ketone_mmol?: number | null;
+            /** Temperature */
+            temperature?: number | null;
+            /** Humidity */
+            humidity?: number | null;
+            /** Raw */
+            raw?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** SensorReadingOut */
+        SensorReadingOut: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Ambient Voc */
+            ambient_voc: number | null;
+            /** Breath Voc */
+            breath_voc: number | null;
+            /** Acetone Delta */
+            acetone_delta: number | null;
+            /** Pressure Mean */
+            pressure_mean: number | null;
+            /** Pressure Std */
+            pressure_std: number | null;
+            /** Breath Duration */
+            breath_duration: number | null;
+            /** Voc Ppb */
+            voc_ppb: number | null;
+            /** Ketone Mmol */
+            ketone_mmol: number | null;
+            /** Temp C */
+            temp_c: number | null;
+            /** Humidity Pct */
+            humidity_pct: number | null;
+            /** Quality Score */
+            quality_score: number | null;
+            /** Reliability Score */
+            reliability_score: number | null;
+            /** Environment Penalty */
+            environment_penalty: number | null;
+            /** Slope */
+            slope: number | null;
+            /** Time To Peak */
+            time_to_peak: number | null;
+            /** Recovery Rate */
+            recovery_rate: number | null;
+            /** Metabolic Risk Index */
+            metabolic_risk_index: number | null;
+            /** Confidence Score */
+            confidence_score: number | null;
+            /** Label */
+            label: string | null;
+        };
+        /** SensorReport */
+        SensorReport: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Device Id */
+            device_id: string | null;
+            user: components["schemas"]["ReportUser"];
+            baseline: components["schemas"]["BaselineOut"];
+            /** Trend */
+            trend: {
+                [key: string]: unknown;
+            };
+            /** Recent Sessions */
+            recent_sessions: components["schemas"]["SessionSummary"][];
+            /** Lifestyle Summary */
+            lifestyle_summary: {
+                [key: string]: unknown;
+            };
+        };
+        /** SessionSummary */
+        SessionSummary: {
+            /** Session Id */
+            session_id: string;
+            /** Device Id */
+            device_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Duration Seconds */
+            duration_seconds: number;
+            /** N Samples */
+            n_samples: number;
+            /** Peak Acetone Delta */
+            peak_acetone_delta: number | null;
+            /** Mean Acetone Delta */
+            mean_acetone_delta: number | null;
+            /** Avg Pressure Kpa */
+            avg_pressure_kpa: number | null;
+            /** Avg Temp C */
+            avg_temp_c: number | null;
+            /** Avg Humidity Pct */
+            avg_humidity_pct: number | null;
+            /** Dominant Label */
+            dominant_label: string | null;
+        };
+        /** SetSimulationRequest */
+        SetSimulationRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** SharedDeviceOut */
+        SharedDeviceOut: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Sensor Model */
+            sensor_model: string | null;
+            /** Active */
+            active: boolean;
+            /** Needs Recalibration */
+            needs_recalibration: boolean;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Claimed By Username */
+            claimed_by_username?: string | null;
+            /**
+             * Claimed By Me
+             * @default false
+             */
+            claimed_by_me: boolean;
+            /** Session Expires At */
+            session_expires_at?: string | null;
+        };
+        /** SimulateAcetoneRequest */
+        SimulateAcetoneRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** StreakOut */
+        StreakOut: {
+            /** Current */
+            current: number;
+            /** Longest */
+            longest: number;
+            /** Last Active Date */
+            last_active_date: string | null;
+            /** Freezes Left */
+            freezes_left: number;
+        };
+        /**
+         * ThresholdsResponse
+         * @description Single source of truth for zone/label boundary constants so the
+         *     frontend never hardcodes its own copy of these numbers.
+         */
+        ThresholdsResponse: {
+            /** Anderson Five Class */
+            anderson_five_class: components["schemas"]["FiveClassThreshold"][];
+            /** Anderson Reference */
+            anderson_reference: string;
+            /** Metabolic Risk Index */
+            metabolic_risk_index: {
+                [key: string]: unknown;
+            };
+            /** Trend Labels */
+            trend_labels: string[];
+            /** Trend Min Sequence Length */
+            trend_min_sequence_length: number;
+            /** Reliability Gate Threshold */
+            reliability_gate_threshold: number;
+            /** Model Confidence Gate */
+            model_confidence_gate: number;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -135,6 +2817,89 @@ export interface components {
              */
             token_type: string;
         };
+        /** TrendClassifyRequest */
+        TrendClassifyRequest: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Sequence */
+            sequence?: {
+                [key: string]: unknown;
+            }[] | null;
+            /**
+             * Sessions
+             * @default 14
+             */
+            sessions: number;
+        };
+        /** TrendClassifyResponse */
+        TrendClassifyResponse: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Trend */
+            trend: string | null;
+            /** Confidence */
+            confidence: number;
+            /** Probabilities */
+            probabilities: {
+                [key: string]: unknown;
+            };
+            /** Sequence Length */
+            sequence_length: number;
+            /** Min Required */
+            min_required: number;
+            /** Model Used */
+            model_used: string;
+            /** Fallback Reason */
+            fallback_reason?: string | null;
+        };
+        /** TrendResponse */
+        TrendResponse: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Trend Direction */
+            trend_direction: string;
+            /** Slope Ppm Per Day */
+            slope_ppm_per_day: number | null;
+            /** Predicted Points */
+            predicted_points: {
+                [key: string]: unknown;
+            }[];
+            /** Confidence */
+            confidence: number;
+            /** N Readings Used */
+            n_readings_used: number;
+        };
+        /** UserDashboardOut */
+        UserDashboardOut: {
+            /** User */
+            user: {
+                [key: string]: unknown;
+            };
+            /** Window Days */
+            window_days: number;
+            kpi: components["schemas"]["DashboardKPI"];
+            /** Devices */
+            devices: components["schemas"]["DashboardDevice"][];
+            /** Label Counts */
+            label_counts: {
+                [key: string]: unknown;
+            };
+            /** Series */
+            series: components["schemas"]["DashboardReading"][];
+            /** Recent */
+            recent: components["schemas"]["DashboardReading"][];
+            /** Ketone Logs */
+            ketone_logs: components["schemas"]["DashboardKetoneLog"][];
+        };
         /** UserOut */
         UserOut: {
             /**
@@ -147,11 +2912,21 @@ export interface components {
             /** Email */
             email: string;
             /**
+             * Role
+             * @default patient
+             */
+            role: string;
+            /**
              * Created At
              * Format: date-time
              */
             created_at: string;
             profile?: components["schemas"]["ProfileOut"] | null;
+            /**
+             * Is Admin
+             * @default false
+             */
+            is_admin: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -161,6 +2936,39 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WeightLogCreate */
+        WeightLogCreate: {
+            /** Kg */
+            kg: number;
+        };
+        /** WeightLogOut */
+        WeightLogOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Kg */
+            kg: number;
+        };
+        /** XPOut */
+        XPOut: {
+            /** Total */
+            total: number;
+            /** Level */
+            level: number;
+            /** Level Name */
+            level_name: string;
+            /** Xp In Level */
+            xp_in_level: number;
+            /** Xp To Next */
+            xp_to_next: number;
         };
     };
     responses: never;
@@ -286,6 +3094,2219 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    list_ketone_logs_ketone_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KetoneLogOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ketone_logs_ketone_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KetoneLogCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KetoneLogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_weight_logs_weight_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeightLogOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_weight_logs_weight_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeightLogCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeightLogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_meal_logs_meal_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealLogOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_meal_logs_meal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MealLogCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealLogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_activity_logs_activity_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityLogOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_activity_logs_activity_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityLogCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityLogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_profile_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_xp_me_xp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XPOut"];
+                };
+            };
+        };
+    };
+    my_streak_me_streak_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreakOut"];
+                };
+            };
+        };
+    };
+    my_badges_me_badges_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BadgeOut"][];
+                };
+            };
+        };
+    };
+    quests_today_me_quests_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestOut"][];
+                };
+            };
+        };
+    };
+    checkin_me_checkin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckinOut"];
+                };
+            };
+        };
+    };
+    list_articles_articles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleOut"][];
+                };
+            };
+        };
+    };
+    get_article_articles__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_article_articles__slug__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleCompleteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vapid_public_push_vapid_public_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    subscribe_push_subscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscribeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reminders_reminders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderOut"][];
+                };
+            };
+        };
+    };
+    create_reminder_reminders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReminderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_reminder_reminders__reminder_id__toggle_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reminder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_reminder_reminders__reminder_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reminder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_provision_token_sensor_provision_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvisionTokenOut"];
+                };
+            };
+        };
+    };
+    pair_device_sensor_device_pair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevicePairRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePairResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_devices_sensor_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+        };
+    };
+    set_full_simulation_sensor_device__device_id__simulation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSimulationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_device_sensor_device__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shared_devices_sensor_devices_pool_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedDeviceOut"][];
+                };
+            };
+        };
+    };
+    claim_shared_device_sensor_device__device_id__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_shared_device_sensor_device__device_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_readings_sensor_readings_get: {
+        parameters: {
+            query: {
+                device_id: string;
+                days?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensorReadingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_reading_sensor_readings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SensorReadingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensorReadingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_sensor_sessions_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_daily_stats_sensor_daily_stats_get: {
+        parameters: {
+            query: {
+                device_id: string;
+                days?: number;
+                /** @description Rollup granularity — 'week'/'month' avoid forcing the frontend to render hundreds of raw daily points over a long range. */
+                granularity?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyStat"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_personal_baseline_sensor_baseline_get: {
+        parameters: {
+            query?: {
+                /** @description Restrict to one device; omit for all of the user's devices */
+                device_id?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaselineOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_health_report_sensor_report_get: {
+        parameters: {
+            query?: {
+                /** @description Defaults to the user's active device */
+                device_id?: string | null;
+                session_days?: number;
+                log_days?: number;
+                /** @description How many recent readings to feed the trend classifier */
+                trend_readings?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensorReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calibrate_device_sensor_device__device_id__calibrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalibrationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_calibration_history_sensor_device__device_id__calibration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calibration_report_sensor_device__device_id__calibration_report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalibrationReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_configured_firmware_sensor_device__device_id__firmware_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirmwareConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_device_wifi_sensor_device__device_id__reset_wifi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_recording_sensor_device__device_id__recording_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_recording_sensor_device__device_id__recording_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recording_status_sensor_device__device_id__recording_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thresholds_ai_thresholds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThresholdsResponse"];
+                };
+            };
+        };
+    };
+    interpret_reading_ai_interpret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterpretRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterpretResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    predict_ai_predict_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PredictRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PredictResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trend_ai_trend_get: {
+        parameters: {
+            query: {
+                device_id: string;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompts_ai_prompts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptsResponse"];
+                };
+            };
+        };
+    };
+    chat_ai_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_stream_ai_chat_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    predict_lstm_ai_predict_lstm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LstmPredictRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LstmPredictResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    predict_trend_classification_ai_predict_trend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrendClassifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrendClassifyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_drift_ai_drift_get: {
+        parameters: {
+            query: {
+                device_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_flexibility_ai_flexibility_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlexibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlexibilityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_session_pilot_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotSessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_pilot_sessions_get: {
+        parameters: {
+            query?: {
+                cohort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_correlation_pilot_correlation_get: {
+        parameters: {
+            query?: {
+                cohort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrelationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_csv_pilot_export_get: {
+        parameters: {
+            query?: {
+                cohort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_admin_admin_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_admin_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_doctors_admin_doctors_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_role_admin_users__user_id__role_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_doctor_admin_users__user_id__assign_doctor_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignDoctorRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ensure_manual_device_admin_device_ensure__user_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_mac_device_admin_device_mac_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MacDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_device_to_user_admin_device__device_id__assign_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_simulate_acetone_admin_device__device_id__simulate_acetone_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateAcetoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_reading_admin_reading_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminReadingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReadingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    user_dashboard_admin_user__user_id__dashboard_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ketone_agreement_admin_ketone_agreement_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Admin-Password"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KetoneAgreementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

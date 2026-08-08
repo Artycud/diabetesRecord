@@ -20,9 +20,12 @@ Source: Anderson JC. Obesity (2015) 23:2327-2334. doi:10.1002/oby.21242
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 _MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "models")
 
@@ -136,7 +139,11 @@ def _load_models():
             _lstm_trend_scaler_mean  = np.load(trend_mean_path)
             _lstm_trend_scaler_scale = np.load(trend_scale_path)
     except Exception:
-        pass
+        # Genuinely best-effort: missing/corrupt model artifacts should degrade
+        # to the rule-based fallback rather than crash inference — but the
+        # failure must be visible in logs, not silently swallowed, or nobody
+        # notices the models never loaded in the first place.
+        logger.exception("ml_inference: failed to load one or more model artifacts")
 
 
 def _load_lstm():
@@ -282,7 +289,19 @@ def predict_risk(features: dict) -> dict:
             continue
         try:
             import numpy as np
-            arr = np.array([feat_vec])
+            arr = np.array([feat_vec], dtype=float)
+            # Guard against a genuine shape mismatch (e.g. feature_columns.json
+            # failed to load, or the model was trained on a different feature
+            # set) BEFORE handing the array to the model — this is the
+            # concrete "shape mismatch" failure mode narrowed except clauses
+            # below are meant to catch, raised deterministically rather than
+            # relying on whatever error sklearn/xgboost happens to throw.
+            if not _feature_columns or arr.shape[1] != len(_feature_columns):
+                raise ValueError(
+                    f"feature vector length {arr.shape[1]} does not match "
+                    f"expected {len(_feature_columns)} columns from "
+                    f"feature_columns.json"
+                )
             proba = model.predict_proba(arr)[0]
             pred_idx = int(proba.argmax())
             confidence = float(proba.max())
@@ -307,7 +326,19 @@ def predict_risk(features: dict) -> dict:
                 "model_used": model_name,
                 "recalibration_needed": confidence < 0.6,
             }
-        except Exception:
+        except (ValueError, KeyError, IndexError, TypeError) as e:
+            # Narrowed from a blanket `except Exception: continue` — that used
+            # to silently swallow ANY failure (including real bugs like a
+            # feature-vector/shape mismatch) and always fall through to the
+            # rule-based classifier without a trace. These are the genuine
+            # "bad input to the model" failure modes; log them so a real
+            # regression is visible instead of masquerading as "no model
+            # available", then fall back for this one prediction only.
+            logger.warning(
+                "ml_inference.predict_risk: %s predict_proba failed "
+                "(%s: %s) — falling back to next model", model_name,
+                type(e).__name__, e,
+            )
             continue
 
     result = _rule_based_risk(features.get("acetone_delta"))
@@ -445,6 +476,10 @@ def predict_risk_lstm(sequence: list[dict]) -> dict:
         }
     except Exception as e:
         latest = sequence[-1]
+        logger.warning(
+            "ml_inference.predict_risk_lstm: LSTM inference failed (%s: %s) "
+            "— falling back to single-point prediction", type(e).__name__, e,
+        )
         result = predict_risk(latest)
         result["model_used"] = f"{result.get('model_used', 'rule_based')}_fallback"
         result["reason"] = f"lstm_error: {type(e).__name__}"
@@ -529,6 +564,10 @@ def classify_trend(session_sequence: list[dict]) -> dict:
             "fallback_reason": None,
         }
     except Exception as e:
+        logger.warning(
+            "ml_inference.classify_trend: LSTM trend inference failed "
+            "(%s: %s) — falling back to rule-based trend", type(e).__name__, e,
+        )
         return _classify_trend_rule_fallback(
             session_sequence, reason=f"lstm_error:{type(e).__name__}"
         )

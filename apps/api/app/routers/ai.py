@@ -13,7 +13,7 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User, Profile
 from app.models.health import Device, DeviceCalibration, SensorReading
-from app.services import ml_inference, llm_guardrail, flexibility_engine, chat_tools
+from app.services import ml_inference, llm_guardrail, flexibility_engine, chat_tools, baseline
 from app.mcp_context import mcp_scope
 from app.mcp_server import mcp as mcp_server
 
@@ -141,6 +141,196 @@ class FlexibilityResponse(BaseModel):
     n_sessions: int
     message_th: str
     context_tag: Optional[str] = None
+
+
+class FiveClassThreshold(BaseModel):
+    label: str
+    upper_bound_ppm: Optional[float]  # None for the top ("dka_risk") band — open-ended
+
+
+class ThresholdsResponse(BaseModel):
+    """Single source of truth for zone/label boundary constants so the
+    frontend never hardcodes its own copy of these numbers."""
+    anderson_five_class: List[FiveClassThreshold]
+    anderson_reference: str
+    metabolic_risk_index: dict  # label -> index (0-4), unreliable -> null
+    trend_labels: List[str]
+    trend_min_sequence_length: int
+    reliability_gate_threshold: float  # below this reliability_score(0-100), result is "unreliable"
+    model_confidence_gate: float       # below this confidence, result is "unreliable"
+
+
+class InterpretRequest(BaseModel):
+    device_id: UUID
+    # Interpret one specific reading (its primary key is time+device_id);
+    # omit to interpret the user's latest reading instead.
+    time: Optional[datetime] = None
+
+
+class InterpretResponse(BaseModel):
+    text: str
+    refusal: bool
+    based_on: dict
+
+
+# ─── GET /ai/thresholds ────────────────────────────────────────────────────
+
+@router.get("/thresholds", response_model=ThresholdsResponse)
+async def get_thresholds(user: User = Depends(get_current_user)):
+    """
+    Expose the Anderson (2015) five-pattern zone boundaries, trend labels,
+    and the confidence/reliability gates used by ml_inference — so the
+    frontend renders zone bands, chart reference lines, etc. from the same
+    numbers the backend actually classifies with, instead of a hand-copied
+    duplicate that can drift out of sync.
+    """
+    bounds = [
+        FiveClassThreshold(label=label, upper_bound_ppm=threshold)
+        for threshold, label in ml_inference.FIVE_CLASS_THRESHOLDS
+    ] + [FiveClassThreshold(label="dka_risk", upper_bound_ppm=None)]
+
+    return ThresholdsResponse(
+        anderson_five_class=bounds,
+        anderson_reference="Anderson JC. Obesity (2015) 23:2327-2334. doi:10.1002/oby.21242",
+        metabolic_risk_index=ml_inference.FIVE_CLASS_MRI,
+        trend_labels=ml_inference.TREND_LABELS,
+        trend_min_sequence_length=ml_inference.TREND_MIN_SEQUENCE_LENGTH,
+        reliability_gate_threshold=40.0,
+        model_confidence_gate=0.6,
+    )
+
+
+# ─── POST /ai/interpret (short one-shot NL blurb, not a chat conversation) ──
+
+@router.post("/interpret", response_model=InterpretResponse)
+async def interpret_reading(
+    body: InterpretRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate a SHORT (1-3 sentence) natural-language interpretation of one
+    reading (or the user's latest, if `time` is omitted) — a one-shot blurb,
+    not a multi-turn chat. Compares against the user's personal baseline
+    (Task 2) when available, falling back to the fixed Anderson thresholds
+    otherwise. Goes through the same llm_guardrail sanitisation as /ai/chat
+    — this is still a health-adjacent AI output.
+    """
+    device_result = await db.exec(
+        select(Device).where(Device.id == body.device_id, Device.user_id == user.id)
+    )
+    if not device_result.first():
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    # Resolve the target reading: an explicit time, or the user's latest.
+    reading_stmt = select(SensorReading).where(
+        SensorReading.device_id == body.device_id,
+        SensorReading.user_id == user.id,
+    )
+    if body.time:
+        reading_stmt = reading_stmt.where(SensorReading.time == body.time)
+    reading_stmt = reading_stmt.order_by(SensorReading.time.desc())
+    reading_result = await db.exec(reading_stmt)
+    reading = reading_result.first()
+
+    if not reading or reading.acetone_delta is None:
+        text = (
+            "ยังไม่มีข้อมูลการวัดให้ตีความค่ะ ลองเป่าเครื่องมือแล้วบันทึกผลก่อน "
+            "แล้วค่อยกลับมาดูสรุปนี้อีกครั้งนะคะ"
+        )
+        return InterpretResponse(
+            text=llm_guardrail.sanitise_response(text, lang="th"),
+            refusal=False,
+            based_on={"reading_found": False},
+        )
+
+    # Personal baseline (last 30 days, across all of the user's devices —
+    # reuses the exact same computation as GET /sensor/baseline).
+    since = datetime.utcnow() - timedelta(days=baseline.BASELINE_WINDOW_DAYS)
+    baseline_stmt = select(SensorReading.acetone_delta).where(
+        SensorReading.user_id == user.id,
+        SensorReading.time >= since,
+        SensorReading.acetone_delta.is_not(None),
+    )
+    baseline_result = await db.exec(baseline_stmt)
+    baseline_values = [float(v) for v in baseline_result.all()]
+    personal_baseline = baseline.compute_personal_baseline(baseline_values)
+    comparison = baseline.compare_to_baseline(reading.acetone_delta, personal_baseline)
+
+    # Reuse the existing chat context-gathering tool for recent-trend framing
+    # ("comparison_to_7day_avg") instead of re-deriving it.
+    recent_ctx = await chat_tools.tool_get_recent_readings(
+        db, user, body.device_id, days=7, limit=5,
+    )
+
+    acetone_ppm = round(reading.acetone_delta / chat_tools.MV_PER_PPM, 2)
+    label = reading.label or ml_inference._anderson_label(acetone_ppm)
+
+    based_on = {
+        "reading_found": True,
+        "reading_time": reading.time.isoformat() if reading.time else None,
+        "acetone_ppm": acetone_ppm,
+        "label": label,
+        "confidence_score": reading.confidence_score,
+        "personal_baseline": personal_baseline,
+        "comparison_to_baseline": comparison,
+        "comparison_to_7day_avg": recent_ctx.get("comparison_to_7day_avg"),
+    }
+
+    facts_th = (
+        f"ค่าที่วัดได้: {acetone_ppm} ppm (label: {label}). "
+        + (
+            f"baseline ปกติของผู้ใช้คนนี้ (trimmed mean {baseline.BASELINE_WINDOW_DAYS} วันล่าสุด) "
+            f"อยู่ที่ {personal_baseline['baseline_mean_ppm']} ppm "
+            f"(ช่วง {personal_baseline['baseline_range_ppm'][0]}-{personal_baseline['baseline_range_ppm'][1]} ppm), "
+            f"ค่านี้ {comparison['direction'] if comparison else 'n/a'} "
+            f"({comparison['pct_change_vs_baseline'] if comparison else 'n/a'}% เทียบ baseline). "
+            if not personal_baseline["insufficient_data"] and comparison
+            else "ยังไม่มี baseline ส่วนตัว (ข้อมูลน้อยกว่า "
+                 f"{baseline.MIN_SAMPLES_FOR_BASELINE} ครั้ง) — เทียบกับช่วง Anderson มาตรฐานแทน. "
+        )
+    )
+
+    api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
+    model = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
+
+    if not api_key:
+        raw_reply = (
+            f"ค่าล่าสุดของคุณอยู่ที่ {acetone_ppm} ppm ({label}) ค่ะ "
+            + (
+                f"เทียบกับ baseline ปกติของคุณ ({personal_baseline['baseline_mean_ppm']} ppm) "
+                f"ถือว่า{'สูงกว่า' if comparison and comparison['direction']=='above_baseline_range' else 'ต่ำกว่า' if comparison and comparison['direction']=='below_baseline_range' else 'ใกล้เคียงกับ'}ปกติค่ะ"
+                if comparison else "ยังไม่มี baseline ส่วนตัวให้เทียบค่ะ"
+            )
+        )
+    else:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+            system_prompt = llm_guardrail.build_system_prompt({
+                "display_name": user.username,
+                "task": "one_shot_reading_interpretation",
+            })
+            user_msg = (
+                "สรุปค่าการวัดนี้ให้ผู้ใช้แบบสั้น ๆ 1-3 ประโยค ภาษาไทย เป็นกันเอง "
+                "ห้ามวินิจฉัยโรค ห้ามแนะนำยา ห้ามใช้ emoji ห้ามใส่ disclaimer ท้ายข้อความ "
+                "(ระบบจะจัดการ disclaimer เอง). ข้อมูล:\n" + facts_th
+            )
+            response = client.messages.create(
+                model=model,
+                max_tokens=200,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_msg}],
+            )
+            texts = [getattr(b, "text", "") for b in response.content
+                     if getattr(b, "type", None) == "text"]
+            raw_reply = "\n".join(t for t in texts if t).strip() or facts_th
+        except Exception:
+            raw_reply = facts_th
+
+    safe_reply = llm_guardrail.sanitise_response(raw_reply, lang="th")
+
+    return InterpretResponse(text=safe_reply, refusal=False, based_on=based_on)
 
 
 # ─── POST /ai/predict ─────────────────────────────────────────────────────────

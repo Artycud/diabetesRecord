@@ -12,7 +12,7 @@ import os
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, Profile
 from app.models.health import Device, SensorReading, DeviceCalibration
 from app.schemas.sensor import (
     SensorReadingCreate, SensorReadingOut,
@@ -30,6 +30,8 @@ from app.services.device_session import (
 from app.models.health import DeviceSession
 
 from app.core.security import create_access_token
+from app.services import baseline as baseline_service
+from app.services import ml_inference, chat_tools
 
 router = APIRouter(prefix="/sensor", tags=["sensor"])
 
@@ -524,7 +526,10 @@ async def ingest_reading(
 @router.get("/readings", response_model=List[SensorReadingOut])
 async def get_readings(
     device_id: UUID = Query(...),
-    days: int = Query(default=7, ge=1, le=90),
+    # Raised from 90 -> 365 to match /sensor/sessions' 365-day cap (see
+    # get_daily_stats docstring) — this and daily-stats were the outliers,
+    # not sessions, since more history is strictly more useful here.
+    days: int = Query(default=7, ge=1, le=365),
     limit: int = Query(default=0, ge=0, le=10000),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -575,13 +580,11 @@ class SessionSummary(BaseModel):
     dominant_label: Optional[str]
 
 
-@router.get("/sessions", response_model=List[SessionSummary])
-async def list_sessions(
-    days: int = Query(default=7, ge=1, le=365),
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """One row per recording session (grouped by session_id)."""
+async def _get_session_summaries(
+    db: AsyncSession, user: User, days: int, limit: Optional[int] = None,
+) -> List[SessionSummary]:
+    """Shared implementation behind GET /sensor/sessions and the session
+    history block of GET /sensor/report — one row per recording session."""
     since = datetime.utcnow() - timedelta(days=days)
 
     rows = (await db.exec(
@@ -628,7 +631,7 @@ async def list_sessions(
         if cur is None or n > cur[1]:
             dominant[sid] = (label, n)
 
-    return [
+    summaries = [
         SessionSummary(
             session_id=r[0],
             device_id=str(r[1]),
@@ -645,12 +648,24 @@ async def list_sessions(
         )
         for r in rows
     ]
+    return summaries[:limit] if limit else summaries
+
+
+@router.get("/sessions", response_model=List[SessionSummary])
+async def list_sessions(
+    days: int = Query(default=7, ge=1, le=365),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """One row per recording session (grouped by session_id)."""
+    return await _get_session_summaries(db, user, days)
 
 
 # ─── Daily aggregated stats ────────────────────────────────────────────────
 
 class DailyStat(BaseModel):
-    date: _date
+    date: _date                 # period start (day, or start of ISO week / month for rollups)
+    granularity: str = "day"    # "day" | "week" | "month" — echoes the request param
     count: int
     avg_acetone_delta: Optional[float]
     max_acetone_delta: Optional[float]
@@ -660,24 +675,42 @@ class DailyStat(BaseModel):
     dominant_label: Optional[str]
 
 
+def _period_to_date(v) -> _date:
+    """func.date() returns a date; func.date_trunc() returns a datetime — normalise to date."""
+    return v.date() if isinstance(v, datetime) else v
+
+
 @router.get("/daily-stats", response_model=List[DailyStat])
 async def get_daily_stats(
     device_id: UUID = Query(...),
-    days: int = Query(default=7, ge=1, le=90),
+    days: int = Query(default=7, ge=1, le=365),
+    granularity: str = Query(
+        default="day", pattern="^(day|week|month)$",
+        description="Rollup granularity — 'week'/'month' avoid forcing the "
+                    "frontend to render hundreds of raw daily points over a long range.",
+    ),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Per-day aggregate for the CURRENT user's readings on this device.
+    Per-period aggregate for the CURRENT user's readings on this device.
     Shared-device semantics: each user sees their own recordings only —
     the WHERE clause filters user_id, so no cross-user leak even without an active claim.
+
+    `days` now goes up to 365 (previously capped at 90) to match the
+    `/sensor/sessions` history limit — long-term history is more useful for
+    a "history" feature, not less, so the readings/daily-stats endpoints
+    were the ones raised rather than lowering sessions to 90.
     """
     since = datetime.utcnow() - timedelta(days=days)
-    day = func.date(SensorReading.time).label("day")
+    if granularity == "day":
+        period = func.date(SensorReading.time).label("period")
+    else:
+        period = func.date_trunc(granularity, SensorReading.time).label("period")
 
     rows = (await db.exec(
         select(
-            day,
+            period,
             func.count().label("count"),
             func.avg(SensorReading.acetone_delta).label("avg_ac"),
             func.max(SensorReading.acetone_delta).label("max_ac"),
@@ -690,14 +723,14 @@ async def get_daily_stats(
             SensorReading.user_id == user.id,
             SensorReading.time >= since,
         )
-        .group_by(day)
-        .order_by(day.desc())
+        .group_by(period)
+        .order_by(period.desc())
     )).all()
 
-    # Dominant label per day (mode) — second cheap query
+    # Dominant label per period (mode) — second cheap query
     label_rows = (await db.exec(
         select(
-            day,
+            period,
             SensorReading.label,
             func.count().label("n"),
         )
@@ -707,28 +740,177 @@ async def get_daily_stats(
             SensorReading.time >= since,
             SensorReading.label.isnot(None),
         )
-        .group_by(day, SensorReading.label)
+        .group_by(period, SensorReading.label)
     )).all()
 
     dominant: dict = {}
     for d, label, n in label_rows:
-        cur = dominant.get(d)
+        key = _period_to_date(d)
+        cur = dominant.get(key)
         if cur is None or n > cur[1]:
-            dominant[d] = (label, n)
+            dominant[key] = (label, n)
 
     return [
         DailyStat(
-            date=r[0],
+            date=_period_to_date(r[0]),
+            granularity=granularity,
             count=int(r[1]),
             avg_acetone_delta=float(r[2]) if r[2] is not None else None,
             max_acetone_delta=float(r[3]) if r[3] is not None else None,
             min_acetone_delta=float(r[4]) if r[4] is not None else None,
             avg_temp_c=float(r[5]) if r[5] is not None else None,
             avg_humidity_pct=float(r[6]) if r[6] is not None else None,
-            dominant_label=dominant.get(r[0], (None,))[0],
+            dominant_label=dominant.get(_period_to_date(r[0]), (None,))[0],
         )
         for r in rows
     ]
+
+
+# ─── Personal (physiological) baseline ─────────────────────────────────────
+# NOT the same thing as DeviceCalibration (hardware sensor-zero baseline).
+# This is "what's normal for this person", computed on-the-fly from their
+# own reading history — see app/services/baseline.py for method + rationale.
+
+class BaselineOut(BaseModel):
+    insufficient_data: bool
+    sample_count: int
+    computed_from_days: int
+    baseline_mean_mv: Optional[float]
+    baseline_range_mv: Optional[List[float]]
+    baseline_mean_ppm: Optional[float]
+    baseline_range_ppm: Optional[List[float]]
+    method: str
+    device_id: Optional[UUID] = None  # null when computed across all of the user's devices
+
+
+@router.get("/baseline", response_model=BaselineOut)
+async def get_personal_baseline(
+    device_id: Optional[UUID] = Query(default=None, description="Restrict to one device; omit for all of the user's devices"),
+    days: int = Query(default=baseline_service.BASELINE_WINDOW_DAYS, ge=7, le=180),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Per-user physiological baseline (trimmed mean + range) computed from the
+    caller's own acetone_delta history — distinct from device hardware
+    calibration. Returns `insufficient_data: true` with all numeric fields
+    null when the user doesn't have enough history yet (e.g. a fresh demo
+    account), rather than a misleading number from 1-2 readings.
+    """
+    since = datetime.utcnow() - timedelta(days=days)
+    stmt = select(SensorReading.acetone_delta).where(
+        SensorReading.user_id == user.id,
+        SensorReading.time >= since,
+        SensorReading.acetone_delta.is_not(None),
+    )
+    if device_id:
+        stmt = stmt.where(SensorReading.device_id == device_id)
+
+    result = await db.exec(stmt)
+    values = [float(v) for v in result.all()]
+
+    baseline = baseline_service.compute_personal_baseline(values, window_days=days)
+    return BaselineOut(**baseline, device_id=device_id)
+
+
+# ─── Health / doctor-facing report ─────────────────────────────────────────
+# NOT the device calibration QA report (GET /sensor/device/{id}/calibration
+# /report) — that stays untouched, it's a separate hardware-evidence
+# artifact. This aggregates USER health data for a printable summary page;
+# no server-side PDF generation here (frontend does browser print-to-PDF).
+
+class ReportUser(BaseModel):
+    display_name: Optional[str]
+    assigned_doctor_id: Optional[str] = None
+
+
+class SensorReport(BaseModel):
+    generated_at: datetime
+    device_id: Optional[str]  # resolved device the trend section is scoped to (if any)
+    user: ReportUser
+    baseline: BaselineOut
+    trend: dict                       # shape of ml_inference.classify_trend()'s return value
+    recent_sessions: List[SessionSummary]
+    lifestyle_summary: dict           # shape of chat_tools.tool_get_recent_logs()'s return value
+
+
+@router.get("/report", response_model=SensorReport)
+async def get_health_report(
+    device_id: Optional[UUID] = Query(default=None, description="Defaults to the user's active device"),
+    session_days: int = Query(default=90, ge=1, le=365),
+    log_days: int = Query(default=14, ge=1, le=90),
+    trend_readings: int = Query(default=14, ge=1, le=90, description="How many recent readings to feed the trend classifier"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Doctor/health-facing report aggregating: trend classification (existing
+    LSTM trend classifier), personal baseline (Task 2), recent session
+    history, and a lifestyle log summary — one payload for the frontend to
+    render as a printable page. `Profile.assigned_doctor_id` is included so
+    a "share with doctor" UI has something real to point at.
+    """
+    resolved_device_id = await chat_tools._pick_device_id(db, user, device_id)
+
+    profile_res = await db.exec(select(Profile).where(Profile.user_id == user.id))
+    profile = profile_res.first()
+
+    trend_result: dict = {
+        "trend": None, "confidence": 0.0, "probabilities": {},
+        "sequence_length": 0, "min_required": ml_inference.TREND_MIN_SEQUENCE_LENGTH,
+        "model_used": "no_device", "fallback_reason": "user has no accessible device",
+    }
+    if resolved_device_id:
+        readings_result = await db.exec(
+            select(SensorReading)
+            .where(
+                SensorReading.device_id == resolved_device_id,
+                SensorReading.user_id == user.id,
+            )
+            .order_by(SensorReading.time.desc())
+            .limit(max(trend_readings, ml_inference.TREND_MIN_SEQUENCE_LENGTH))
+        )
+        readings = list(readings_result.all())[::-1]  # oldest -> newest
+        sequence = [
+            {
+                "acetone_delta":     r.acetone_delta,
+                "pressure_mean":     r.pressure_mean,
+                "pressure_std":      r.pressure_std,
+                "breath_duration":   r.breath_duration,
+                "temperature":       r.temp_c,
+                "humidity":          r.humidity_pct,
+                "quality_score":     r.quality_score,
+                "reliability_score": r.reliability_score,
+            }
+            for r in readings
+        ]
+        trend_result = ml_inference.classify_trend(sequence)
+
+    since = datetime.utcnow() - timedelta(days=baseline_service.BASELINE_WINDOW_DAYS)
+    baseline_stmt = select(SensorReading.acetone_delta).where(
+        SensorReading.user_id == user.id,
+        SensorReading.time >= since,
+        SensorReading.acetone_delta.is_not(None),
+    )
+    baseline_values = [float(v) for v in (await db.exec(baseline_stmt)).all()]
+    baseline_result = baseline_service.compute_personal_baseline(baseline_values)
+
+    sessions = await _get_session_summaries(db, user, session_days, limit=50)
+    lifestyle = await chat_tools.tool_get_recent_logs(db, user, days=log_days)
+
+    return SensorReport(
+        generated_at=datetime.utcnow(),
+        device_id=str(resolved_device_id) if resolved_device_id else None,
+        user=ReportUser(
+            display_name=profile.display_name if profile else user.username,
+            assigned_doctor_id=str(profile.assigned_doctor_id)
+                if profile and profile.assigned_doctor_id else None,
+        ),
+        baseline=BaselineOut(**baseline_result, device_id=None),
+        trend=trend_result,
+        recent_sessions=sessions,
+        lifestyle_summary=lifestyle,
+    )
 
 
 # ─── Calibrate device ────────────────────────────────────────────────────────
