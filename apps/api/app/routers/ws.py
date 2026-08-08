@@ -1,7 +1,20 @@
 """
 WebSocket endpoint for real-time sensor readings.
 
-Clients connect to /ws/readings/{user_id}?token=<jwt>
+Clients connect to /ws/readings/{user_id} and authenticate via the
+Sec-WebSocket-Protocol header — NOT a `?token=` query param. Query params
+get written into reverse-proxy access logs (nginx), browser history, and
+Referer headers, so a raw JWT there is a real leak vector. Browsers can't
+set arbitrary headers on the WS handshake, but the `protocols` argument to
+the JS `WebSocket` constructor *is* sent as a real Sec-WebSocket-Protocol
+header, so we piggyback the token on that instead.
+
+Client sends protocols=["access_token", <jwt>] (see useDeviceStream.ts).
+We select the fixed "access_token" marker back in the handshake response
+(never the token itself) — RFC 6455 requires the server to echo back one
+of the values the client offered, but nothing says it has to be the secret
+one, so the token is never reflected into the response headers either.
+
 Server subscribes to Redis channel readings:{user_id} (published by mqtt_subscriber.py)
 and forwards each JSON message to the connected client.
 """
@@ -9,7 +22,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from app.core.security import decode_access_token
 from app.core.config import settings
@@ -18,20 +31,29 @@ log = logging.getLogger("ws_readings")
 
 router = APIRouter(tags=["ws"])
 
+_AUTH_SUBPROTOCOL = "access_token"
+
 
 @router.websocket("/ws/readings/{user_id}")
 async def ws_readings(
     websocket: WebSocket,
     user_id: str,
-    token: str = Query(...),
 ):
-    # Authenticate: decode JWT and verify user_id matches
-    subject = decode_access_token(token)
+    # Authenticate: pull the JWT out of the offered subprotocols (not a
+    # query param), decode it, and verify user_id matches.
+    offered = websocket.scope.get("subprotocols") or []
+    token = (
+        offered[1]
+        if len(offered) >= 2 and offered[0] == _AUTH_SUBPROTOCOL
+        else None
+    )
+
+    subject = decode_access_token(token) if token else None
     if subject != user_id:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    await websocket.accept()
+    await websocket.accept(subprotocol=_AUTH_SUBPROTOCOL)
     log.info("WS connected user=%s", user_id[:8])
 
     try:

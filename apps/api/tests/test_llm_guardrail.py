@@ -66,15 +66,17 @@ class TestRefusalCases:
         assert should_refuse, f"Expected refusal for: '{message}' (reason: {reason or 'none'})"
         assert len(reason) > 0
 
-    def test_refusal_response_contains_disclaimer_th(self):
+    def test_refusal_response_recommends_professional_th(self):
+        # Refusal text no longer carries the DISCLAIMER_TH footer (dropped in
+        # 819ce08 "drop disclaimer, ban emojis..." — the persona rule now
+        # forbids appending disclaimers at all), but it must still point the
+        # user at a real healthcare professional.
         reply = build_refusal_response(lang="th")
         assert "ปรึกษาแพทย์" in reply
-        assert "ไม่ใช่คำแนะนำทางการแพทย์" in reply or "การศึกษา" in reply
 
-    def test_refusal_response_contains_disclaimer_en(self):
+    def test_refusal_response_recommends_professional_en(self):
         reply = build_refusal_response(lang="en")
         assert "healthcare professional" in reply.lower()
-        assert "medical advice" in reply.lower()
 
 
 class TestSafeCases:
@@ -85,15 +87,19 @@ class TestSafeCases:
 
 
 class TestSanitiseResponse:
-    def test_disclaimer_appended_when_missing(self):
+    def test_no_disclaimer_appended_when_missing(self):
+        # sanitise_response intentionally stopped appending a disclaimer
+        # (819ce08) — the system prompt instructs the model never to write
+        # one either, so clean text should pass through unchanged.
         raw = "ค่า acetone ของคุณอยู่ในช่วงปกติ"
         result = sanitise_response(raw, lang="th")
-        assert DISCLAIMER_TH.strip() in result
+        assert DISCLAIMER_TH.strip() not in result
+        assert result == raw
 
-    def test_disclaimer_not_duplicated(self):
+    def test_self_written_th_disclaimer_is_stripped(self):
         raw = "ข้อมูลบางอย่าง" + DISCLAIMER_TH
         result = sanitise_response(raw, lang="th")
-        assert result.count("ไม่ใช่คำแนะนำทางการแพทย์") == 1
+        assert "ไม่ใช่คำแนะนำทางการแพทย์" not in result
 
     def test_sanitise_masks_insulin_mention(self):
         raw = "คุณควรปรับ insulin dose ตามนี้"
@@ -105,10 +111,16 @@ class TestSanitiseResponse:
         result = sanitise_response(raw, lang="th")
         assert "[ข้อมูลนี้ถูกซ่อน" in result
 
-    def test_en_disclaimer_in_english_mode(self):
+    def test_no_disclaimer_appended_in_english_mode(self):
         raw = "Your acetone is in normal range."
         result = sanitise_response(raw, lang="en")
-        assert DISCLAIMER_EN.strip() in result
+        assert DISCLAIMER_EN.strip() not in result
+        assert result == raw
+
+    def test_self_written_en_disclaimer_is_stripped(self):
+        raw = "Some info." + DISCLAIMER_EN
+        result = sanitise_response(raw, lang="en")
+        assert "For educational purposes only" not in result
 
 
 class TestHallucinationPrevention:
@@ -117,27 +129,36 @@ class TestHallucinationPrevention:
     common LLM hallucination patterns.
     """
 
+    # NOTE: build_system_prompt() dropped its `sensor_data` parameter in
+    # f807dfe ("MetaBreath chat via real MCP protocol") — sensor context is
+    # no longer pre-injected into the prompt, it's fetched live by the model
+    # via MCP tools (get_recent_readings / get_recent_logs). user_context is
+    # the only input now. The prompt itself was also rewritten to Thai in
+    # 819ce08, so the safety-rule assertions below check for the current
+    # Thai wording rather than the old English phrasing.
+
     def test_system_prompt_contains_no_diagnosis_rule(self):
         from app.services.llm_guardrail import build_system_prompt
-        prompt = build_system_prompt(
-            user_context={"goal_type": "keto"},
-            sensor_data={"acetone_delta": 2.5, "label": "fat_burning"},
-        )
-        assert "Never diagnose" in prompt
+        prompt = build_system_prompt(user_context={"goal_type": "keto"})
+        # Rule 1: never tell the user they "have a disease" (เป็นโรค)
+        assert "เป็นโรค" in prompt
 
     def test_system_prompt_contains_no_medication_rule(self):
         from app.services.llm_guardrail import build_system_prompt
-        prompt = build_system_prompt(user_context={}, sensor_data={})
-        assert "prescribe" in prompt or "medication" in prompt
+        prompt = build_system_prompt(user_context={})
+        # Rule 2: never recommend medication / dose changes / injections
+        assert "ปรับขนาดยา" in prompt or "ฉีดยา" in prompt
 
     def test_system_prompt_contains_emergency_protocol(self):
         from app.services.llm_guardrail import build_system_prompt
-        prompt = build_system_prompt(user_context={}, sensor_data={})
+        prompt = build_system_prompt(user_context={})
         assert "1669" in prompt or "ห้องฉุกเฉิน" in prompt
 
     def test_system_prompt_contains_disclaimer_instruction(self):
         from app.services.llm_guardrail import build_system_prompt
-        prompt = build_system_prompt(user_context={}, sensor_data={})
+        prompt = build_system_prompt(user_context={})
+        # Persona rule explicitly forbids the model from appending its own
+        # disclaimer text — the word "disclaimer" appears in that rule.
         assert "disclaimer" in prompt.lower()
 
 

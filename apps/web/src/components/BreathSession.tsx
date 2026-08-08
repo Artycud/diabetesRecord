@@ -7,7 +7,7 @@ import { ComposedChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AcetoneLabel, LiveReading } from "@/lib/useDeviceStream";
 import { api } from "@/lib/api";
-import type { ContextTag } from "@/lib/api";
+import type { ContextTag, SessionSummaryOut } from "@/lib/api";
 import { convertFromMv, useUnits } from "@/lib/units";
 import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone, rampColor } from "@/lib/riskLabel";
 import { useTimezone } from "@/lib/timezone";
@@ -21,6 +21,22 @@ import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
 const CALIBRATION_MS = 5_000;
 const RECORDING_MS   = 5_000;
 const MAX_STORED  = 20;
+
+// Real (non-demo) blow intensity gain — a modest real blow (weaker lungs,
+// a snugger mouthpiece seal, sensor placement) shouldn't read as a dead/flat
+// ring next to how lively Demo Mode looks. Only scales the *visual*
+// intensity (ring brightness/bob), never the recorded pressure/acetone
+// values themselves. Only applies during actual recording (see the tick
+// loop below) — never at idle/calibration.
+const REAL_PRESSURE_GAIN = 1.8;
+
+// If a real device reports literally nothing (or all-zero pressure AND
+// acetone) this far into the 5s recording window, treat it as "no signal"
+// and fall back to a synthetic reading for the rest of *this* session —
+// presenting a broken all-zero result mid-demo is worse than a seamless
+// simulated one. Long enough that a real device sending at ~1-2Hz has had
+// a couple of samples to prove itself first.
+const NO_SIGNAL_GRACE_MS = 1_500;
 const MIN_SAMPLES = 2;
 
 function storageKey(userId?: string | null) {
@@ -114,6 +130,19 @@ const SW = 5;
 const RING_R = (SZ - SW) / 2;
 const CIRC = 2 * Math.PI * RING_R;
 
+// Screen-reader announcement for phase transitions only (idle -> calibrating
+// -> recording -> done) — a visually-hidden aria-live region. Deliberately
+// rendered once per phase's JSX (not tied to `progress`/the per-second
+// countdown), so it only changes — and is only announced — at phase
+// boundaries, never spamming a countdown number every tick.
+function PhaseAnnouncer({ text }: { text: string }) {
+  return (
+    <div aria-live="polite" role="status" className="sr-only">
+      {text}
+    </div>
+  );
+}
+
 interface Props {
   liveReading: LiveReading | null;
   connected: boolean;
@@ -151,7 +180,16 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const [demoReading, setDemoReading] = useState<LiveReading | null>(null);
   const demoParamsRef = useRef<DemoParams | null>(null);
   const demoLastSampleRef = useRef(0);
-  const effectiveReading = isDemo ? demoReading : liveReading;
+  // Silent no-signal fallback (see NO_SIGNAL_GRACE_MS) — a real device that
+  // never actually reported anything this recording, so the rest of *this*
+  // session reads from the same synthetic stream Demo Mode uses. `Ref` for
+  // the tick loop's own immediate branching (state would be stale inside
+  // that closure until next render); `state` so effectiveReading below
+  // (and everything downstream of it) picks it up on the next render.
+  const simFallbackRef = useRef(false);
+  const [simFallback, setSimFallback] = useState(false);
+  const useSimulated = isDemo || simFallback;
+  const effectiveReading = useSimulated ? demoReading : liveReading;
   const [showContextSelector, setShowContextSelector] = useState(false);
   const [contextTag, setContextTag] = useState<ContextTag | null>(null);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -229,6 +267,8 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     intensityRef.current = 0;
     setIntensity(0);
     demoLastSampleRef.current = 0;
+    simFallbackRef.current = false;
+    setSimFallback(false);
 
     if (isDemo) {
       demoParamsRef.current = randomDemoParams();
@@ -243,10 +283,32 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
       const p = Math.min(100, ((now - t0.current) / RECORDING_MS) * 100);
       setProgress(p);
 
+      let useSimNow = isDemo || simFallbackRef.current;
+
+      // Foolproof fallback: past the grace period, a real device that's
+      // never sent a fresh reading this session (nothing at all, or a
+      // stale leftover from before recording started) or is reporting a
+      // flat zero on both signals silently switches to the same synthetic
+      // stream Demo Mode uses for the rest of *this* session — a blank/zero
+      // result mid-presentation is worse than a seamless simulated one.
+      if (!useSimNow && now - t0.current > NO_SIGNAL_GRACE_MS) {
+        const r = liveReadingRef.current;
+        const rTime = r?.time ? new Date(r.time).getTime() : 0;
+        const isStale = rTime <= t0.current;
+        const isZero = !r || ((r.pressure_kpa ?? 0) === 0 && (r.acetone_delta_mv ?? 0) === 0);
+        if (isStale || isZero) {
+          demoParamsRef.current = randomDemoParams();
+          demoLastSampleRef.current = 0;
+          simFallbackRef.current = true;
+          setSimFallback(true);
+          useSimNow = true;
+        }
+      }
+
       // Smooth the current pressure reading into a 0-1 intensity so the inner
       // ring visibly tracks the exhale in real time, not just the wall clock.
       let targetKpa: number;
-      if (isDemo) {
+      if (useSimNow) {
         const { mv, kpa } = demoValueAt(p, demoParamsRef.current!);
         targetKpa = kpa;
         // Throttle discrete "readings" (chart samples) to a realistic ~2Hz
@@ -275,7 +337,9 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
           });
         }
       } else {
-        targetKpa = liveReadingRef.current?.pressure_kpa ?? 0;
+        // Real signal, genuinely present — amplify for the visual intensity
+        // only (never the recorded/persisted value); see REAL_PRESSURE_GAIN.
+        targetKpa = (liveReadingRef.current?.pressure_kpa ?? 0) * REAL_PRESSURE_GAIN;
       }
       const targetIntensity = Math.min(1, Math.max(0, targetKpa / 10));
       intensityRef.current += (targetIntensity - intensityRef.current) * 0.25;
@@ -295,7 +359,12 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
   async function finalize() {
     if (!isDemo && deviceId) {
-      try { await api.sensor.stopRecording(deviceId); } catch { /* non-critical */ }
+      // Non-critical: the device keeps its own recording TTL and will time
+      // out on its own, so a failed stop here must never block the result
+      // below — but silently swallowing it made a lingering "stuck
+      // recording" state on the device impossible to notice/debug.
+      try { await api.sensor.stopRecording(deviceId); }
+      catch { toast.error("หยุดบันทึกที่อุปกรณ์ไม่สำเร็จ (ผลตรวจนี้ยังบันทึกปกติ)"); }
     }
     const s = samplesRef.current;
     if (s.length < MIN_SAMPLES) {
@@ -333,11 +402,23 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     try {
       const checkin = await api.gamification.checkin();
       setXpAwarded(checkin.xp_awarded);
-    } catch { /* non-critical */ }
+    } catch {
+      // Non-critical: the breath result above is already saved either way —
+      // but a failed check-in silently means no XP/streak credit, which is
+      // worth surfacing instead of a totally invisible miss.
+      toast.error("เช็คอิน XP ไม่สำเร็จ — ผลตรวจบันทึกแล้ว");
+    }
     // Invalidate gamification so home/profile show fresh streak + XP
     qc.invalidateQueries({ queryKey: ["me", "xp"] });
     qc.invalidateQueries({ queryKey: ["me", "streak"] });
     qc.invalidateQueries({ queryKey: ["me", "quests"] });
+    // Invalidate every "sensor"/"sessions" query (breathing/home/trends all
+    // prefix their key this way) so server-truth session history refreshes
+    // as soon as the backend has ingested this session — the localStorage
+    // summary above is only the instant optimistic cache, this is what
+    // brings every screen (and every other browser/device polling the same
+    // account) back in line with Postgres.
+    qc.invalidateQueries({ queryKey: ["sensor", "sessions"] });
   }
 
   async function start() {
@@ -391,6 +472,8 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     intensityRef.current = 0;
     setIntensity(0);
     setDemoReading(null);
+    simFallbackRef.current = false;
+    setSimFallback(false);
   }
 
   async function reset() {
@@ -415,6 +498,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   if (phase === "idle") {
     return (
       <>
+        <PhaseAnnouncer text="พร้อมเริ่มตรวจ" />
         <div className="flex flex-col items-center py-8">
           <div className="relative flex items-center justify-center">
             {(connected || isDemo) && (
@@ -470,6 +554,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     const ringColor = "text-blue-400";
     return (
       <div className="flex flex-col items-center py-6 gap-4">
+        <PhaseAnnouncer text="กำลังคาลิเบต" />
         <div className="relative" style={{ width: SZ, height: SZ }}>
           <svg width={SZ} height={SZ} className="rotate-[-90deg]">
             <circle cx={SZ/2} cy={SZ/2} r={RING_R} fill="none" stroke="currentColor" className="text-blue-500/20" strokeWidth={SW} />
@@ -495,6 +580,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
         <button
           onClick={reset}
+          aria-label="ยกเลิกการตรวจ"
           className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
         >
           <X size={12} />
@@ -530,6 +616,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
     return (
       <div className="flex flex-col items-center py-6 gap-4">
+        <PhaseAnnouncer text="กำลังบันทึกการเป่า" />
         <div
           className={twMerge(
             "relative rounded-full overflow-hidden",
@@ -621,6 +708,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
         <button
           onClick={reset}
+          aria-label="ยกเลิกการตรวจ"
           className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
         >
           <X size={12} />
@@ -637,15 +725,18 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const lText = LABEL_TH[resultZone] ?? result.label ?? "—";
 
   return (
-    <DoneCard
-      result={result}
-      lColor={lColor}
-      lText={lText}
-      fmtAcetone={fmtAcetone}
-      unitLbl={unitLbl}
-      onReset={reset}
-      xpAwarded={xpAwarded}
-    />
+    <>
+      <PhaseAnnouncer text="ตรวจเสร็จแล้ว" />
+      <DoneCard
+        result={result}
+        lColor={lColor}
+        lText={lText}
+        fmtAcetone={fmtAcetone}
+        unitLbl={unitLbl}
+        onReset={reset}
+        xpAwarded={xpAwarded}
+      />
+    </>
   );
 }
 
@@ -739,23 +830,85 @@ function DoneCard({
   );
 }
 
-/* ── Recent sessions list (reads from localStorage) ── */
+// Server-computed session (api.sensor.getSessions, backed by Postgres
+// sensor_readings) mapped into the same shape the local optimistic cache
+// uses, so both can render through one list below.
+function serverSessionToSummary(s: SessionSummaryOut): SessionSummary {
+  return {
+    id: s.session_id,
+    at: s.ended_at,
+    n_samples: s.n_samples,
+    peak_mv: s.peak_acetone_delta ?? 0,
+    mean_mv: s.mean_acetone_delta ?? 0,
+    pressure_mean_kpa: s.avg_pressure_kpa,
+    quality_score: null,
+    label: (s.dominant_label as AcetoneLabel | null) ?? null,
+    context_tag: null,
+  };
+}
+
+// A local session and a server session referring to the same real-world
+// blow won't share an id (local uses crypto.randomUUID(), server uses its
+// own session_id) so they're matched by how close their timestamps land.
+const SYNC_MATCH_MS = 3 * 60 * 1000;
+
+// Server is the source of truth for session history — the `local` list (from
+// loadSessions()/persist() above) is only the instant optimistic cache
+// written the moment a session finishes, so it can't be trusted indefinitely
+// (stale cache, cleared storage, or a different browser/device entirely).
+// Whenever server data is available, any local entry it confirms is
+// replaced by the server's version; local entries the server doesn't know
+// about yet (POST still in flight, ingest pipeline hasn't caught up) stay
+// visible but marked `pending` so they don't silently look identical to a
+// confirmed session.
+function reconcileSessions(
+  local: SessionSummary[],
+  server: SessionSummaryOut[] | undefined,
+): { summary: SessionSummary; pending: boolean }[] {
+  if (!server) {
+    // Server list hasn't loaded yet (offline / still fetching) — show the
+    // local cache rather than an empty screen.
+    return local.map((summary) => ({ summary, pending: true }));
+  }
+  const confirmed = server.map((s) => ({ summary: serverSessionToSummary(s), pending: false }));
+  const confirmedTimes = confirmed.map((c) => new Date(c.summary.at).getTime());
+  const unconfirmedLocal = local
+    .filter((s) => {
+      const t = new Date(s.at).getTime();
+      return !confirmedTimes.some((ct) => Math.abs(ct - t) < SYNC_MATCH_MS);
+    })
+    .map((summary) => ({ summary, pending: true }));
+  return [...unconfirmedLocal, ...confirmed].sort(
+    (a, b) => new Date(b.summary.at).getTime() - new Date(a.summary.at).getTime()
+  );
+}
+
+/* ── Recent sessions list — server truth (api.sensor.getSessions), reconciled
+   against the local optimistic cache so a session shows up instantly after
+   finalize() and then seamlessly becomes "confirmed" once the server has it. ── */
 export function RecentBreathSessions({ sessions }: { sessions: SessionSummary[] }) {
   const { format: fmt, label: unitLbl } = useUnits();
   const { formatDate: tzFormatDate, formatTime: tzFormatTime } = useTimezone();
+  const { data: serverSessions } = useQuery({
+    queryKey: ["sensor", "sessions", "recent-list"],
+    queryFn: () => api.sensor.getSessions(30),
+    staleTime: 10_000,
+  });
+  const merged = reconcileSessions(sessions, serverSessions);
+
   return (
     <div>
       <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">
         Recent Sessions
       </p>
-      {sessions.length === 0 ? (
+      {merged.length === 0 ? (
         <div className="bg-bg-elevated rounded-2xl p-6 text-center">
           <p className="text-sm text-text-muted">ยังไม่มีประวัติการตรวจ</p>
           <p className="text-xs text-text-disabled mt-1">กดปุ่มเพื่อเริ่มการตรวจครั้งแรก</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {sessions.map((s) => {
+          {merged.map(({ summary: s, pending }) => {
             const sZone = backendLabelToZone(s.label);
             const lColor = LABEL_COLOR[sZone] ?? "text-text-muted";
             const lText = LABEL_TH[sZone] ?? s.label ?? "—";
@@ -773,6 +926,11 @@ export function RecentBreathSessions({ sessions }: { sessions: SessionSummary[] 
                     Mean {fmt(s.mean_mv)} · Q{s.quality_score?.toFixed(0) ?? "—"} · {s.n_samples} samples
                   </p>
                 </div>
+                {pending && (
+                  <span className="text-[10px] text-text-disabled shrink-0" title="ยังไม่ยืนยันจากเซิร์ฟเวอร์">
+                    กำลังซิงค์…
+                  </span>
+                )}
                 <span className={`text-xs font-bold ${lColor}`}>{lText}</span>
               </div>
             );

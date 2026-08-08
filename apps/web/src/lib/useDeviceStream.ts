@@ -76,8 +76,14 @@ export function useDeviceStream(userId: string | undefined): StreamState {
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
-    const url = `${getWsBase()}/ws/readings/${userId}?token=${encodeURIComponent(token)}`;
-    const ws = new WebSocket(url);
+    // Auth token travels via Sec-WebSocket-Protocol, not a URL query param —
+    // query params leak into reverse-proxy access logs, browser history, and
+    // Referer headers. The WebSocket constructor's second argument is sent
+    // as a real Sec-WebSocket-Protocol header. Server (ws.py) expects
+    // ["access_token", <jwt>] and echoes back the "access_token" marker
+    // (never the token) as the accepted subprotocol.
+    const url = `${getWsBase()}/ws/readings/${userId}`;
+    const ws = new WebSocket(url, ["access_token", token]);
     wsRef.current = ws;
 
     ws.onopen = () => {

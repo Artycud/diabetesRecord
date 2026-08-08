@@ -1,10 +1,8 @@
 """
-LLM Safety Guardrail for Cheewarun AI Coach.
+LLM Safety Guardrail for the MetaBreath AI Coach.
 
 Implements content filtering for medical advice, drug recommendations,
 and dangerous health claims. Required per NSC Judge #7 evaluation criteria.
-
-All AI responses must include the DISCLAIMER_TH footer.
 """
 from __future__ import annotations
 
