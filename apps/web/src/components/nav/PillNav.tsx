@@ -49,7 +49,7 @@ export function PillNav() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-2 px-4 py-3 bg-bg-primary/90 backdrop-blur-md border-b border-border-soft">
+    <header className="sticky top-0 z-40 flex items-center gap-2 px-4 py-3 bg-bg-primary/90 backdrop-blur-md border-b border-border-soft print:hidden">
       <nav
         className={twMerge(
           "flex flex-1 rounded-full p-1 gap-0.5",

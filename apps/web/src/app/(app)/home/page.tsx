@@ -14,6 +14,7 @@ import { LABEL_TH, backendLabelToZone } from "@/lib/riskLabel";
 import { TodayMetricCard } from "@/components/cards/TodayMetricCard";
 import { CategoryCard } from "@/components/cards/CategoryCard";
 import { TrendClassCard } from "@/components/cards/TrendClassCard";
+import { BaselineCard } from "@/components/cards/BaselineCard";
 import { InfoButton } from "@/components/ui/InfoButton";
 import { StatNumber } from "@/components/ui/StatNumber";
 import { Card } from "@/components/ui/card";
@@ -174,6 +175,10 @@ export default function HomePage() {
 
       {/* Long-term trend classifier (Phase 3 LSTM) */}
       {deviceId && <TrendClassCard deviceId={deviceId} sessions={14} />}
+
+      {/* Personal baseline — quick daily glance (Task D1); full detail + chart
+          overlay lives on /trends. */}
+      {deviceId && <BaselineCard deviceId={deviceId} />}
 
       {/* Quests — streak now lives in the greeting header, not duplicated here */}
       <Card padding="md" className="flex items-center gap-3">

@@ -406,8 +406,10 @@ export interface DeviceOut {
   simulate_pressure: boolean;
 }
 
+export type DailyStatGranularity = "day" | "week" | "month";
+
 export interface DailyStat {
-  date: string;            // YYYY-MM-DD
+  date: string;            // YYYY-MM-DD (or period start for week/month)
   count: number;
   avg_acetone_delta: number | null;  // mV
   max_acetone_delta: number | null;  // mV
@@ -415,6 +417,7 @@ export interface DailyStat {
   avg_temp_c: number | null;
   avg_humidity_pct: number | null;
   dominant_label: string | null;
+  granularity?: DailyStatGranularity;
 }
 
 export interface SessionSummaryOut {
@@ -462,6 +465,67 @@ export interface CalibrationReportOut {
   n_calibrations: number;
   latest_drift_score: number;
   needs_recalibration: boolean;
+}
+
+// ─── AI thresholds / interpretation ──────────────────
+export interface FiveClassThreshold {
+  label: string;                    // basal|light_ketosis|nutritional_ketosis|deep_ketosis|dka_risk
+  upper_bound_ppm: number | null;   // null for the open-ended top band (dka_risk)
+}
+
+export interface ThresholdsResponse {
+  anderson_five_class: FiveClassThreshold[];
+  anderson_reference: string;
+  metabolic_risk_index: Record<string, number | null>;
+  trend_labels: string[];
+  trend_min_sequence_length: number;
+  reliability_gate_threshold: number;
+  model_confidence_gate: number;
+}
+
+export interface InterpretResponse {
+  text: string;
+  refusal: boolean;
+  based_on: Record<string, unknown>;
+}
+
+// ─── Personal baseline / health report ───────────────
+export interface BaselineOut {
+  insufficient_data: boolean;
+  sample_count: number;
+  computed_from_days: number;
+  baseline_mean_mv: number | null;
+  baseline_mean_ppm: number | null;
+  baseline_range_mv: [number, number] | null;
+  baseline_range_ppm: [number, number] | null;
+  method: string;
+  device_id: string | null;
+}
+
+export interface ReportUser {
+  display_name: string | null;
+  assigned_doctor_id: string | null;
+}
+
+// `trend` mirrors TrendClassifyResponse's fields (classify_trend()'s return
+// shape) but is typed as `dict` server-side, so we reuse that shape here
+// rather than duplicating a slightly different interface.
+export interface SensorReportLifestyleSummary {
+  window_days: number;
+  meals: { ts: string; name: string; kcal: number | null; carbs_g: number | null }[];
+  activities: { ts: string; kind: string; duration_min: number; kcal: number | null }[];
+  weights: { ts: string; kg: number }[];
+  ketones: { ts: string; value_mmol: number | null; type: string }[];
+}
+
+export interface SensorReport {
+  generated_at: string;
+  device_id: string | null;
+  user: ReportUser;
+  baseline: BaselineOut;
+  trend: TrendClassifyResponse;
+  recent_sessions: SessionSummaryOut[];
+  lifestyle_summary: SensorReportLifestyleSummary;
 }
 
 // ─── AI ──────────────────────────────────────────────
@@ -689,10 +753,33 @@ export const api = {
       request<SensorReadingOut[]>(
         `/sensor/readings?device_id=${deviceId}&days=${days}${limit ? `&limit=${limit}` : ""}`
       ),
-    getDailyStats: (deviceId: string, days = 7) =>
-      request<DailyStat[]>(`/sensor/daily-stats?device_id=${deviceId}&days=${days}`),
+    getDailyStats: (deviceId: string, days = 7, granularity: DailyStatGranularity = "day") =>
+      request<DailyStat[]>(
+        `/sensor/daily-stats?device_id=${deviceId}&days=${days}&granularity=${granularity}`
+      ),
     getSessions: (days = 7) =>
       request<SessionSummaryOut[]>(`/sensor/sessions?days=${days}`),
+    getBaseline: (params?: { deviceId?: string; days?: number }) =>
+      request<BaselineOut>(
+        `/sensor/baseline?${[
+          params?.deviceId ? `device_id=${params.deviceId}` : null,
+          params?.days ? `days=${params.days}` : null,
+        ].filter(Boolean).join("&")}`
+      ),
+    getReport: (params?: {
+      deviceId?: string;
+      sessionDays?: number;
+      logDays?: number;
+      trendReadings?: number;
+    }) =>
+      request<SensorReport>(
+        `/sensor/report?${[
+          params?.deviceId ? `device_id=${params.deviceId}` : null,
+          params?.sessionDays ? `session_days=${params.sessionDays}` : null,
+          params?.logDays ? `log_days=${params.logDays}` : null,
+          params?.trendReadings ? `trend_readings=${params.trendReadings}` : null,
+        ].filter(Boolean).join("&")}`
+      ),
     calibrationReport: (deviceId: string) =>
       request<CalibrationReportOut>(`/sensor/device/${deviceId}/calibration/report`),
     calibrateDevice: (deviceId: string, data: {
@@ -751,6 +838,12 @@ export const api = {
   ai: {
     getTrend: (deviceId: string, days = 7) =>
       request<TrendResponse>(`/ai/trend?device_id=${deviceId}&days=${days}`),
+    getThresholds: () => request<ThresholdsResponse>("/ai/thresholds"),
+    interpret: (deviceId: string, time?: string) =>
+      request<InterpretResponse>("/ai/interpret", {
+        method: "POST",
+        body: JSON.stringify({ device_id: deviceId, time }),
+      }),
     classifyTrend: (deviceId: string, sessions = 14) =>
       request<TrendClassifyResponse>("/ai/predict/trend", {
         method: "POST",

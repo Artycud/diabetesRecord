@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Palette, Globe, LogOut, ChevronRight, Ruler,
-  Flame, Trophy, Star, Shield, FlaskConical, Radar,
+  Flame, Trophy, Star, Shield, FlaskConical, Radar, FileText,
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
 import { useDemoMode } from "@/lib/demoMode";
@@ -175,6 +175,19 @@ export default function MePage() {
               <ChevronRight size={14} className="text-text-disabled" />
             </Link>
           )}
+
+          {/* Health report (Task D3) — printable summary pulling trend,
+              baseline, session history, and lifestyle logs into one page. */}
+          <Link href="/me/report" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
+            <div className="h-8 w-8 rounded-lg bg-mint-500/20 flex items-center justify-center">
+              <FileText size={15} className="text-mint-500" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm text-text-primary font-medium">{t("report.linkLabel")}</p>
+              <p className="text-[11px] text-text-muted truncate">{t("report.linkSub")}</p>
+            </div>
+            <ChevronRight size={14} className="text-text-disabled shrink-0" />
+          </Link>
 
           {/* Language toggle */}
           <button

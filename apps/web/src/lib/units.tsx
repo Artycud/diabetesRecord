@@ -13,7 +13,10 @@ const MV_PER_MMOL = 20.0;
 // mV → ppm: linear fit to TGS1820 datasheet Rs/Ro curve at breath-relevant range
 //   30 mV boundary ≈ 3 ppm (low→moderate)
 //   80 mV boundary ≈ 8 ppm (moderate→high)
-const MV_PER_PPM = 10.0;
+// Exported so callers that need to go the other way (e.g. converting the
+// Anderson five-class ppm boundaries from GET /ai/thresholds into mV for a
+// chart reference line) can reuse the same fixed ratio instead of redefining it.
+export const MV_PER_PPM = 10.0;
 
 export function convertFromMv(mv: number, to: AcetoneUnit): number {
   // Concentrations are non-negative in the physical world; small negatives

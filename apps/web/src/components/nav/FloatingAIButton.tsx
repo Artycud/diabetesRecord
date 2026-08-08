@@ -45,7 +45,7 @@ export function FloatingAIButton() {
       <button
         aria-label="AI Coach"
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full bg-mint-500 text-white flex items-center justify-center shadow-lg shadow-mint-500/30 hover:bg-mint-400 transition-colors"
+        className="fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full bg-mint-500 text-white flex items-center justify-center shadow-lg shadow-mint-500/30 hover:bg-mint-400 transition-colors print:hidden"
       >
         <Bot size={24} strokeWidth={1.6} />
       </button>
@@ -53,8 +53,8 @@ export function FloatingAIButton() {
       {/* Bottom sheet */}
       {open && (
         <>
-          <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setOpen(false)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-bg-elevated rounded-t-3xl max-h-[80vh]">
+          <div className="fixed inset-0 z-50 bg-black/60 print:hidden" onClick={() => setOpen(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-bg-elevated rounded-t-3xl max-h-[80vh] print:hidden">
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 rounded-full bg-border-strong" />
