@@ -8,7 +8,7 @@ import { useT } from "@/lib/i18n";
 import { useDeviceStream } from "@/lib/useDeviceStream";
 import { parseServerTime } from "@/lib/time";
 import { useUnits } from "@/lib/units";
-import { AcetoneRing } from "@/components/cards/AcetoneRing";
+import { AcetoneTrendChart } from "@/components/cards/AcetoneTrendChart";
 import { flexScoreStyle } from "@/lib/riskLabel";
 import { TodayMetricCard } from "@/components/cards/TodayMetricCard";
 import { CategoryCard } from "@/components/cards/CategoryCard";
@@ -68,9 +68,6 @@ export default function HomePage() {
   const dateLocale = locale === "th" ? "th-TH" : "en-US";
   const dateStr = new Date().toLocaleDateString(dateLocale, { weekday: "short", day: "numeric", month: "short" });
 
-  const heroValue = today?.max_acetone_delta ?? liveReading?.acetone_delta_mv ?? null;
-  const heroLabel = today?.dominant_label ?? liveReading?.label ?? null;
-
   const questDone  = quests?.filter((q) => q.completed_at).length ?? 0;
   const questTotal = quests?.length ?? 0;
   const breathQuest = quests?.find((q) => q.code === "daily_breath_check");
@@ -103,9 +100,9 @@ export default function HomePage() {
           here, with its full breakdown living on /trends. */}
       <Card padding="lg" className="flex flex-col items-center gap-3 relative">
         <div className="absolute top-3 right-3">
-          <InfoButton title="Breath Acetone · สูงสุดวันนี้" ariaLabel="รายละเอียด Breath Acetone">
+          <InfoButton title="Breath Acetone" ariaLabel="รายละเอียด Breath Acetone">
             <p>
-              ค่า <b>breath acetone สูงสุด</b> ที่วัดได้ใน <b>วันนี้</b> (00:00 – 23:59 ตาม timezone ที่ตั้ง)
+              แนวโน้ม <b>breath acetone</b> ของวันนี้ (หรือช่วงล่าสุดที่มีข้อมูล ถ้าวันนี้ยังไม่ได้ตรวจ)
             </p>
             <p className="text-text-muted">
               acetone คือสารระเหยที่ร่างกายผลิตเมื่อเผาไขมัน — ยิ่งสูง ยิ่งอยู่ในสถานะ ketosis
@@ -126,9 +123,9 @@ export default function HomePage() {
           </InfoButton>
         </div>
         <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">
-          BREATH ACETONE · สูงสุดวันนี้
+          BREATH ACETONE
         </p>
-        <AcetoneRing value={heroValue} label={heroLabel} size={216} />
+        <AcetoneTrendChart deviceId={deviceId} />
         <div className="flex items-center gap-2">
           <div className={`h-2 w-2 rounded-full ${liveConnected ? "bg-mint-500 animate-pulse" : "bg-text-disabled"}`} />
           <span className="text-xs text-text-muted">
