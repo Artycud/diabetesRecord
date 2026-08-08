@@ -8,7 +8,6 @@ import { useT } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { useThemeConfig } from "@/components/theme/ThemeProvider";
 import { StreakChip } from "@/components/StreakChip";
-import { PlusMenu } from "./PlusMenu";
 
 interface NavItem {
   href: string;
@@ -82,7 +81,6 @@ export function PillNav() {
           <StreakChip current={streak.current} compact />
         </Link>
       )}
-      <PlusMenu />
     </header>
   );
 }

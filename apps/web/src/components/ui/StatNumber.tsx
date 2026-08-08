@@ -9,6 +9,7 @@ const SIZES = {
   md: "text-2xl",
   lg: "text-3xl",
   xl: "text-4xl",
+  hero: "text-5xl",
 } as const;
 
 interface StatNumberProps extends Omit<HTMLAttributes<HTMLSpanElement>, "children"> {

@@ -30,8 +30,18 @@ const cardVariants = cva("rounded-2xl transition-[box-shadow,background-color] d
       // text/icons, not just its backdrop, and was removed.
       liquidGlass: "liquid-glass",
     },
+    // Hierarchy axis, independent of `appearance` (the visual skin) and
+    // `padding`. Lets a page mark exactly one section as the hero and demote
+    // low-priority content to bare rows instead of every section getting
+    // identical card chrome. Defaults to "raised" (today's look) so pages
+    // that don't opt in are visually unchanged.
+    tier: {
+      hero: "rounded-[28px] ring-1 ring-mint-500/15 shadow-lg",
+      raised: "",
+      flat: "shadow-none border-0 bg-transparent",
+    },
   },
-  defaultVariants: { padding: "none", appearance: "neumorphic" },
+  defaultVariants: { padding: "none", appearance: "neumorphic", tier: "raised" },
 });
 
 export interface CardProps
@@ -41,12 +51,12 @@ export interface CardProps
   forceAppearance?: "neumorphic" | "liquidGlass" | "flat";
 }
 
-export function Card({ className, padding, forceAppearance, ...props }: CardProps) {
+export function Card({ className, padding, tier, forceAppearance, ...props }: CardProps) {
   const { cardStyle } = useThemeConfig();
   const appearance = forceAppearance ?? cardStyle;
   return (
     <div
-      className={twMerge(cardVariants({ padding, appearance }), className)}
+      className={twMerge(cardVariants({ padding, appearance, tier }), className)}
       {...props}
     />
   );

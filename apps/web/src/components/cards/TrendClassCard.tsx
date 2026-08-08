@@ -49,6 +49,10 @@ interface Props {
   deviceId: string | undefined;
   sessions?: number;   // how many recent sessions to consider (default 14)
   className?: string;
+  /** Render just the inner content, no outer Card — for composing into a
+   *  shared wrapper card alongside other modules (e.g. Home's combined
+   *  trend+baseline module). Trends keeps the default (own Card). */
+  bare?: boolean;
 }
 
 type TrendStyle = {
@@ -86,7 +90,7 @@ const UNKNOWN_STYLE: TrendStyle = {
   accent: "bg-muted/40 text-muted",
 };
 
-export function TrendClassCard({ deviceId, sessions = 14, className }: Props) {
+export function TrendClassCard({ deviceId, sessions = 14, className, bare = false }: Props) {
   const { t } = useT();
 
   const { data, isLoading, isError } = useQuery({
@@ -98,40 +102,50 @@ export function TrendClassCard({ deviceId, sessions = 14, className }: Props) {
   });
 
   if (!deviceId || isLoading) {
+    const skeleton = (
+      <div className={twMerge("animate-pulse", bare ? className : undefined)}>
+        <div className="h-4 w-24 rounded bg-muted/30" />
+        <div className="mt-3 h-10 w-40 rounded bg-muted/20" />
+        <div className="mt-4 h-3 w-full rounded bg-muted/10" />
+      </div>
+    );
+    if (bare) return skeleton;
     return (
       <Card className={twMerge("animate-pulse", className)}>
-        <CardContent>
-          <div className="h-4 w-24 rounded bg-muted/30" />
-          <div className="mt-3 h-10 w-40 rounded bg-muted/20" />
-          <div className="mt-4 h-3 w-full rounded bg-muted/10" />
-        </CardContent>
+        <CardContent>{skeleton}</CardContent>
       </Card>
     );
   }
 
   if (isError || !data) {
+    const content = (
+      <div className={bare ? className : undefined}>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-muted">{t("trendClass.title")}</p>
+          <TrendInfo />
+        </div>
+        <p className="mt-2 text-sm text-fg">{t("trendClass.unknown")}</p>
+      </div>
+    );
+    if (bare) return content;
     return (
       <Card className={className}>
-        <CardContent>
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm text-muted">{t("trendClass.title")}</p>
-            <TrendInfo />
-          </div>
-          <p className="mt-2 text-sm text-fg">{t("trendClass.unknown")}</p>
-        </CardContent>
+        <CardContent>{content}</CardContent>
       </Card>
     );
   }
 
-  return <TrendClassCardBody data={data} className={className} />;
+  return <TrendClassCardBody data={data} className={className} bare={bare} />;
 }
 
 function TrendClassCardBody({
   data,
   className,
+  bare = false,
 }: {
   data: TrendClassifyResponse;
   className?: string;
+  bare?: boolean;
 }) {
   const { t } = useT();
 
@@ -152,6 +166,30 @@ function TrendClassCardBody({
         : t("trendClass.modelFallback");
 
   const lowConfidence = !insufficient && data.confidence < 0.6;
+
+  if (bare) {
+    // Compact glance row (Home) — icon, label, value, confidence badge only.
+    // Full description/based-on/disclaimer text stays on Trends where the
+    // detail is actually being read, not just glanced at.
+    return (
+      <div className={twMerge("flex items-center gap-3", className)}>
+        <div className={twMerge("flex h-9 w-9 items-center justify-center rounded-xl shrink-0", style.ring)}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs uppercase tracking-wide text-muted">{t("trendClass.title")}</p>
+          <p className="text-sm font-semibold text-fg truncate">
+            {insufficient ? t("trendClass.unknown") : t(`trendClass.${trend}`)}
+          </p>
+        </div>
+        {!insufficient && (
+          <Badge className={twMerge("border-0 shrink-0", style.accent)}>
+            {Math.round(data.confidence * 100)}%
+          </Badge>
+        )}
+      </div>
+    );
+  }
 
   return (
     <Card className={className}>
