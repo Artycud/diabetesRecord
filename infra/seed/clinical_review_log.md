@@ -1,4 +1,4 @@
-# Clinical Review Log — Cheewarun AI Responses
+# Clinical Review Log — MetaBreath AI Responses
 
 All AI-generated content that touches medical interpretation must be logged here
 before being used in NSC demo or pilot study materials.

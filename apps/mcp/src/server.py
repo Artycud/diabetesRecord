@@ -1,5 +1,5 @@
 """
-Cheewarun MCP Server
+MetaBreath MCP Server
 
 Implements Model Context Protocol for AI coach integration.
 Tools allow Claude to read sensor data, log health events,
@@ -39,10 +39,10 @@ except ImportError:
         def list_prompts(self): return lambda f: f
         def get_prompt(self): return lambda f: f
 
-API_BASE = os.getenv("CHEEWARUN_API_URL", "http://localhost:8000")
-API_TOKEN = os.getenv("CHEEWARUN_API_TOKEN", "")
+API_BASE = os.getenv("METABREATH_API_URL", "http://localhost:8000")
+API_TOKEN = os.getenv("METABREATH_API_TOKEN", "")
 
-server = Server("cheewarun-mcp")
+server = Server("metabreath-mcp")
 
 
 def _headers():
@@ -231,13 +231,13 @@ async def call_tool(name: str, arguments: dict) -> CallToolResult:
 async def list_resources() -> ListResourcesResult:
     return ListResourcesResult(resources=[
         Resource(
-            uri="cheewarun://reference/acetone-ranges",
+            uri="metabreath://reference/acetone-ranges",
             name="MetaBreath Acetone Reference Ranges",
             description="Acetone ppm thresholds and their metabolic meaning",
             mimeType="application/json",
         ),
         Resource(
-            uri="cheewarun://reference/tgs1820-datasheet",
+            uri="metabreath://reference/tgs1820-datasheet",
             name="TGS1820 Sensor Characteristics",
             description="TGS1820 sensor specs, cross-sensitivity, drift characteristics",
             mimeType="application/json",
@@ -247,7 +247,7 @@ async def list_resources() -> ListResourcesResult:
 
 @server.read_resource()
 async def read_resource(uri: str) -> ReadResourceResult:
-    if uri == "cheewarun://reference/acetone-ranges":
+    if uri == "metabreath://reference/acetone-ranges":
         data = {
             "ranges": [
                 {"label": "healthy", "min_ppm": 0.3, "max_ppm": 0.9, "description": "Normal metabolic state"},
@@ -258,7 +258,7 @@ async def read_resource(uri: str) -> ReadResourceResult:
             "sensor": "MetaBreath TGS1820",
             "measurement": "acetone_delta = breath_voc - ambient_voc",
         }
-    elif uri == "cheewarun://reference/tgs1820-datasheet":
+    elif uri == "metabreath://reference/tgs1820-datasheet":
         data = {
             "sensor": "TGS1820",
             "manufacturer": "Figaro Engineering",
@@ -310,7 +310,7 @@ async def get_prompt(name: str, arguments: dict) -> GetPromptResult:
         prompt_text = (
             f"ใช้เครื่องมือ get_recent_readings (device_id={device_id}) "
             "เพื่อดึงข้อมูล sensor readings ล่าสุด แล้ววิเคราะห์สถานะ metabolic ของผู้ใช้ "
-            "โดยอ้างอิงจาก reference ranges ใน cheewarun://reference/acetone-ranges "
+            "โดยอ้างอิงจาก reference ranges ใน metabreath://reference/acetone-ranges "
             "และให้คำแนะนำ 2–3 ข้อ ปิดท้ายด้วย disclaimer"
         )
     elif name == "daily_coaching_message":
@@ -325,7 +325,7 @@ async def get_prompt(name: str, arguments: dict) -> GetPromptResult:
         prompt_text = f"Unknown prompt: {name}"
 
     return GetPromptResult(
-        description=f"Cheewarun prompt: {name}",
+        description=f"MetaBreath prompt: {name}",
         messages=[PromptMessage(role="user", content=TextContent(type="text", text=prompt_text))],
     )
 
@@ -338,7 +338,7 @@ async def main():
         return
 
     options = InitializationOptions(
-        server_name="cheewarun-mcp",
+        server_name="metabreath-mcp",
         server_version="1.0.0",
         capabilities=server.get_capabilities(
             notification_options=None,

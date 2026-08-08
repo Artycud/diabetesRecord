@@ -234,7 +234,7 @@ def sect_cover(S, meta):
         sp(1.5),
         hr(C_PRIMARY, 2),
         sp(0.4),
-        Paragraph("NSC 2026 — Cheewarun Health Platform",
+        Paragraph("NSC 2026 — MetaBreath Health Platform",
                   S["cover_meta"]),
         Paragraph(f"Report generated: {meta['date']}", S["cover_meta"]),
         Paragraph("Report version: 2.0  |  Deadline: 2026-07-17",
@@ -739,7 +739,7 @@ def main():
         leftMargin=2.2 * cm, rightMargin=2.2 * cm,
         topMargin=2.0 * cm, bottomMargin=2.0 * cm,
         title="MetaBreath AI — Test Report",
-        author="MetaBreath / Cheewarun Research Team",
+        author="MetaBreath / MetaBreath Research Team",
     )
 
     story = []

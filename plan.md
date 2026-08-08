@@ -1,4 +1,4 @@
-# แผนพัฒนา AI Pipeline — MetaBreath / Cheewarun
+# แผนพัฒนา AI Pipeline — MetaBreath
 
 > **Owner**: Pranai
 > **สร้าง**: 2026-07-12

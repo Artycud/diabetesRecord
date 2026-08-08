@@ -740,3 +740,47 @@ Ro (baseline resistance) ของ TGS1820 ต้องวัดใน "clean ai
 - ตอนนี้ admin มีทั้ง **Spearman** (ความสัมพันธ์) และ **Bland-Altman** (ความตรง) คู่กัน ตามที่กรรมการ biomedical คาดหวัง
 
 **ตรวจความเข้ากันได้ firmware ↔ ระบบ (ผ่าน):** payload keys (`sensor_voltage`, `baseline_voltage`, `acetone_delta_mv`, `pressure_kpa`, `temperature`, `humidity`), topic `metabreath/{device_id}/reading`, และเกณฑ์ classify 5/30/80 mV ตรงกันทั้งสองฝั่ง — เวอร์ชัน serial-only ที่ใช้ทดสอบ bench เป็นโค้ดวัดชุดเดียวกับ `metabreath.ino` เป๊ะ ต่างแค่ไม่มี network layer
+
+---
+
+## Reconciliation Status (added 2026-08-08)
+
+Re-audited all 31 bugs against the current codebase (`git log --oneline -60` + direct read of current source). Original bug descriptions above are left untouched as a paper trail — this section only records present-day status.
+
+**Major architectural note:** since this audit was written, ESP32 provisioning was redesigned entirely. Firmware dropped BLE GATT pairing and now boots into a `MetaBreath-Setup-<MAC>` WiFiManager captive-portal AP; MQTT broker/user/pass are compiled directly into firmware via `#define`; device identity = the device's own MAC address, entered by the user into the web app (`/me/device/add`) rather than transferred over BLE. `apps/firmware/metabreath/metabreath.ino` now contains **zero BLE code** (no `BLEDevice.h`, no GATT service, no HTTP client). This means most of the 14 `BUG-A*` BLE bugs are moot rather than literally "fixed" — the vulnerable subsystem was replaced, not patched. The old `/me/device/pair` BLE web flow still exists in the app and several of its own JS-side bugs (A9 disconnect handling, A10 timeout, A11 chunking/EOF) were genuinely fixed in that code — but the page is unreachable/non-functional in practice since no current firmware advertises that BLE service.
+
+| Bug ID | Status | Evidence/Note |
+|---|---|---|
+| BUG-1 | FIXED | `mqtt_subscriber.py` uses `aiomqtt.Client`; `requirements.txt` pins `aiomqtt==2.3.0` + `paho-mqtt>=2.0.0,<3`. |
+| BUG-2 | FIXED | `useDeviceStream.ts` builds `${getWsBase()}/ws/readings/${userId}` (single `/ws`); `ws.py` route is `/ws/readings/{user_id}`. Auth also upgraded from `?token=` query param to `Sec-WebSocket-Protocol` header (separate, more recent hardening, in progress alongside this audit). |
+| BUG-3 | PARTIALLY FIXED | `docker-compose.yml` mqtt service now binds `0.0.0.0:1883:1883` (was `127.0.0.1`-only) — docker half fixed. Actual VPS `ufw` firewall rule can't be verified from the repo. |
+| BUG-4 | FIXED | `config.py` / `sensor.py` `MQTT_BROKER_PUBLIC` default changed `"localhost"` → `"metabreath.duckdns.org"`. Also moot: new firmware hardcodes `#define MQTT_BROKER "metabreath.duckdns.org"` directly, no longer depends on the pair response. |
+| BUG-5 | PARTIALLY FIXED | `mqtt_subscriber.py` now reads `MQTT_PASSWORD = os.getenv("MQTT_PASSWORD") or os.getenv("MQTT_PASS", "")`, fixing the var-name mismatch in code. `.env.example` still ships a stale `MQTT_USER=cheewarun_server` not present in `infra/mosquitto/acl` (only `esp32`/`api`/`admin` defined there) — a fresh deploy from the template would still break. Real production `.env` value: NEEDS LIVE-SYSTEM CHECK. |
+| BUG-6 | FIXED | `DevicePairResponse` in `sensor.py` now has an `mqtt_pass` field populated from `MQTT_ESP32_PASS`. Also moot: current firmware hardcodes a real MQTT password directly (`#define MQTT_PASS "..."`) — no BLE/NVS mqtt_pass handoff exists anymore. |
+| BUG-7 | FIXED | `docker-compose.yml` mqtt-sub healthcheck now checks heartbeat-file mtime (`< 60s` staleness), backed by `mqtt_subscriber.py`'s heartbeat loop — matches commit `cc607bf` era fixes. |
+| BUG-8 | NEEDS LIVE-SYSTEM CHECK | Code defaults (`config.py`) and `.env.example` no longer literally say "CHANGEME" (now a clear placeholder pattern), but the actual production `.env` secret value can't be verified from the repo — `.env` is correctly gitignored. Recommend confirming rotation happened on the VPS. |
+| BUG-9 | NEEDS LIVE-SYSTEM CHECK | `main.py` still gates `/api/docs` on `APP_ENV != "production"`; `.env.example` says `APP_ENV=production`. Actual value on the live VPS `.env` can't be verified from the repo. |
+| BUG-10 | FIXED (moot) | Current firmware makes no HTTP calls at all — no `HTTPClient`/`API_BASE_URL` in `metabreath.ino`. Pairing now happens from the authenticated web app, not the ESP32, so the HTTP→HTTPS redirect failure mode no longer exists. |
+| BUG-11 | FIXED | `config.py`'s `CORS_ORIGINS` is now a computed field that tries `json.loads()` for `[`-prefixed values, else falls back to comma-split — robust regardless of Pydantic version quirks. |
+| BUG-12 | PARTIALLY FIXED | The exact placeholder linear ADC→"ppm" formula from the original audit is gone. No Rs/Ro log-log datasheet conversion was implemented either — firmware now uses raw voltage delta (mV) against fixed empirical classification thresholds (5/30/80 mV) instead. Deliberate architecture pivot away from ppm (see the `Fix Log` section above re: `breath_acetone_to_mmol_estimate()`), not the originally-requested datasheet-based fix. |
+| BUG-13 | FIXED | `metabreath.ino`'s `readSHT31()` does real I2C reads (0x44) for temperature/humidity; payload sends `NAN` only on sensor failure, not hardcoded 0. |
+| BUG-14 | PARTIALLY FIXED | Pressure sensing is now fully implemented (tare/EMA/hysteresis blow detection, real non-zero `pressure_kpa`). `breath_duration` and `pressure_std` are still never computed — both `mqtt_subscriber.py` and `sensor.py` hardcode them to `None`, so `signal_processing.pressure_normalize()` still skips that branch. |
+| BUG-15 | FIXED | `docker-compose.yml` mosquitto healthcheck now correctly double-dollar-escapes: `-t '$$SYS/healthcheck'`. |
+| BUG-16 | STILL OPEN | The calibrate page (`/me/device/[id]/calibrate/page.tsx`) still only stores `ambient_voc`/`baseline_voc` (a voltage baseline), no Ro concept — though this is somewhat obsoleted by the same BUG-12 architecture pivot away from Rs/Ro. |
+| BUG-17 | FIXED | `metabreath.ino`'s MQTT client ID is now `"metabreath-" + deviceId` using the full 12-hex-char MAC (not an 8-char UUID prefix) — effectively globally unique. |
+| BUG-A1 | STILL OPEN (moot) | Firmware has no BLE stack at all now, so the MTU/reassembly bug can't manifest — not because it was fixed, but because BLE provisioning was dropped entirely. The dead `pair/page.tsx` does implement correct chunking+EOF client-side, but there's no firmware BLE service left to receive it. |
+| BUG-A2 | FIXED (redesigned) | `add/page.tsx` still calls `pairDevice()` directly with no BLE, but this is now intentional — firmware self-identifies by its own MAC regardless of DB registration order, so there's no true "orphan" device anymore. |
+| BUG-A3 | FIXED | Fake "Searching for devices…" spinner removed; `add/page.tsx` now shows a real MAC-entry flow. |
+| BUG-A4 | FIXED | QR-scan placeholder removed entirely from `add/page.tsx`. |
+| BUG-A5 | FIXED (moot) | No more manual BLE-field race condition — WiFi credentials are now collected entirely by WiFiManager's own captive-portal form before `autoConnect()` proceeds. |
+| BUG-A6 | FIXED | WiFiManager's `autoConnect()` auto-falls-back into captive-portal AP mode on connect failure (bounded timeouts), rather than restart-looping forever. |
+| BUG-A7 | FIXED (different mechanism) | No physical reset button, but a remote user-accessible reset exists: `POST /sensor/device/{id}/reset-wifi` publishes an MQTT command the firmware handles by clearing NVS and restarting into provisioning mode. |
+| BUG-A8 | FIXED (moot) | No BLE surface exists to sniff anymore. Note: WiFi credentials now go over WiFiManager's own open HTTP captive-portal AP — a different but comparable local-range exposure window, worth flagging separately from the original BLE-specific bug. |
+| BUG-A9 | FIXED | `pair/page.tsx` implements `gattserverdisconnected` handling with a Thai error message. (Dead code path per BUG-A1 note — firmware has no BLE service anymore.) |
+| BUG-A10 | FIXED | `pair/page.tsx` has a 60s waiting-state timeout that flips to an error state. (Same dead-code caveat as BUG-A9.) |
+| BUG-A11 | PARTIALLY FIXED | `pair/page.tsx` implements a correct EOF-marker + chunked-write protocol client-side, but firmware has no BLE reassembly logic to pair with it (no BLE at all), so it can't be exercised end-to-end. |
+| BUG-A12 | FIXED (moot) | Current `add/page.tsx` no longer calls `useSearchParams()` at all — the hook was removed, sidestepping the missing-Suspense issue. |
+| BUG-A13 | STILL OPEN | `add/page.tsx` still has no link/button to `/me/device/pair` — though low real-world impact since that BLE page is non-functional against current firmware anyway. |
+| BUG-A14 | FIXED (moot) | No BLE UUID/name-prefix filtering used in the live flow anymore — device identity is the real MAC address, inherently unique per device, sidestepping the original collision concern. Legacy UUIDs remain hardcoded in the dead `pair/page.tsx` only. |
+
+**Summary:** 21 FIXED (10 of BUG-1..17, 11 of BUG-A1..A14 — several of the latter "fixed by architecture replacement" rather than by patching the original mechanism), 5 PARTIALLY FIXED, 3 STILL OPEN (BUG-16, BUG-A1, BUG-A13), 2 NEEDS LIVE-SYSTEM CHECK (BUG-8 JWT secret rotation, BUG-9 `APP_ENV` on the VPS — both require checking the actual production `.env`, not just the repo).

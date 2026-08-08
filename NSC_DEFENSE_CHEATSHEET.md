@@ -1,5 +1,5 @@
 # NSC 2026 Defense — Q&A Cheat Sheet
-> **สำหรับ**: MetaBreath AI Pipeline — Cheewarun Health Platform
+> **สำหรับ**: MetaBreath AI Pipeline — MetaBreath Health Platform
 > **สร้าง**: 2026-07-12
 > **ใช้เพื่อ**: เตรียมตอบคำถามกรรมการวันซ้อม/วันจริง
 > **หลักการ**: ตอบตรง สั้น มีเลข อ้าง section ในรายงาน (`MetaBreath_AI_Technical_Report_NSC2026.pdf`)

@@ -1,5 +1,5 @@
 """
-สร้างรายงาน MCP (Model Context Protocol) — Cheewarun Health Platform
+สร้างรายงาน MCP (Model Context Protocol) — MetaBreath Health Platform
 เชื่อมโยงกับ SmartBreath LSTM Training Data
 """
 from docx import Document
@@ -202,7 +202,7 @@ def build(out_path: str):
     SP(doc, 1.5)
     cov = doc.add_paragraph()
     cov.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    rn(cov, "รายงาน Model Context Protocol (MCP)\nCheewarun Health Platform",
+    rn(cov, "รายงาน Model Context Protocol (MCP)\nMetaBreath Health Platform",
        bold=True, size=20, color=C_NAVY)
 
     p2 = doc.add_paragraph()
@@ -222,7 +222,7 @@ def build(out_path: str):
     ap.paragraph_format.space_after  = Pt(8)
     rn(ap, "บทคัดย่อ\n", bold=True, size=11, color=C_NAVY)
     rn(ap,
-       "รายงานนี้บันทึกสถาปัตยกรรม Model Context Protocol (MCP) ของ Cheewarun "
+       "รายงานนี้บันทึกสถาปัตยกรรม Model Context Protocol (MCP) ของ MetaBreath "
        "ซึ่งเป็นชั้น middleware ที่เชื่อม Claude AI Coach กับข้อมูลสุขภาพจริงของผู้ใช้ "
        "ครอบคลุม Schema of Context, Data Contract, Tool/Interface, Reasoning Flow "
        "และ Guardrail/Prompt Template ทั้งหมด "
@@ -240,7 +240,7 @@ def build(out_path: str):
        "แทนที่จะให้ผู้ใช้ copy-paste ข้อมูลเข้าไปเอง MCP จะทำให้ AI สามารถ:")
     for item in [
         "อ่านข้อมูล sensor readings จาก MetaBreath โดยตรง",
-        "เรียก API endpoint ของ Cheewarun backend เพื่อดึงแนวโน้มและการพยากรณ์",
+        "เรียก API endpoint ของ MetaBreath backend เพื่อดึงแนวโน้มและการพยากรณ์",
         "บันทึกข้อมูลมื้ออาหาร กิจกรรม และ calibration",
         "อ้างอิง reference range ของ TGS1820 และ Anderson 2015 เป็น Resource",
     ]:
@@ -250,7 +250,7 @@ def build(out_path: str):
         rn(p, item, size=10.5)
 
     BD(doc,
-       "ใน Cheewarun, MCP server ชื่อ cheewarun-mcp ทำงานเป็น stdio process "
+       "ใน MetaBreath, MCP server ชื่อ metabreath-mcp ทำงานเป็น stdio process "
        "รับคำสั่งจาก Claude Desktop และส่งผ่านมายัง FastAPI backend (port 8000) "
        "ผ่าน HTTP/JSON ที่มี Bearer Token authentication")
 
@@ -263,7 +263,7 @@ def build(out_path: str):
         "                                                        ↓\n"
         "                               Claude AI (ผ่าน Claude Desktop หรือ /ai/chat)\n"
         "                                                        ↓\n"
-        "                              Cheewarun Web App (แสดงผลผู้ใช้)\n"
+        "                              MetaBreath Web App (แสดงผลผู้ใช้)\n"
         "\nSmartBreath LSTM Training Data → LSTM Model (lstm_model.pt) → /ai/predict/lstm endpoint → MCP Tool")
 
     doc.add_page_break()
@@ -312,9 +312,9 @@ def build(out_path: str):
         ],
         widths=[4.5, 1.5, 5.5, 4.5])
 
-    H2(doc, "2.4 การนำข้อมูลเข้าสู่ Pipeline LSTM ของ Cheewarun")
+    H2(doc, "2.4 การนำข้อมูลเข้าสู่ Pipeline LSTM ของ MetaBreath")
     BD(doc,
-       "LSTM ของ Cheewarun ใช้ SmartBreath เป็น pretraining dataset "
+       "LSTM ของ MetaBreath ใช้ SmartBreath เป็น pretraining dataset "
        "เพื่อให้โมเดลเรียนรู้ pattern การตอบสนองของเซนเซอร์ MOS/SnO₂ ต่ออะซีโตน "
        "ก่อนที่จะ fine-tune ด้วยข้อมูลจาก MetaBreath TGS1820 จริง")
     tbl(doc,
@@ -359,7 +359,7 @@ def build(out_path: str):
              "MCP Tool: get_metabolic_trend → /ai/trend"],
             ["C4", "Reference Context",
              "acetone-ranges (Anderson 2015), TGS1820 datasheet specs",
-             "MCP Resource: cheewarun://reference/*"],
+             "MCP Resource: metabreath://reference/*"],
         ],
         widths=[0.8, 3.5, 6.2, 5.5])
 
@@ -508,11 +508,11 @@ def build(out_path: str):
     tbl(doc,
         ["URI", "ชื่อ", "เนื้อหา", "Claude ใช้เมื่อ"],
         [
-            ["cheewarun://reference/acetone-ranges",
+            ["metabreath://reference/acetone-ranges",
              "MetaBreath Acetone Reference Ranges",
              "4 class ranges: healthy (0.3–0.9), fat_burning (1–5),\nketosis (5–40), diabetes_risk (>75) ppm\nพร้อม measurement formula",
              "ก่อนอธิบายค่า ppm ให้ผู้ใช้ ต้องการ context ว่า range นี้หมายความว่าอะไร"],
-            ["cheewarun://reference/tgs1820-datasheet",
+            ["metabreath://reference/tgs1820-datasheet",
              "TGS1820 Sensor Characteristics",
              "cross-sensitivity (Ethanol ~30%, H₂ ~15%),\noperating range (20–60°C, 10–95%RH),\ndrift characteristics (~0.2–0.5 ppm/month),\nLoD typical 0.01 ppm",
              "เมื่อผู้ใช้ถามว่าเซนเซอร์แม่นแค่ไหน หรือทำไมค่าถึงผันผวน"],
@@ -529,7 +529,7 @@ def build(out_path: str):
 
     H2(doc, "7.1 Flow Diagram (ข้อความ)")
     info_box(doc,
-        "Reasoning Flow — Cheewarun AI Coach",
+        "Reasoning Flow — MetaBreath AI Coach",
         "ผู้ใช้ถาม: \"ค่าของฉันเป็นยังไงบ้างตอนนี้?\"\n"
         "│\n"
         "▼ Step 1: SAFETY CHECK (Guardrail pre-screen)\n"
@@ -539,7 +539,7 @@ def build(out_path: str):
         "▼ Step 2: CONTEXT GATHERING (MCP Tools)\n"
         "  [Tool] get_recent_readings(device_id) → ดึง 5 readings ล่าสุด\n"
         "  [Tool] get_metabolic_trend(device_id) → ดึง trend 7 วัน\n"
-        "  [Resource] cheewarun://reference/acetone-ranges → โหลด reference\n"
+        "  [Resource] metabreath://reference/acetone-ranges → โหลด reference\n"
         "│\n"
         "▼ Step 3: SIGNAL PROCESSING CHECK\n"
         "  ตรวจ quality_score ≥ 60 และ reliability_score ≥ 40\n"
@@ -573,7 +573,7 @@ def build(out_path: str):
              "TrendResponse — direction, slope, predictions"],
             ["2c. Load Reference",
              "โหลด reference range จาก MCP Resource",
-             "MCP Resource: cheewarun://reference/*",
+             "MCP Resource: metabreath://reference/*",
              "JSON: acetone-ranges, TGS1820 specs"],
             ["3. Quality Gate",
              "ตรวจ quality_score + reliability_score",
@@ -636,7 +636,7 @@ def build(out_path: str):
     H2(doc, "8.2 ตัวอย่าง Refusal Response (ภาษาไทย)")
     info_box(doc, "build_refusal_response(lang='th')",
         "\"ขอโทษค่ะ คำถามนี้เกี่ยวกับการรักษาทางการแพทย์เฉพาะบุคคล\n"
-        "ซึ่ง Cheewarun ไม่สามารถให้คำแนะนำได้\n"
+        "ซึ่ง MetaBreath ไม่สามารถให้คำแนะนำได้\n"
         "กรุณาปรึกษาแพทย์หรือผู้เชี่ยวชาญด้านสุขภาพโดยตรง\n\n"
         "---\n"
         "⚠️ ข้อมูลนี้เพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์\n"
@@ -689,7 +689,7 @@ def build(out_path: str):
 
     H2(doc, "9.2 Prompt Template (ย่อ)")
     CODE(doc, 'SYSTEM_PROMPT_TEMPLATE = """')
-    CODE(doc, 'You are Cheewarun AI Coach — a wellness assistant specialising in')
+    CODE(doc, 'You are MetaBreath AI Coach — a wellness assistant specialising in')
     CODE(doc, 'ketogenic lifestyle, intermittent fasting, and metabolic health monitoring.')
     CODE(doc, '')
     CODE(doc, 'ROLE:')
@@ -838,7 +838,7 @@ def build(out_path: str):
     foot = doc.add_paragraph()
     foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
     rn(foot,
-       "Cheewarun MCP Report — NSC 2026 | สร้างเมื่อ 12 กรกฎาคม 2569 | "
+       "MetaBreath MCP Report — NSC 2026 | สร้างเมื่อ 12 กรกฎาคม 2569 | "
        "เพื่อวัตถุประสงค์ทางวิชาการ ไม่ใช่สำหรับการวินิจฉัยโรค",
        size=8.5, italic=True, color=C_GREY)
 
@@ -849,6 +849,6 @@ def build(out_path: str):
 if __name__ == "__main__":
     out = os.path.abspath(os.path.join(
         os.path.dirname(__file__),
-        "../../../Cheewarun_MCP_Technical_Report_NSC2026.docx"
+        "../../../MetaBreath_MCP_Technical_Report_NSC2026.docx"
     ))
     build(out)

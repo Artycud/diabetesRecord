@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Cheewarun MCP Data Contract",
-  "description": "JSON Schema for all data exchanged between Cheewarun API and MCP server",
+  "title": "MetaBreath MCP Data Contract",
+  "description": "JSON Schema for all data exchanged between MetaBreath API and MCP server",
   "definitions": {
     "SensorReading": {
       "type": "object",

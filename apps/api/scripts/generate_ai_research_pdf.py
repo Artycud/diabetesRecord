@@ -131,7 +131,7 @@ def build_pdf(out_path: str):
         leftMargin=2.2*cm, rightMargin=2.2*cm,
         topMargin=2.2*cm,  bottomMargin=2.2*cm,
         title="MetaBreath AI Technical Report — NSC 2026",
-        author="MetaBreath / Cheewarun Research Team",
+        author="MetaBreath / MetaBreath Research Team",
     )
 
     S = build_styles()
@@ -150,7 +150,7 @@ def build_pdf(out_path: str):
         sp(1.5),
         hr(C_PRIMARY, 2),
         sp(0.5),
-        Paragraph("NSC 2026 — Cheewarun Health Platform", S["cover_meta"]),
+        Paragraph("NSC 2026 — MetaBreath Health Platform", S["cover_meta"]),
         Paragraph("Version 1.0  |  Report Date: 2026-07-12", S["cover_meta"]),
         sp(0.3),
         Paragraph(
@@ -1045,7 +1045,7 @@ def build_pdf(out_path: str):
         ["Ethics",
          "IRB approval required; no clinical diagnosis made from device during pilot"],
         ["Target timeline",
-         "Post-NSC 2026; Phase 6 of Cheewarun development roadmap"],
+         "Post-NSC 2026; Phase 6 of MetaBreath development roadmap"],
     ]
     for i, row in enumerate(pilot_rows[1:], 1):
         pilot_rows[i] = [Paragraph(str(c), S["tbl_cell"]) for c in row]
@@ -1058,10 +1058,10 @@ def build_pdf(out_path: str):
     # ═══════════════════════════════════════════════════════════════════
     # SECTION 8 — LLM Safety Guardrail
     # ═══════════════════════════════════════════════════════════════════
-    story.append(Paragraph("8. LLM Safety Guardrail — Cheewarun AI Coach", S["h1"]))
+    story.append(Paragraph("8. LLM Safety Guardrail — MetaBreath AI Coach", S["h1"]))
     story.append(hr())
     story.append(Paragraph(
-        "The Cheewarun AI Coach uses an LLM (Claude) for natural-language interpretation "
+        "The MetaBreath AI Coach uses an LLM (Claude) for natural-language interpretation "
         "of sensor readings. A mandatory safety guardrail layer pre-screens both user "
         "input and LLM output for medically dangerous content.",
         S["body"]))
@@ -1165,7 +1165,7 @@ def build_pdf(out_path: str):
     # Footer
     story += [sp(1), hr(C_GREY, 0.5),
               Paragraph(
-                  "MetaBreath AI Technical Report — NSC 2026 | Cheewarun Health Platform | "
+                  "MetaBreath AI Technical Report — NSC 2026 | MetaBreath Health Platform | "
                   "Generated 2026-07-12 | This report is for academic/competition purposes only. "
                   "Not for clinical use.",
                   ParagraphStyle("footer", fontName=BASE_FONT, fontSize=8,

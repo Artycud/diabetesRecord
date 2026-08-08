@@ -1,4 +1,4 @@
-# MetaBreath / Cheewarun — คู่มือการใช้งานระบบ
+# MetaBreath — คู่มือการใช้งานระบบ
 
 **สถานะ:** Production live ที่ `https://metabreath.duckdns.org`
 **อัพเดตล่าสุด:** 2026-07-07
@@ -390,7 +390,7 @@ Model นี้ inference ใน `apps/api/app/services/ml_inference.py` — ไ
 
 ### API endpoints
 - **Production:** `https://metabreath.duckdns.org/api`
-- **WebSocket:** `wss://metabreath.duckdns.org/ws/readings/{user_id}?token=...`
+- **WebSocket:** `wss://metabreath.duckdns.org/ws/readings/{user_id}` (auth token sent via `Sec-WebSocket-Protocol: access_token, <jwt>`, not a URL query param — avoids leaking the token into proxy access logs/history)
 - **API docs (dev only):** `/api/docs` — ปิดใน production เพราะ `APP_ENV=production`
 
 ### VPS

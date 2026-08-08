@@ -1,9 +1,9 @@
 # MetaBreath Integration Plan
-> แผนพัฒนา Cheewarun ให้สอดคล้องกับ NSC 2026 MetaBreath ตามข้อมูลใน `แข่งชนะ by Coach Bright_NSC/`
+> แผนพัฒนา MetaBreath ให้สอดคล้องกับ NSC 2026 MetaBreath ตามข้อมูลใน `แข่งชนะ by Coach Bright_NSC/`
 
 - **สร้าง**: 2026-07-06
 - **เจ้าของ**: Pranai
-- **Companion กับ**: `plan.md` (แผนหลักของ Cheewarun)
+- **Companion กับ**: `plan.md` (แผนหลักของ MetaBreath)
 - **Scope**: อ่านและปรับตาม **Comments กรรมการ** + **แผนเก็บข้อมูล** + **ข้อกำหนดจากอาจารย์**
 
 ---
@@ -11,7 +11,7 @@
 ## 0. Executive Summary
 
 ### สภาพปัจจุบัน
-- Cheewarun Phase 0–3 เสร็จแล้ว (auth, log, gamification, articles)
+- MetaBreath Phase 0–3 เสร็จแล้ว (auth, log, gamification, articles)
 - Phase 5 (MQTT/Sensor) + Phase 6 (AI) ยังไม่เริ่ม
 - Kaggle datasets: 6 ชุดที่ download แล้ว (diabetes/metabolic/CGM) แต่ **ขาด 2 ชุดที่กรรมการและอาจารย์แนะนำโดยตรง**
 
@@ -397,7 +397,7 @@ voc_ppb, ketone_mmol, temp_c, humidity_pct, raw (JSONB)
 **Abstract (April)** ใช้: MQ-138 + DHT11
 **Final Round (July)** ใช้: **TGS1820 + SHT35** ← ใช้อันนี้เป็น source of truth
 
-Cheewarun code ควรอ้าง TGS1820 + SHT35 ให้ตรงกับ final round
+MetaBreath code ควรอ้าง TGS1820 + SHT35 ให้ตรงกับ final round
 
 ---
 

@@ -140,7 +140,7 @@ def build():
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("โครงการ MetaBreath — Cheewarun")
+    run = p.add_run("โครงการ MetaBreath")
     set_thai_font(run, size=14, color=GREY)
 
     p = doc.add_paragraph()

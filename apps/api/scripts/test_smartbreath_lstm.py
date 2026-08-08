@@ -316,7 +316,7 @@ def build_pdf(results: list[dict], si: pd.DataFrame, out_path: Path) -> None:
         leftMargin=2.2 * cm, rightMargin=2.2 * cm,
         topMargin=2.0 * cm, bottomMargin=2.0 * cm,
         title="MetaBreath -- SmartBreath External Data Test",
-        author="MetaBreath / Cheewarun Research Team",
+        author="MetaBreath / MetaBreath Research Team",
     )
 
     scored = [r for r in results if r["verdict"] != "info"]
@@ -339,7 +339,7 @@ def build_pdf(results: list[dict], si: pd.DataFrame, out_path: Path) -> None:
         sp(1.5),
         hr(C_PRIMARY, 2),
         sp(0.4),
-        Paragraph("NSC 2026 — Cheewarun Health Platform", S["cover_meta"]),
+        Paragraph("NSC 2026 — MetaBreath Health Platform", S["cover_meta"]),
         Paragraph(f"Report generated: {datetime.now():%Y-%m-%d %H:%M}",
                   S["cover_meta"]),
         sp(0.4),

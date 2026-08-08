@@ -201,7 +201,7 @@ def build_doc(out_path: str):
 
     p2 = doc.add_paragraph()
     p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run(p2, "\nCheewarun Health Platform — NSC 2026\nเวอร์ชัน 1.0  |  วันที่: 12 กรกฎาคม 2569",
+    run(p2, "\nMetaBreath Health Platform — NSC 2026\nเวอร์ชัน 1.0  |  วันที่: 12 กรกฎาคม 2569",
         size=12, color=C_ACCENT)
 
     p3 = doc.add_paragraph()
@@ -615,7 +615,7 @@ def build_doc(out_path: str):
             ["Ground-truth Label",         "จาก Blood BOHB: <0.5 mM=basal, 0.5–3 mM=nutritional_ketosis, >3 mM=deep"],
             ["LSTM Re-training",           "เก็บ Reading ≥5 วันติดต่อกันต่อคน เพื่อสร้าง Temporal Sequence จริง"],
             ["จริยธรรม",                   "ต้องผ่าน IRB ก่อน; ไม่วินิจฉัยโรคจากอุปกรณ์ระหว่าง Pilot"],
-            ["Timeline เป้าหมาย",          "หลัง NSC 2026; Phase 6 ของ Roadmap Cheewarun"],
+            ["Timeline เป้าหมาย",          "หลัง NSC 2026; Phase 6 ของ Roadmap MetaBreath"],
         ],
         col_widths=[4.5, 11.5])
 
@@ -624,9 +624,9 @@ def build_doc(out_path: str):
     # ════════════════════════════════════════════════════════════════════
     # 8. LLM Guardrail
     # ════════════════════════════════════════════════════════════════════
-    heading(doc, "8. LLM Safety Guardrail — Cheewarun AI Coach")
+    heading(doc, "8. LLM Safety Guardrail — MetaBreath AI Coach")
     body(doc,
-         "AI Coach Cheewarun ใช้ LLM (Claude) ในการตีความค่าเซนเซอร์เป็นภาษาธรรมชาติ "
+         "AI Coach MetaBreath ใช้ LLM (Claude) ในการตีความค่าเซนเซอร์เป็นภาษาธรรมชาติ "
          "มีชั้น Safety Guardrail บังคับที่กรองทั้ง Input ผู้ใช้และ Output ของ LLM "
          "สำหรับเนื้อหาที่อาจเป็นอันตรายทางการแพทย์")
 
@@ -712,7 +712,7 @@ def build_doc(out_path: str):
     doc.add_paragraph()
     hr_p = doc.add_paragraph()
     hr_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run(hr_p, "MetaBreath AI Technical Report — NSC 2026 | Cheewarun Health Platform\n"
+    run(hr_p, "MetaBreath AI Technical Report — NSC 2026 | MetaBreath Health Platform\n"
               "สร้างเมื่อ 12 กรกฎาคม 2569 | รายงานนี้เพื่อวัตถุประสงค์ทางวิชาการ/การแข่งขันเท่านั้น ไม่ใช่สำหรับใช้ทางคลินิก",
         size=8, color=C_GREY, italic=True)
 

@@ -90,7 +90,7 @@ function PasswordGate({ onUnlock }: { onUnlock: (pw: string) => void }) {
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-white tracking-tight">Admin Console</h1>
-          <p className="text-slate-400 text-sm mt-1">MetaBreath · Cheewarun</p>
+          <p className="text-slate-400 text-sm mt-1">MetaBreath</p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -674,7 +674,7 @@ export default function AdminPage() {
           </div>
           <div>
             <h1 className="font-bold text-gray-900 text-sm leading-none">Admin Console</h1>
-            <p className="text-xs text-gray-400 mt-0.5">MetaBreath · Cheewarun</p>
+            <p className="text-xs text-gray-400 mt-0.5">MetaBreath</p>
           </div>
         </div>
         <button

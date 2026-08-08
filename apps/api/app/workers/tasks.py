@@ -103,7 +103,7 @@ def check_reminders():
                                     "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
                                 },
                                 data=json.dumps({
-                                    "title": "Cheewarun",
+                                    "title": "MetaBreath",
                                     "body": reminder.message or f"เวลา {reminder.kind} แล้ว!",
                                 }),
                                 vapid_private_key=settings.VAPID_PRIVATE,

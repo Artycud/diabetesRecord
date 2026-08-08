@@ -1,6 +1,6 @@
-# Cheewarun MCP Server
+# MetaBreath MCP Server
 
-Model Context Protocol server that exposes Cheewarun health data to Claude AI.
+Model Context Protocol server that exposes MetaBreath health data to Claude AI.
 
 ## Setup
 
@@ -22,8 +22,8 @@ pip install mcp[server] httpx
 
 ## Resources
 
-- `cheewarun://reference/acetone-ranges` — Metabolic state reference ranges
-- `cheewarun://reference/tgs1820-datasheet` — Sensor specs and cross-sensitivity
+- `metabreath://reference/acetone-ranges` — Metabolic state reference ranges
+- `metabreath://reference/tgs1820-datasheet` — Sensor specs and cross-sensitivity
 
 ## Prompts
 
@@ -37,12 +37,12 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "cheewarun": {
+    "metabreath": {
       "command": "python",
       "args": ["-m", "apps.mcp.src.server"],
       "env": {
-        "CHEEWARUN_API_URL": "http://localhost:8000",
-        "CHEEWARUN_API_TOKEN": "<your_token>"
+        "METABREATH_API_URL": "http://localhost:8000",
+        "METABREATH_API_TOKEN": "<your_token>"
       }
     }
   }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cheewarun — Seed initial data
+MetaBreath — Seed initial data
 Run: docker compose exec api python /app/../infra/seed/seed.py
 Or:  docker compose exec api python -m infra.seed.seed  (from /root/cheewarun)
 """
@@ -137,7 +137,7 @@ IF คือการจำกัด**เวลา**การกิน ไม่
 
 ทำ IF ร่วมกับ keto ช่วยให้เข้า ketosis เร็วขึ้นและออก ketosis ยากขึ้น เป็น combination ที่นิยมมากใน biohacking community
 
-> **เคล็ดลับ**: บันทึกเวลากินและเวลาอดใน Cheewarun เพื่อสะสม streak และรับ XP""",
+> **เคล็ดลับ**: บันทึกเวลากินและเวลาอดใน MetaBreath เพื่อสะสม streak และรับ XP""",
     },
     {
         "slug": "breath-acetone-explained",
@@ -242,7 +242,7 @@ Acetone ในลมหายใจสะท้อนการเผาไขม
 3. **ออกกำลังกายแบบ fasted** — เช้าก่อนอาหาร เผาไขมันได้มากขึ้น
 4. **Zone 2 Cardio** — ความเข้มข้นต่ำ ยาวนาน → เทรน fat oxidation
 
-> **หมายเหตุ**: การวัด acetone_delta ทุกวันใน Cheewarun ช่วยติดตาม metabolic flexibility ของคุณในชีวิตประจำวัน""",
+> **หมายเหตุ**: การวัด acetone_delta ทุกวันใน MetaBreath ช่วยติดตาม metabolic flexibility ของคุณในชีวิตประจำวัน""",
     },
     {
         "slug": "exercise-starter",
@@ -294,7 +294,7 @@ Acetone ในลมหายใจสะท้อนการเผาไขม
 สัปดาห์แรก: เดิน 30 นาที / วัน ก่อนอาหารเช้า 3–5 วัน
 เดือนแรก: Zone 2 cardio 150 นาที/สัปดาห์
 
-> **บันทึกใน Cheewarun**: log activity ทุกวันเพื่อสะสม streak และดู pattern การออกกำลังกายของคุณ""",
+> **บันทึกใน MetaBreath**: log activity ทุกวันเพื่อสะสม streak และดู pattern การออกกำลังกายของคุณ""",
     },
 ]
 
