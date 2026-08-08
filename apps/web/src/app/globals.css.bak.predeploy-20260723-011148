@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+@theme {
+  /* ─── Brand: Mint ─────────────────────────────────── */
+  --color-mint-50:  #E6FEF7;
+  --color-mint-100: #C0FAE9;
+  --color-mint-200: #88F3D5;
+  --color-mint-300: #4EEABD;
+  --color-mint-400: #1EDBA7;
+  --color-mint-500: #01D19B;
+  --color-mint-600: #00A47A;
+  --color-mint-700: #007A5A;
+  --color-mint-800: #00503C;
+  --color-mint-900: #00281E;
+
+  /* ─── Brand: Peach ────────────────────────────────── */
+  --color-peach-50:  #FFF3EE;
+  --color-peach-100: #FFE2D5;
+  --color-peach-200: #FFC5AB;
+  --color-peach-300: #FFA882;
+  --color-peach-400: #FF8A5A;
+  --color-peach-500: #FF7A4A;
+  --color-peach-600: #E05830;
+  --color-peach-700: #B33B1B;
+  --color-peach-800: #80230C;
+  --color-peach-900: #4D1100;
+
+  /* ─── Gold / XP ───────────────────────────────────── */
+  --color-gold-50:  #FBF7EE;
+  --color-gold-100: #F3E9C9;
+  --color-gold-300: #D9BC7B;
+  --color-gold-500: #B08D57;
+  --color-gold-700: #7C5F35;
+
+  /* ─── Typography ───────────────────────────────────── */
+  --font-sans: var(--font-inter), var(--font-sarabun), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
+
+  /* ─── Motion ───────────────────────────────────────── */
+  --motion-fast:   150ms;
+  --motion-base:   250ms;
+  --motion-slow:   400ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ─── Semantic defaults (navy — same as System mode) ── */
+  --color-bg-primary:  #0b1535;
+  --color-bg-surface:  #142552;
+  --color-bg-elevated: #1b3068;
+  --color-bg-raised:   #243d80;
+  --color-bg-overlay:  #0b153599;
+
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #DDEAFF;
+  --color-text-muted:     #B4CBEC;
+  --color-text-disabled:  #7A98C4;
+
+  --color-border-soft:   rgba(255,255,255,0.10);
+  --color-border-strong: rgba(255,255,255,0.18);
+
+  --color-cat-breath:  #01D19B;
+  --color-cat-heart:   #FF3B4A;
+  --color-cat-sleep:   #A855F7;
+  --color-cat-oxygen:  #3B82F6;
+  --color-cat-stress:  #F59E0B;
+  --color-cat-workout: #10B981;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger:  #EF4444;
+  --color-info:    #3B82F6;
+
+  /* Legacy aliases (keep for old components) */
+  --color-surface:   #142552;
+  --color-surface-2: #1b3068;
+  --color-border:    rgba(255,255,255,0.10);
+  --color-muted:     #B4CBEC;
+  --color-muted-bg:  #1b3068;
+  --color-charcoal-500: #FFFFFF;
+  --color-charcoal-600: #DDEAFF;
+}
+
+/* ─── System mode = Navy brand ──────────────────────── */
+[data-theme="system"] {
+  background-color: #0b1535;
+
+  --color-bg-primary:  #0b1535;
+  --color-bg-surface:  #142552;
+  --color-bg-elevated: #1b3068;
+  --color-bg-raised:   #243d80;
+  --color-bg-overlay:  #0b153599;
+
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #DDEAFF;
+  --color-text-muted:     #B4CBEC;
+  --color-text-disabled:  #7A98C4;
+
+  --color-border-soft:   rgba(255,255,255,0.10);
+  --color-border-strong: rgba(255,255,255,0.18);
+
+  --color-surface:   #142552;
+  --color-surface-2: #1b3068;
+  --color-border:    rgba(255,255,255,0.10);
+  --color-muted:     #B4CBEC;
+  --color-muted-bg:  #1b3068;
+  --color-charcoal-500: #FFFFFF;
+  --color-charcoal-600: #DDEAFF;
+}
+
+[data-theme="system"] body {
+  background-color: #0b1535;
+}
+
+/* ─── Dark mode = pure black ────────────────────────── */
+[data-theme="dark"] {
+  background-color: #0A0A0A;
+
+  --color-bg-primary:  #0A0A0A;
+  --color-bg-surface:  #141414;
+  --color-bg-elevated: #1F1F1F;
+  --color-bg-raised:   #2A2A2A;
+  --color-bg-overlay:  #00000099;
+
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #E8E8E8;
+  --color-text-muted:     #B8B8B8;
+  --color-text-disabled:  #808080;
+
+  --color-border-soft:   #333333;
+  --color-border-strong: #4A4A4A;
+
+  --color-surface:   #141414;
+  --color-surface-2: #1F1F1F;
+  --color-border:    #333333;
+  --color-muted:     #B8B8B8;
+  --color-muted-bg:  #1F1F1F;
+  --color-charcoal-500: #FFFFFF;
+  --color-charcoal-600: #E8E8E8;
+}
+
+[data-theme="dark"] body {
+  background-color: #0A0A0A;
+}
+
+/* ─── Light mode override ───────────────────────────── */
+[data-theme="light"] {
+  --color-bg-primary:  #FAFAF7;
+  --color-bg-surface:  #FFFFFF;
+  --color-bg-elevated: #F4F4F1;
+  --color-bg-raised:   #EEEDE8;
+  --color-text-primary:   #000000;
+  --color-text-secondary: #1F1F1F;
+  --color-text-muted:     #3D3D3A;
+  --color-text-disabled:  #7A7A75;
+  --color-border-soft:    #D8D6CF;
+  --color-border-strong:  #B0AEA5;
+
+  /* Legacy aliases */
+  --color-surface:   #FFFFFF;
+  --color-surface-2: #F4F4F1;
+  --color-border:    #D8D6CF;
+  --color-muted:     #3D3D3A;
+  --color-muted-bg:  #F4F4F1;
+  --color-charcoal-500: #000000;
+  --color-charcoal-600: #1F1F1F;
+}
+
+/* ─── Base ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { height: 100%; }
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+  /* Slightly denser default weight so labels/metadata read at a glance
+     without over-scaling the design system. */
+  font-weight: 450;
+}
+
+/* ─── Readability upgrades ──────────────────────────
+   Applies globally: forbid tiny type (< 12px), and give muted text
+   a heavier weight so it still reads at low contrast without needing
+   another design pass on every card. */
+[class*="text-[10px]"],
+[class*="text-[11px]"] {
+  font-size: 12px !important;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+}
+.text-xs {
+  font-size: 13px;   /* was 12px */
+  font-weight: 500;
+}
+.text-sm {
+  font-weight: 500;   /* was 400 — improves legibility at 14px */
+}
+
+/* Muted / secondary text always at least medium weight so lower contrast
+   is compensated by weight rather than color alone. */
+.text-text-muted,
+.text-muted,
+.text-text-secondary {
+  font-weight: 500;
+}
+.text-text-disabled {
+  font-weight: 500;
+}
+
+/* Numeric stat display */
+.stat-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }
+
+/* ─── Reduced motion ────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

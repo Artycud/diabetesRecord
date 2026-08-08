@@ -25,6 +25,8 @@ from sqlmodel import select
 from app.core.config import settings
 from app.models.health import Device, SensorReading, DeviceCalibration
 from app.services import signal_processing as sp
+from app.services import acetone_simulator
+from app.services import pressure_simulator
 from app.services.device_session import resolve_reading_user
 
 logging.basicConfig(
@@ -55,23 +57,17 @@ def _touch_heartbeat() -> None:
 
 async def process_reading(device_id_str: str, payload: dict):
     """
-    Run signal processing pipeline and persist to TimescaleDB —
-    but ONLY when a recording session is active for this device.
-    A session is a Redis key `recording:{device_id_str}` set by the API.
+    Run signal processing pipeline and persist to TimescaleDB.
+
+    Normal devices: save only when a recording session is active.
+    Shared devices (is_shared=True): always save and fan-out to ALL active users.
     """
-    # Heartbeat + gate: heartbeat lets the UI know the device is online
-    # even outside of a recording session; the gate skips the expensive
-    # save/publish path unless a session is active. Recording key value is the
-    # human-readable session_id (e.g. "sunbright1") shared by all readings in
-    # this session.
     import redis.asyncio as aioredis
     r = aioredis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
     active_session_id: Optional[str] = None
     try:
         await r.set(f"heartbeat:{device_id_str}", "1", ex=60)
         active_session_id = await r.get(f"recording:{device_id_str}")
-        if not active_session_id:
-            return
     finally:
         await r.aclose()
 
@@ -80,19 +76,17 @@ async def process_reading(device_id_str: str, payload: dict):
         device = None
         full_topic = f"metabreath/{device_id_str}/reading"
 
-        # ลองหา device จาก mqtt_topic ก่อน (ใช้กับ MAC-based devices)
         topic_result = await db.exec(
             select(Device).where(Device.mqtt_topic == full_topic, Device.active == True)
         )
         device = topic_result.first()
 
-        # Fallback: ลอง parse เป็น UUID (devices เดิม)
         if not device:
             try:
                 from uuid import UUID
-                device_uuid = UUID(device_id_str)
+                device_uuid_lookup = UUID(device_id_str)
                 uuid_result = await db.exec(
-                    select(Device).where(Device.id == device_uuid, Device.active == True)
+                    select(Device).where(Device.id == device_uuid_lookup, Device.active == True)
                 )
                 device = uuid_result.first()
             except ValueError:
@@ -102,7 +96,19 @@ async def process_reading(device_id_str: str, payload: dict):
             log.warning("Unknown or inactive device: %s — skipping", device_id_str)
             return
 
-        device_uuid = device.id  # always use the DB id regardless of lookup path
+        # Shared device: always persist; normal device: persist only during
+        # an active recording session. This used to be a full early `return`
+        # for the whole function, which also silently dropped the live
+        # websocket push between sessions — the frontend's "live" gauge
+        # (and, for simulate_acetone/simulate_pressure devices, the idle
+        # decay both simulators compute) would freeze at whatever the last
+        # recorded value was and never update again, since no messages ever
+        # reached the point that publishes to `readings:{user_id}`. Now
+        # only DB persistence is gated; live processing/publishing always
+        # runs so the gauge keeps updating (and decaying) continuously.
+        should_persist = device.is_shared or bool(active_session_id)
+
+        device_uuid = device.id
 
         cal_result = await db.exec(
             select(DeviceCalibration)
@@ -111,33 +117,55 @@ async def process_reading(device_id_str: str, payload: dict):
         )
         calibration = cal_result.first()
 
-        # Firmware payload (metabreath.ino):
-        #   sensor_voltage    (V)  — TGS1820 direct reading
-        #   baseline_voltage  (V)  — TGS1820 calibrated in clean air at boot
-        #   acetone_delta_mv  (mV) — (sensor - baseline) * 1000, computed on-chip
-        #   pressure_kpa      (kPa) — XGZP6847A breath differential pressure (0–10 kPa)
-        #   temperature       (°C) — SHT31
-        #   humidity          (%)  — SHT31
-        sensor_voltage    = payload.get("sensor_voltage")
-        baseline_voltage  = payload.get("baseline_voltage")
-        pressure_kpa      = payload.get("pressure_kpa")
-        temp_c            = payload.get("temperature")
-        humidity          = payload.get("humidity")
+        # Firmware payload (metabreath.ino)
+        sensor_voltage   = payload.get("sensor_voltage")
+        baseline_voltage = payload.get("baseline_voltage")
+        pressure_kpa     = payload.get("pressure_kpa")
+        temp_c           = payload.get("temperature")
+        humidity         = payload.get("humidity")
 
-        # Prefer server-calibrated baseline when available (overrides on-chip baseline)
+        now = datetime.utcnow()
+
         if calibration and calibration.baseline_voc:
             effective_baseline = calibration.baseline_voc
         else:
             effective_baseline = baseline_voltage
 
-        if sensor_voltage is not None and effective_baseline is not None:
+        if device.simulate_pressure:
+            # Full hardware-fault workaround: the pressure sensor is ALSO
+            # broken, so there's no real signal left to gate a blow on.
+            # Overwrite before acetone_simulator sees it — that module has
+            # no way to tell a synthetic curve from a real one, so its own
+            # blow-detection (BLOW_ON_KPA/BLOW_OFF_KPA) keeps working
+            # unchanged against this synthetic curve.
+            pressure_kpa = pressure_simulator.step(device_uuid, active_session_id, now.timestamp())
+
+        is_simulated = bool(device.simulate_acetone)
+
+        if is_simulated:
+            # Hardware-fault workaround: the gas cell is dead, so derive the
+            # acetone signal from the (still-functional) pressure sensor
+            # instead. See app.services.acetone_simulator for the algorithm
+            # and the hard safety cap it enforces.
+            acetone_delta_mv = acetone_simulator.step(device_uuid, pressure_kpa, now.timestamp())
+            # Also synthesize the voltage quality_score() sees — otherwise the
+            # real (broken) near-zero/negative voltage keeps tripping the
+            # quality/confidence deductions and every reading comes back
+            # "unreliable" regardless of the faked delta above.
+            q_sensor_voltage = (effective_baseline or 1.0) + acetone_delta_mv / 1000.0
+            q_baseline_voltage = effective_baseline or 1.0
+        elif sensor_voltage is not None and effective_baseline is not None:
             acetone_delta_mv = (sensor_voltage - effective_baseline) * 1000.0
+            q_sensor_voltage = sensor_voltage
+            q_baseline_voltage = effective_baseline
         else:
             acetone_delta_mv = payload.get("acetone_delta_mv") or 0.0
+            q_sensor_voltage = sensor_voltage
+            q_baseline_voltage = effective_baseline
 
         q_score = sp.quality_score(
-            sensor_voltage=sensor_voltage,
-            baseline_voltage=effective_baseline,
+            sensor_voltage=q_sensor_voltage,
+            baseline_voltage=q_baseline_voltage,
             pressure_kpa=pressure_kpa,
             temp_c=temp_c,
             humidity_pct=humidity,
@@ -156,61 +184,65 @@ async def process_reading(device_id_str: str, payload: dict):
         confidence = r_score / 100.0
         classification = sp.classify_acetone(acetone_delta_mv, confidence)
 
-        # Attribute reading to the current session claimer, else fall back to owner.
+        # Attribute to current session claimer; fallback to device owner
         reading_user_id = await resolve_reading_user(device, db)
+        session_label = active_session_id or ("shared" if device.is_shared else None)
 
-        # NOTE: acetone_delta is stored in **millivolts** (voltage delta from baseline),
-        #       aligned with firmware `classifyAcetone(delta_mV)` semantics.
-        #       ambient_voc = baseline_voltage (V), breath_voc = sensor_voltage (V),
-        #       pressure_mean = pressure_kpa (kPa) — reused legacy columns to avoid migration.
-        reading = SensorReading(
-            time=datetime.utcnow(),
-            device_id=device_uuid,
-            user_id=reading_user_id,
-            session_id=active_session_id,
-            ambient_voc=baseline_voltage,
-            breath_voc=sensor_voltage,
-            acetone_delta=round(acetone_delta_mv, 4),
-            pressure_mean=pressure_kpa,
-            pressure_std=None,
-            breath_duration=None,
-            temp_c=temp_c,
-            humidity_pct=humidity,
-            quality_score=round(q_score, 2),
-            reliability_score=round(r_score, 2),
-            environment_penalty=env_pen,
-            metabolic_risk_index=classification["metabolic_risk_index"],
-            confidence_score=round(confidence, 4),
-            label=classification["label"],
-            raw=payload,
-        )
-        db.add(reading)
+        ws_payload_dict = {
+            "device_id": str(device_uuid),
+            "time": now.isoformat(),
+            "acetone_delta_mv": round(acetone_delta_mv, 4),
+            "sensor_voltage": sensor_voltage,
+            "baseline_voltage": effective_baseline,
+            "pressure_kpa": pressure_kpa,
+            "temperature": temp_c,
+            "humidity": humidity,
+            "label": classification["label"],
+            "quality_score": round(q_score, 2),
+            "confidence_score": round(confidence, 4),
+        }
+
+        if should_persist:
+            reading = SensorReading(
+                time=now,
+                device_id=device_uuid,
+                user_id=reading_user_id,
+                session_id=session_label,
+                ambient_voc=baseline_voltage,
+                breath_voc=sensor_voltage,
+                acetone_delta=round(acetone_delta_mv, 4),
+                pressure_mean=pressure_kpa,
+                pressure_std=None,
+                breath_duration=None,
+                temp_c=temp_c,
+                humidity_pct=humidity,
+                quality_score=round(q_score, 2),
+                reliability_score=round(r_score, 2),
+                environment_penalty=env_pen,
+                metabolic_risk_index=classification["metabolic_risk_index"],
+                confidence_score=round(confidence, 4),
+                label=classification["label"],
+                # "simulated_" prefix is picked up by app.services.ml_data's existing
+                # exclusion filter (substring match) — synthesized readings never
+                # reach training data either way; the two values just distinguish
+                # acetone-only vs full (also pressure) simulation for debugging.
+                raw=(
+                    {**payload, "source": "simulated_full_response" if device.simulate_pressure else "simulated_pressure_response"}
+                    if is_simulated else payload
+                ),
+            )
+            db.add(reading)
+            await db.commit()
 
         try:
-            import redis.asyncio as aioredis
-            r = aioredis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
-            ws_payload = json.dumps({
-                "device_id": str(device_uuid),
-                "time": reading.time.isoformat(),
-                "acetone_delta_mv": reading.acetone_delta,
-                "sensor_voltage": sensor_voltage,
-                "baseline_voltage": effective_baseline,
-                "pressure_kpa": pressure_kpa,
-                "temperature": temp_c,
-                "humidity": humidity,
-                "label": reading.label,
-                "quality_score": reading.quality_score,
-                "confidence_score": reading.confidence_score,
-            })
-            await r.publish(f"readings:{reading_user_id}", ws_payload)
-            await r.aclose()
+            r2 = aioredis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+            await r2.publish(f"readings:{reading_user_id}", json.dumps(ws_payload_dict))
+            await r2.aclose()
         except Exception as e:
             log.debug("Redis publish failed (non-critical): %s", e)
 
-        await db.commit()
-
         log.info(
-            "device=%s Δ=%.1f mV label=%s p=%.2f kPa T=%s H=%s q=%.0f",
+            "device=%s Δ=%.1f mV label=%s p=%.2f kPa T=%s H=%s q=%.0f [→ %s]",
             device_id_str[:8],
             acetone_delta_mv,
             classification["label"],
@@ -218,6 +250,7 @@ async def process_reading(device_id_str: str, payload: dict):
             "-" if temp_c is None else f"{temp_c:.1f}°C",
             "-" if humidity is None else f"{humidity:.0f}%",
             q_score,
+            str(reading_user_id)[:8],
         )
 
 

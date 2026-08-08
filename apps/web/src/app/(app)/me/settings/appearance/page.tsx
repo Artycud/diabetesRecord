@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { ArrowLeft, Check } from "lucide-react";
 import { useThemeConfig, ACCENT_COLORS } from "@/components/theme/ThemeProvider";
+import { Card } from "@/components/ui/card";
 import { twMerge } from "tailwind-merge";
 
 type AccentColor = keyof typeof ACCENT_COLORS;
-type CardStyle = "solid" | "glass" | "gradient";
+type CardStyle = "neumorphic" | "liquidGlass" | "flat";
 
 const ACCENT_LABELS: Record<AccentColor, string> = {
   mint:   "Mint",
@@ -18,16 +19,16 @@ const ACCENT_LABELS: Record<AccentColor, string> = {
   yellow: "Yellow",
 };
 
-const CARD_STYLES: { value: CardStyle; label: string }[] = [
-  { value: "solid",    label: "Solid" },
-  { value: "glass",    label: "Glass" },
-  { value: "gradient", label: "Gradient" },
+const CARD_STYLES: { value: CardStyle; label: string; hint: string }[] = [
+  { value: "neumorphic",  label: "Neumorphic",  hint: "Soft, extruded" },
+  { value: "liquidGlass", label: "Liquid Glass", hint: "Translucent" },
+  { value: "flat",        label: "Flat",         hint: "Plain, high-contrast" },
 ];
 
 export default function AppearancePage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { accent, setAccent, cardStyle, setCardStyle } = useThemeConfig();
+  const { accent, setAccent, cardStyle, setCardStyle, gradientIntensity, setGradientIntensity } = useThemeConfig();
 
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-6">
@@ -87,35 +88,58 @@ export default function AppearancePage() {
         </div>
       </div>
 
+      {/* Background gradient intensity — the accent-tinted wash on the page
+          background and card surfaces; 0 turns it off entirely. */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">Background Gradient</p>
+          <span className="text-xs text-text-muted font-mono">{gradientIntensity}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={gradientIntensity}
+          onChange={(e) => setGradientIntensity(Number(e.target.value))}
+          className="w-full accent-mint-500"
+        />
+        <p className="text-[11px] text-text-disabled">
+          Tints the background with your {ACCENT_LABELS[accent].toLowerCase()} accent. Set to 0 for a plain background.
+        </p>
+      </div>
+
       {/* Card style */}
       <div className="space-y-3">
         <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">Card Style</p>
         <div className="grid grid-cols-3 gap-2">
-          {CARD_STYLES.map(({ value, label }) => (
+          {CARD_STYLES.map(({ value, label, hint }) => (
             <button
               key={value}
               onClick={() => setCardStyle(value)}
               className={twMerge(
-                "py-3 rounded-2xl border text-sm font-medium transition-colors",
+                "py-3 px-2 rounded-2xl border text-sm font-medium transition-colors flex flex-col items-center gap-0.5",
                 cardStyle === value
                   ? "border-mint-500 bg-mint-500/10 text-mint-500"
                   : "border-border-soft bg-bg-elevated text-text-muted hover:border-border-strong"
               )}
             >
-              {label}
+              <span>{label}</span>
+              <span className="text-[10px] opacity-70 font-normal">{hint}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Preview */}
+      {/* Preview — uses the real Card component so this actually reflects
+          the selection, not a hardcoded mock. */}
       <div className="space-y-3">
         <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">Preview</p>
-        <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
+        <Card padding="md" className="space-y-3">
           <div className="h-8 rounded-full bg-bg-raised flex items-center px-3">
             <span className="text-xs text-text-muted">Health · Breathing · Device · Profile</span>
           </div>
-          <div className="bg-bg-raised rounded-2xl p-4 flex items-center gap-3">
+          <Card padding="md" className="flex items-center gap-3">
             <div
               className="h-12 w-12 rounded-full border-4 flex items-center justify-center"
               style={{ borderColor: ACCENT_COLORS[accent] }}
@@ -126,8 +150,8 @@ export default function AppearancePage() {
               <p className="text-sm font-semibold text-text-primary">Acetone Ring</p>
               <p className="text-xs text-text-muted">Live preview</p>
             </div>
-          </div>
-        </div>
+          </Card>
+        </Card>
       </div>
     </div>
   );

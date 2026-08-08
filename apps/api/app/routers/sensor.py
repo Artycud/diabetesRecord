@@ -82,6 +82,12 @@ class DevicePairRequest(BaseModel):
     kind: str = "breath"
     sensor_model: str = "TGS1820"
     firmware_version: Optional[str] = None
+    # Real ESP32 MAC address (e.g. "88F155302810" or "88:F1:55:30:28:10").
+    # Required for the stock MetaBreath firmware — it always publishes under
+    # metabreath/<its own MAC>/reading, so the DB row must be registered under
+    # that same topic or the device will never be reachable. Omit only for
+    # "custom firmware" devices where the caller controls their own topic.
+    mac: Optional[str] = None
 
 
 class DevicePairResponse(BaseModel):
@@ -104,10 +110,83 @@ async def pair_device(
     """
     Pair a new MetaBreath device with the user account.
     Returns MQTT credentials and topic for the ESP32 firmware to use.
+
+    When `mac` is given, the device is registered under the topic the real
+    firmware actually publishes to (metabreath/<MAC>/reading) — idempotent,
+    and safe to re-run (e.g. user retries setup) as long as the MAC still
+    belongs to this user or has no owner yet.
     """
     import secrets as _secrets
     import os
 
+    mqtt_broker = os.getenv("MQTT_BROKER_PUBLIC", "metabreath.duckdns.org")
+    mqtt_port = int(os.getenv("MQTT_PORT_PUBLIC", "1883"))
+    mqtt_user = os.getenv("MQTT_ESP32_USER", "esp32")
+    mqtt_pass = os.getenv("MQTT_ESP32_PASS", "")
+
+    if body.mac:
+        mac = body.mac.upper().replace(":", "").replace("-", "")
+        if len(mac) != 12 or not all(c in "0123456789ABCDEF" for c in mac):
+            raise HTTPException(status_code=400, detail="MAC ต้องมี 12 hex chars เช่น 88F155302810")
+
+        mqtt_topic = f"metabreath/{mac}/reading"
+        existing_result = await db.exec(select(Device).where(Device.mqtt_topic == mqtt_topic))
+        device = existing_result.first()
+
+        if device and device.user_id != user.id and not device.is_shared:
+            # Already claimed by someone else and not shared — refuse rather than steal it.
+            raise HTTPException(
+                status_code=409,
+                detail="อุปกรณ์นี้ถูกลงทะเบียนกับบัญชีอื่นแล้ว ติดต่อแอดมินหากต้องการโอนย้าย",
+            )
+
+        if device and device.is_shared and device.user_id != user.id:
+            # Shared device someone else owns. Pairing must never itself grant a
+            # claim — that would let typing in a MAC silently "steal" the active
+            # session with no confirmation. Claiming only ever happens through
+            # the explicit ใช้เครื่องนี้ button (POST /device/{id}/claim).
+            raise HTTPException(
+                status_code=409,
+                detail="อุปกรณ์นี้ใช้ร่วมกันอยู่แล้ว — ไปที่หน้าอุปกรณ์แล้วกด \"ใช้เครื่องนี้\" เพื่อจอง",
+            )
+
+        if device:
+            # Re-registering own device (retry) — refresh metadata, keep secret.
+            device.kind = body.kind
+            device.sensor_model = body.sensor_model
+            device.firmware_version = body.firmware_version
+            device.active = True
+            if not device.secret:
+                device.secret = _secrets.token_hex(16)
+            db.add(device)
+        else:
+            device = Device(
+                user_id=user.id,
+                kind=body.kind,
+                sensor_model=body.sensor_model,
+                firmware_version=body.firmware_version,
+                active=True,
+                mqtt_topic=mqtt_topic,
+                secret=_secrets.token_hex(16),
+            )
+            db.add(device)
+
+        await db.commit()
+        await db.refresh(device)
+
+        return DevicePairResponse(
+            device_id=str(device.id),
+            mqtt_topic=mqtt_topic,
+            mqtt_user=mqtt_user,
+            mqtt_pass=mqtt_pass,
+            mqtt_broker=mqtt_broker,
+            mqtt_port=mqtt_port,
+            secret=device.secret,
+            message=f"อุปกรณ์จับคู่สำเร็จ! กำลังรอสัญญาณจาก {mac}",
+        )
+
+    # No MAC given — "custom firmware" path. Server invents an ID; caller's
+    # own firmware must be configured to publish to the returned mqtt_topic.
     device = Device(
         user_id=user.id,
         kind=body.kind,
@@ -127,11 +206,6 @@ async def pair_device(
 
     await db.commit()
     await db.refresh(device)
-
-    mqtt_broker = os.getenv("MQTT_BROKER_PUBLIC", "metabreath.duckdns.org")
-    mqtt_port = int(os.getenv("MQTT_PORT_PUBLIC", "1883"))
-    mqtt_user = os.getenv("MQTT_ESP32_USER", "esp32")
-    mqtt_pass = os.getenv("MQTT_ESP32_PASS", "")
 
     return DevicePairResponse(
         device_id=device_id_str,
@@ -157,6 +231,55 @@ async def list_devices(user: User = Depends(get_current_user), db: AsyncSession 
         .order_by(Device.created_at.desc())
     )
     return result.all()
+
+
+# ─── Full hardware-fault simulation (self-service) ──────────────────────────
+# simulate_acetone already exists as an admin-only toggle (POST /admin/
+# device/{id}/simulate-acetone). This is the user-facing escalation: for a
+# device whose pressure sensor is ALSO broken, not just the gas sensor —
+# the owner flips it themselves rather than needing an admin. Ownership-
+# gated like unlink_device below, not _get_accessible_device, since this
+# changes a persistent hardware-config flag, not a session-scoped action.
+
+class SetSimulationRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/device/{device_id}/simulation", response_model=DeviceOut)
+async def set_full_simulation(
+    device_id: UUID,
+    body: SetSimulationRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle full simulation (both acetone AND pressure) for the caller's
+    own device. Off: leaves simulate_acetone exactly as it already was —
+    only simulate_pressure is cleared. On: forces simulate_acetone on too,
+    since "full simulation" means neither sensor is trusted."""
+    result = await db.exec(
+        select(Device).where(Device.id == device_id, Device.user_id == user.id)
+    )
+    device = result.first()
+    if not device:
+        raise HTTPException(404, "Device not found or not owned by user")
+
+    if body.enabled:
+        device.simulate_acetone = True
+        device.simulate_pressure = True
+    else:
+        device.simulate_pressure = False
+
+    db.add(device)
+    await db.commit()
+    await db.refresh(device)
+
+    # Drop any in-memory sim state so the next reading starts clean rather
+    # than continuing mid-curve from before the toggle flipped.
+    from app.services import acetone_simulator, pressure_simulator
+    acetone_simulator.reset(device.id)
+    pressure_simulator.reset(device.id)
+
+    return device
 
 
 @router.delete("/device/{device_id}", status_code=204)
@@ -406,9 +529,8 @@ async def get_readings(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _get_accessible_device(device_id, user, db):
-        raise HTTPException(status_code=404, detail="Device not found")
-
+    # History is user-scoped: the WHERE clause already filters SensorReading.user_id == user.id,
+    # so users can see their own past readings even after releasing a shared device claim.
     since = datetime.utcnow() - timedelta(days=days)
     if limit > 0:
         # Fetch newest N, then flip to ascending so callers still get chronological order.
@@ -440,6 +562,7 @@ async def get_readings(
 
 class SessionSummary(BaseModel):
     session_id: str
+    device_id: str
     started_at: datetime
     ended_at: datetime
     duration_seconds: float
@@ -464,6 +587,7 @@ async def list_sessions(
     rows = (await db.exec(
         select(
             SensorReading.session_id.label("sid"),
+            SensorReading.device_id.label("device"),  # constant within a session — safe in GROUP BY
             func.min(SensorReading.time).label("started"),
             func.max(SensorReading.time).label("ended"),
             func.count().label("n"),
@@ -478,7 +602,7 @@ async def list_sessions(
             SensorReading.session_id.is_not(None),
             SensorReading.time >= since,
         )
-        .group_by(SensorReading.session_id)
+        .group_by(SensorReading.session_id, SensorReading.device_id)
         .order_by(func.min(SensorReading.time).desc())
     )).all()
 
@@ -507,15 +631,16 @@ async def list_sessions(
     return [
         SessionSummary(
             session_id=r[0],
-            started_at=r[1],
-            ended_at=r[2],
-            duration_seconds=(r[2] - r[1]).total_seconds(),
-            n_samples=int(r[3]),
-            peak_acetone_delta=float(r[4]) if r[4] is not None else None,
-            mean_acetone_delta=float(r[5]) if r[5] is not None else None,
-            avg_pressure_kpa=float(r[6]) if r[6] is not None else None,
-            avg_temp_c=float(r[7]) if r[7] is not None else None,
-            avg_humidity_pct=float(r[8]) if r[8] is not None else None,
+            device_id=str(r[1]),
+            started_at=r[2],
+            ended_at=r[3],
+            duration_seconds=(r[3] - r[2]).total_seconds(),
+            n_samples=int(r[4]),
+            peak_acetone_delta=float(r[5]) if r[5] is not None else None,
+            mean_acetone_delta=float(r[6]) if r[6] is not None else None,
+            avg_pressure_kpa=float(r[7]) if r[7] is not None else None,
+            avg_temp_c=float(r[8]) if r[8] is not None else None,
+            avg_humidity_pct=float(r[9]) if r[9] is not None else None,
             dominant_label=dominant.get(r[0], (None,))[0],
         )
         for r in rows
@@ -544,11 +669,9 @@ async def get_daily_stats(
 ):
     """
     Per-day aggregate for the CURRENT user's readings on this device.
-    Shared-device semantics: each user sees their own recordings only.
+    Shared-device semantics: each user sees their own recordings only —
+    the WHERE clause filters user_id, so no cross-user leak even without an active claim.
     """
-    if not await _get_accessible_device(device_id, user, db):
-        raise HTTPException(status_code=404, detail="Device not found")
-
     since = datetime.utcnow() - timedelta(days=days)
     day = func.date(SensorReading.time).label("day")
 

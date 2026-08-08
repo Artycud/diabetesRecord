@@ -10,11 +10,11 @@
  */
 
 export type MetabolicZone =
-  | "fed_resting"    // 0.3–2 ppm  : Fed / resting baseline
-  | "transitional"   // 2–8 ppm    : Short fast / light exercise / mild carb restriction
-  | "fat_oxidation"  // 8–40 ppm   : Active fat oxidation (extended fast / continuous keto)
-  | "extended_fast"  // 40–75 ppm  : Extended fasting / strict keto — monitor symptoms
-  | "safety_alert"   // ≥ 75 ppm   : Layer 1 ceiling — DKA range, consult doctor
+  | "fed_resting"    // 0.5–2 ppm  : Rest Zone — fed / resting baseline
+  | "transitional"   // 2–4 ppm    : Fat-Burn Zone — mild fat oxidation onset
+  | "fat_oxidation"  // 4–30 ppm   : Deep Burn Zone — active fat oxidation / keto
+  | "extended_fast"  // 30–75 ppm  : Peak Zone — extended fast / strict keto
+  | "safety_alert"   // ≥ 75 ppm   : Caution Zone — DKA range, consult doctor
   | "clean"          // ambient air
   | "unreliable";    // low quality / sensor issue
 
@@ -22,8 +22,21 @@ export type MetabolicZone =
 export type AcetoneLabel = MetabolicZone;
 
 /**
- * Map Anderson 2015 five-class backend labels → 4-zone frontend MetabolicZone.
- * Backend stores: basal|light_ketosis|nutritional_ketosis|deep_ketosis|dka_risk
+ * Map backend labels → 4-zone frontend MetabolicZone.
+ *
+ * Two backend label vocabularies exist and both are mapped here:
+ *   - Anderson 2015 five-class: basal|light_ketosis|nutritional_ketosis|deep_ketosis|dka_risk
+ *   - app.services.signal_processing.classify_acetone (what the API/MQTT
+ *     pipeline actually sends today, confirmed against production logs):
+ *     clean|low|moderate|high|unreliable, at 5/30/80 mV boundaries. These
+ *     were previously NOT in this map at all, so every real reading labeled
+ *     low/moderate/high silently fell through to "unreliable" — fixed below.
+ *     Mapped conservatively (never escalates into safety_alert territory,
+ *     which starts at 75ppm/750mV — far above classify_acetone's 80mV "high"
+ *     floor) to match classify_acetone's own documented intent:
+ *       low      (5-30mV)  "no significant acetone"   → fed_resting
+ *       moderate (30-80mV) "mild ketosis / fat burning" → transitional
+ *       high     (>=80mV)  "strong ketosis"            → fat_oxidation
  * Frontend shows: fed_resting|transitional|fat_oxidation|extended_fast|safety_alert
  */
 export function backendLabelToZone(label: string | null | undefined): MetabolicZone {
@@ -33,6 +46,10 @@ export function backendLabelToZone(label: string | null | undefined): MetabolicZ
     nutritional_ketosis:  "fat_oxidation",
     deep_ketosis:         "extended_fast",
     dka_risk:             "safety_alert",
+    // app.services.signal_processing.classify_acetone's actual vocabulary
+    low:                  "fed_resting",
+    moderate:             "transitional",
+    high:                 "fat_oxidation",
     // pass-through if already 4-zone
     fed_resting:          "fed_resting",
     transitional:         "transitional",
@@ -48,8 +65,8 @@ export function backendLabelToZone(label: string | null | undefined): MetabolicZ
 /** Zone thresholds in ppm (acetone_delta) */
 export const ZONE_THRESHOLDS: [number, MetabolicZone][] = [
   [2,  "fed_resting"],
-  [8,  "transitional"],
-  [40, "fat_oxidation"],
+  [4,  "transitional"],
+  [30, "fat_oxidation"],
   [75, "extended_fast"],
 ];
 
@@ -79,6 +96,51 @@ export const LABEL_STYLE: Record<string, LabelStyle> = {
   unreliable:   { color: "#6B7280", grad: ["#4A4A4A", "#7A7A7A"], tailwind: "text-text-muted" },
 };
 
+// Zone-boundary colors as an ordered ramp (ppm -> color), reusing
+// LABEL_STYLE's own base colors so this never drifts out of sync with the
+// zone palette. Distinct from LABEL_STYLE's per-zone lookup, which is a
+// discrete jump at each threshold — fine for static labels/badges, but
+// visibly "cuts" when applied to a value that's continuously rising (e.g.
+// live during a breath test): crossing 2ppm would instantly snap slate to
+// emerald instead of easing through it.
+const COLOR_RAMP: [number, string][] = [
+  [0,  LABEL_STYLE.fed_resting.color],
+  [2,  LABEL_STYLE.transitional.color],
+  [4,  LABEL_STYLE.fat_oxidation.color],
+  [30, LABEL_STYLE.extended_fast.color],
+  [75, LABEL_STYLE.safety_alert.color],
+];
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex([r, g, b]: [number, number, number]): string {
+  return "#" + [r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("");
+}
+
+/** Continuously interpolated color for a live ppm value — smoothly blends
+ *  between adjacent zone-boundary colors instead of snapping at thresholds
+ *  the way LABEL_STYLE's discrete lookup does. Intended for anything
+ *  tracking a value in real time (e.g. the breathing recording vessel's
+ *  fill color), not for static zone badges/labels. */
+export function rampColor(ppm: number): string {
+  const v = Number.isFinite(ppm) ? Math.max(0, ppm) : 0;
+  if (v <= COLOR_RAMP[0][0]) return COLOR_RAMP[0][1];
+  for (let i = 1; i < COLOR_RAMP.length; i++) {
+    const [hi, hiColor] = COLOR_RAMP[i];
+    const [lo, loColor] = COLOR_RAMP[i - 1];
+    if (v <= hi) {
+      const t = (v - lo) / (hi - lo);
+      const a = hexToRgb(loColor);
+      const b = hexToRgb(hiColor);
+      return rgbToHex([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+    }
+  }
+  return COLOR_RAMP[COLOR_RAMP.length - 1][1];
+}
+
 export const LABEL_TH: Record<string, string> = {
   clean:        "อากาศสะอาด",
   fed_resting:  "พักฟื้น / หลังกิน",
@@ -100,10 +162,10 @@ export const LABEL_EN: Record<string, string> = {
 };
 
 export const LABEL_RANGE: Record<string, string> = {
-  fed_resting:  "0.3–2 ppm",
-  transitional: "2–8 ppm",
-  fat_oxidation:"8–40 ppm",
-  extended_fast:"40–75 ppm",
+  fed_resting:  "0.5–2 ppm",
+  transitional: "2–4 ppm",
+  fat_oxidation:"4–30 ppm",
+  extended_fast:"30–75 ppm",
   safety_alert: "≥ 75 ppm",
 };
 

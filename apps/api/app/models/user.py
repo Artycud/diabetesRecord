@@ -16,6 +16,12 @@ class User(SQLModel, table=True):
     role: str = Field(default="patient", max_length=20)  # patient|doctor|admin
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login_at: Optional[datetime] = None
+    # If True, ALL of this user's sensor_readings / logs are excluded from
+    # any current or future ML training pipeline. Set for internal admin,
+    # demo, and simulation accounts so their data can't leak into training.
+    # Enforced by app.services.ml_data.get_training_readings() and by the
+    # notebooks' data-loading step.
+    exclude_from_training: bool = Field(default=False)
 
 class Profile(SQLModel, table=True):
     __tablename__ = "profiles"

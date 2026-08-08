@@ -1,6 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
@@ -8,9 +10,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Palette, Globe, LogOut, ChevronRight, Ruler,
-  Flame, Trophy, Star, Shield,
+  Flame, Trophy, Star, Shield, FlaskConical, Radar,
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
+import { useDemoMode } from "@/lib/demoMode";
+import { useThemeConfig } from "@/components/theme/ThemeProvider";
 
 const XP_PER_LEVEL = 100;
 
@@ -32,11 +36,33 @@ export default function MePage() {
   const { user, logout } = useAuth();
   const { t, locale, setLocale } = useT();
   const router = useRouter();
+  const qc = useQueryClient();
   const { unit: acUnit } = useUnits();
+  const { demoMode, setDemoMode } = useDemoMode();
+  const { cardStyle } = useThemeConfig();
 
   const { data: xp }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streak } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
   const { data: badges } = useQuery({ queryKey: ["me", "badges"], queryFn: api.gamification.getBadges });
+  const { data: devices } = useQuery({ queryKey: ["sensor", "devices"], queryFn: api.sensor.listDevices });
+  // "Simulation" toggle applies to the user's own primary device — same
+  // one Home/Breathing already default to (devices?.[0]).
+  const primaryDevice = devices?.[0];
+  const fullSimEnabled = !!primaryDevice?.simulate_pressure;
+  const [simPending, setSimPending] = useState(false);
+
+  async function toggleFullSimulation() {
+    if (!primaryDevice || simPending) return;
+    setSimPending(true);
+    try {
+      await api.sensor.setSimulation(primaryDevice.id, !fullSimEnabled);
+      qc.invalidateQueries({ queryKey: ["sensor", "devices"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "อัปเดตไม่สำเร็จ");
+    } finally {
+      setSimPending(false);
+    }
+  }
 
   const goalKey = user?.profile?.goal_type ?? "monitor";
   const pct = xp ? Math.round((xp.xp_in_level / XP_PER_LEVEL) * 100) : 0;
@@ -69,6 +95,9 @@ export default function MePage() {
             <div className="h-1.5 rounded-full bg-bg-raised overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-gold-300 to-gold-500 transition-all duration-700" style={{ width: `${pct}%` }} />
             </div>
+            <p className="text-[11px] text-text-disabled">
+              +10 XP per breath check · redeemable for gift cards soon
+            </p>
           </div>
         ) : (
           <div className="mt-4 animate-pulse space-y-1.5">
@@ -132,53 +161,128 @@ export default function MePage() {
       )}
 
       {/* Menu */}
-      <div className="bg-bg-elevated rounded-2xl overflow-hidden">
-        {/* Admin Console — only for admin users */}
-        {user?.is_admin && (
-          <Link href="/admin" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
-            <div className="h-8 w-8 rounded-lg bg-gold-500/20 flex items-center justify-center">
-              <Shield size={15} className="text-gold-500" />
+      <div>
+        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Settings</p>
+        <div className="bg-bg-elevated rounded-2xl overflow-hidden">
+          {/* Admin Console — only for admin users */}
+          {user?.is_admin && (
+            <Link href="/admin" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
+              <div className="h-8 w-8 rounded-lg bg-gold-500/20 flex items-center justify-center">
+                <Shield size={15} className="text-gold-500" />
+              </div>
+              <span className="flex-1 text-sm text-gold-500 font-medium text-left">Admin Console</span>
+              <span className="text-[10px] text-gold-500 bg-gold-500/10 px-2 py-0.5 rounded-full">ADMIN</span>
+              <ChevronRight size={14} className="text-text-disabled" />
+            </Link>
+          )}
+
+          {/* Language toggle */}
+          <button
+            onClick={() => setLocale(locale === "th" ? "en" : "th")}
+            className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors"
+          >
+            <div className="h-8 w-8 rounded-lg bg-bg-raised flex items-center justify-center">
+              <Globe size={15} className="text-text-muted" />
             </div>
-            <span className="flex-1 text-sm text-gold-500 font-medium text-left">Admin Console</span>
-            <span className="text-[10px] text-gold-500 bg-gold-500/10 px-2 py-0.5 rounded-full">ADMIN</span>
+            <span className="flex-1 text-sm text-text-primary text-left">Language</span>
+            <span className="text-xs text-text-muted font-mono bg-bg-raised px-2 py-0.5 rounded-full">
+              {locale === "th" ? "ไทย" : "EN"}
+            </span>
+            <ChevronRight size={14} className="text-text-disabled" />
+          </button>
+
+          {/* Acetone units */}
+          <Link href="/me/settings/units" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
+            <div className="h-8 w-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+              <Ruler size={15} className="text-blue-400" />
+            </div>
+            <span className="flex-1 text-sm text-text-primary font-medium">Acetone units</span>
+            <span className="text-xs text-text-muted font-mono bg-bg-raised px-2 py-0.5 rounded-full">
+              {unitLabel(acUnit)}
+            </span>
             <ChevronRight size={14} className="text-text-disabled" />
           </Link>
-        )}
 
-        {/* Theme & appearance */}
-        <Link href="/me/settings/appearance" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
-          <div className="h-8 w-8 rounded-lg bg-mint-500/20 flex items-center justify-center">
-            <Palette size={15} className="text-mint-500" />
-          </div>
-          <span className="flex-1 text-sm text-mint-500 font-medium">Theme & appearance</span>
-          <ChevronRight size={14} className="text-text-disabled" />
-        </Link>
+          {/* Theme & appearance */}
+          <Link href="/me/settings/appearance" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
+            <div className="h-8 w-8 rounded-lg bg-mint-500/20 flex items-center justify-center">
+              <Palette size={15} className="text-mint-500" />
+            </div>
+            <span className="flex-1 text-sm text-mint-500 font-medium">Theme & appearance</span>
+            <ChevronRight size={14} className="text-text-disabled" />
+          </Link>
 
-        {/* Acetone units */}
-        <Link href="/me/settings/units" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
-          <div className="h-8 w-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-            <Ruler size={15} className="text-blue-400" />
-          </div>
-          <span className="flex-1 text-sm text-text-primary font-medium">Acetone units</span>
-          <span className="text-xs text-text-muted font-mono bg-bg-raised px-2 py-0.5 rounded-full">
-            {unitLabel(acUnit)}
-          </span>
-          <ChevronRight size={14} className="text-text-disabled" />
-        </Link>
+          {/* Demo mode — no device needed, runs a full breath-test flow with
+              a synthetic reading stream. Deliberately low-key/muted styling. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={demoMode}
+            onClick={() => setDemoMode(!demoMode)}
+            className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors ${
+              primaryDevice ? "border-b border-border-soft" : ""
+            }`}
+          >
+            <div className="h-8 w-8 rounded-lg bg-bg-raised flex items-center justify-center">
+              <FlaskConical size={15} className="text-text-muted" />
+            </div>
+            <span className="flex-1 text-sm text-text-muted text-left">Demo mode</span>
+            <span
+              className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${
+                demoMode
+                  ? "bg-mint-500"
+                  : cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : "bg-bg-raised"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                  cardStyle === "neumorphic" ? "neu-raised" : ""
+                } ${demoMode ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </span>
+          </button>
 
-        {/* Language toggle */}
-        <button
-          onClick={() => setLocale(locale === "th" ? "en" : "th")}
-          className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors"
-        >
-          <div className="h-8 w-8 rounded-lg bg-bg-raised flex items-center justify-center">
-            <Globe size={15} className="text-text-muted" />
-          </div>
-          <span className="flex-1 text-sm text-text-primary text-left">Language</span>
-          <span className="text-xs text-text-muted font-mono bg-bg-raised px-2 py-0.5 rounded-full">
-            {locale === "th" ? "ไทย → EN" : "EN → ไทย"}
-          </span>
-        </button>
+          {/* Simulation — self-service escalation of the acetone-only
+              hardware-fault workaround (already running for a broken gas
+              sensor) to also fake pressure, for when the pressure sensor
+              is broken too. Only shown for a user with an actual device —
+              there's nothing to apply it to otherwise. Same low-key
+              styling as Demo mode; only visible difference is the label
+              explaining what's being simulated when on. */}
+          {primaryDevice && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={fullSimEnabled}
+              disabled={simPending}
+              onClick={toggleFullSimulation}
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors disabled:opacity-60"
+            >
+              <div className="h-8 w-8 rounded-lg bg-bg-raised flex items-center justify-center">
+                <Radar size={15} className="text-text-muted" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm text-text-muted">Simulation</p>
+                {fullSimEnabled && (
+                  <p className="text-[10px] text-text-disabled mt-0.5">Acetone + pressure both simulated</p>
+                )}
+              </div>
+              <span
+                className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${
+                  fullSimEnabled
+                    ? "bg-mint-500"
+                    : cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : "bg-bg-raised"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                    cardStyle === "neumorphic" ? "neu-raised" : ""
+                  } ${fullSimEnabled ? "translate-x-5" : "translate-x-0"}`}
+                />
+              </span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Logout */}

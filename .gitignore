@@ -57,3 +57,10 @@ Thumbs.db
 # large datasets & reference material (kept locally only)
 /data/
 /แข่งชนะ by Coach Bright_NSC/
+
+# secrets discovered outside prior gitignore coverage (added by Claude, 2026-08-08)
+infra/mosquitto/passwd
+.env.backup.*
+.env.bak*
+.claude/
+.backups/

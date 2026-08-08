@@ -18,10 +18,13 @@ import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { useDeviceStream } from "@/lib/useDeviceStream";
 import { convertFromMv, useUnits } from "@/lib/units";
+import { useTimezone } from "@/lib/timezone";
+import { parseServerTime } from "@/lib/time";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Wind } from "lucide-react";
 import { EmptyChartIllustration } from "@/components/brand/empty-chart";
+import { TrendClassCard } from "@/components/cards/TrendClassCard";
 import { twMerge } from "tailwind-merge";
 
 function EmptyChart({ label }: { label: string }) {
@@ -63,6 +66,7 @@ export default function TrendsPage() {
   const highThreshold     = convertFromMv(80, acUnit);
 
   const acDecimals = acUnit === "mV" ? 0 : 2;
+  const { formatDate: tzFormatDate, formatTime: tzFormatTime } = useTimezone();
   const [days, setDays] = useState(7);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   useDeviceStream(user?.id);
@@ -94,8 +98,7 @@ export default function TrendsPage() {
   ];
 
   const dateLocale = locale === "th" ? "th-TH" : "en-US";
-  const fmt = (ts: string) =>
-    new Date(ts).toLocaleDateString(dateLocale, { day: "numeric", month: "short" });
+  const fmt = (ts: string) => tzFormatDate(ts);
 
   const { data: ketone, isLoading: kLoading } = useQuery({
     queryKey: ["ketone", days],
@@ -107,11 +110,21 @@ export default function TrendsPage() {
     queryFn:  () => api.logs.getWeight({ days }),
   });
 
+  // Fallback: if user has no owned device and no active shared claim, look up their
+  // most recent session's device_id — backend now allows user-scoped history queries
+  // on any device the user has ever recorded on.
+  const { data: recentSessions } = useQuery({
+    queryKey: ["sensor", "sessions", "fallback"],
+    queryFn: () => api.sensor.getSessions(30),
+  });
+  const lastRecordedDeviceId = recentSessions?.[0]?.device_id ?? null;
+
   const effectiveDevice =
     selectedDevice
     ?? devices?.find((d) => d.active)?.id
     ?? devices?.[0]?.id
     ?? claimedSharedId
+    ?? lastRecordedDeviceId
     ?? null;
 
   const { data: sensorReadings, isLoading: sLoading } = useQuery({
@@ -124,6 +137,12 @@ export default function TrendsPage() {
     queryKey: ["daily-stats", effectiveDevice, days],
     queryFn:  () => api.sensor.getDailyStats(effectiveDevice!, days),
     enabled:  !!effectiveDevice,
+    refetchInterval: 60_000,
+  });
+
+  const { data: sessions } = useQuery({
+    queryKey: ["sensor", "sessions", days],
+    queryFn:  () => api.sensor.getSessions(days),
     refetchInterval: 60_000,
   });
 
@@ -176,6 +195,9 @@ export default function TrendsPage() {
           ))}
         </div>
       </div>
+
+      {/* Long-term trend classifier (Phase 3 LSTM Trend) */}
+      {effectiveDevice && <TrendClassCard deviceId={effectiveDevice} sessions={14} />}
 
       {/* Ketone chart */}
       <Card>
@@ -412,6 +434,100 @@ export default function TrendsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Per-session summary */}
+      <Card>
+        <CardContent className="pt-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold text-text-primary tracking-tight">สรุปรายครั้ง</h2>
+              <p className="text-xs text-muted mt-0.5">
+                แต่ละครั้งที่กด START · {days === 1 ? "วันนี้" : `${days} วันล่าสุด`}
+              </p>
+            </div>
+            {(sessions?.length ?? 0) > 0 && (
+              <Badge variant="mint">รวม {sessions!.length} ครั้ง</Badge>
+            )}
+          </div>
+
+          {(sessions?.length ?? 0) === 0 && (
+            <EmptyChart label="ยังไม่มี session การเป่าในช่วงนี้" />
+          )}
+
+          {(sessions?.length ?? 0) > 0 && (
+            <div className="overflow-x-auto -mx-4 px-4">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border-soft text-muted">
+                    <th className="text-left  py-2 font-semibold">เวลา</th>
+                    <th className="text-right py-2 font-semibold">น</th>
+                    <th className="text-right py-2 font-semibold">เฉลี่ย</th>
+                    <th className="text-right py-2 font-semibold">สูงสุด</th>
+                    <th className="text-right py-2 font-semibold">แรงเป่า</th>
+                    <th className="text-right py-2 font-semibold">ระดับ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions!.map((s) => {
+                    const zone = s.dominant_label ?? "unreliable";
+                    const zoneColor = ACETONE_ZONE_COLOR[zone] ?? "#9CA3AF";
+                    return (
+                      <tr
+                        key={s.session_id}
+                        className="border-b border-border-soft/60 hover:bg-bg-raised transition-colors"
+                      >
+                        <td className="py-2.5 text-text-primary font-medium">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="h-2 w-2 rounded-full shrink-0"
+                              style={{ background: zoneColor }}
+                            />
+                            <div className="leading-tight">
+                              <div>{tzFormatDate(s.started_at)}</div>
+                              <div className="text-[10px] text-muted">
+                                {tzFormatTime(s.started_at)}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 text-right text-text-primary font-mono">
+                          {s.n_samples}
+                        </td>
+                        <td className="py-2.5 text-right text-text-primary font-mono font-semibold">
+                          {s.mean_acetone_delta != null
+                            ? convertFromMv(s.mean_acetone_delta, acUnit).toFixed(acDecimals)
+                            : "—"}
+                        </td>
+                        <td className="py-2.5 text-right text-muted font-mono">
+                          {s.peak_acetone_delta != null
+                            ? convertFromMv(s.peak_acetone_delta, acUnit).toFixed(acDecimals)
+                            : "—"}
+                        </td>
+                        <td className="py-2.5 text-right text-muted font-mono">
+                          {s.avg_pressure_kpa != null
+                            ? `${s.avg_pressure_kpa.toFixed(1)}`
+                            : "—"}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <span
+                            className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full"
+                            style={{
+                              background: `${zoneColor}22`,
+                              color: zoneColor,
+                            }}
+                          >
+                            {zone}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

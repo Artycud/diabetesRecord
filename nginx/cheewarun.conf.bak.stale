@@ -1,0 +1,91 @@
+# Cheewarun — nginx virtual host
+# Place at: /etc/nginx/sites-enabled/cheewarun
+# Note: certbot will manage the ssl_certificate lines after running:
+#   certbot --nginx -d cheewarun.duckdns.org
+#
+# PORT CONFLICT NOTE (2026-07-04):
+#   Port 443 is currently held by trigger-finger-exercise-caddy container.
+#   Resolution options (choose one before 0.10):
+#   A. (Recommended) Move trigger-finger-caddy port binding to 127.0.0.1:7443,
+#      then let host nginx own 443 and proxy_pass trigger-finger domain to 7443.
+#   B. Use DNS-01 challenge (certbot-dns-duckdns plugin) — gets cert without
+#      needing 443 free. Then serve on port 8443 temporarily.
+#   C. Add cheewarun domain into trigger-finger's Caddyfile directly.
+
+server {
+    listen 80;
+    server_name cheewarun.duckdns.org;
+
+    # ACME challenge (for certbot http-01)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name cheewarun.duckdns.org;
+
+    # TLS — certbot fills these in automatically
+    ssl_certificate /etc/letsencrypt/live/cheewarun.duckdns.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/cheewarun.duckdns.org/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Security headers
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # ── Frontend (Next.js) ──────────────────────────────────
+    location / {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # ── API (FastAPI) ───────────────────────────────────────
+    location /api/ {
+        proxy_pass http://127.0.0.1:8010/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+        client_max_body_size 10m;
+    }
+
+    # ── WebSocket (FastAPI WS) ──────────────────────────────
+    location /ws {
+        proxy_pass http://127.0.0.1:8010/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # ── MQTT over WebSocket (for hardware devices) ──────────
+    location /mqtt {
+        proxy_pass http://127.0.0.1:9010;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}

@@ -3,20 +3,29 @@
 import { useEffect, useRef, useState } from "react";
 import { Wind, X, RefreshCw, Flame, Star } from "lucide-react";
 import { toast } from "sonner";
-import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
+import { ComposedChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AcetoneLabel, LiveReading } from "@/lib/useDeviceStream";
 import { api } from "@/lib/api";
 import type { ContextTag } from "@/lib/api";
-import { useUnits } from "@/lib/units";
-import { LABEL_STYLE, LABEL_TH, backendLabelToZone } from "@/lib/riskLabel";
+import { convertFromMv, useUnits } from "@/lib/units";
+import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone, rampColor } from "@/lib/riskLabel";
+import { useTimezone } from "@/lib/timezone";
+import { randomDemoParams, demoValueAt, type DemoParams } from "@/lib/demoReading";
+import { BreathPulse } from "@/components/ui/BreathPulse";
+import { useThemeConfig } from "@/components/theme/ThemeProvider";
+import { twMerge } from "tailwind-merge";
 import { ContextSelector } from "./ContextSelector";
+import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
 
-const CALIBRATION_MS = 10_000;
-const RECORDING_MS   = 10_000;
-const STORAGE_KEY    = "breath-sessions";
-const MAX_STORED     = 20;
-const MIN_SAMPLES    = 2;
+const CALIBRATION_MS = 5_000;
+const RECORDING_MS   = 5_000;
+const MAX_STORED  = 20;
+const MIN_SAMPLES = 2;
+
+function storageKey(userId?: string | null) {
+  return userId ? `breath-sessions-${userId}` : "breath-sessions";
+}
 
 export interface SessionSummary {
   id: string;
@@ -30,14 +39,15 @@ export interface SessionSummary {
   context_tag: ContextTag | null;
 }
 
-export function loadSessions(): SessionSummary[] {
+export function loadSessions(userId?: string | null): SessionSummary[] {
   if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]"); }
+  try { return JSON.parse(localStorage.getItem(storageKey(userId)) ?? "[]"); }
   catch { return []; }
 }
 
-function persist(s: SessionSummary) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([s, ...loadSessions()].slice(0, MAX_STORED)));
+function persist(s: SessionSummary, userId?: string | null) {
+  const key = storageKey(userId);
+  localStorage.setItem(key, JSON.stringify([s, ...loadSessions(userId)].slice(0, MAX_STORED)));
 }
 
 function trimmedMean(vals: number[]): number {
@@ -96,7 +106,10 @@ const beepEnd       = () => beep(600, 500, 0.3);     // recording done
 
 type Phase = "idle" | "calibrating" | "recording" | "done";
 
-const SZ = 112;
+// 128px matches the idle START button (h-32 w-32) exactly, so the focal
+// circle stays the same size across idle -> calibrating -> recording
+// instead of visibly growing/shrinking as the phase changes.
+const SZ = 128;
 const SW = 5;
 const RING_R = (SZ - SW) / 2;
 const CIRC = 2 * Math.PI * RING_R;
@@ -105,18 +118,44 @@ interface Props {
   liveReading: LiveReading | null;
   connected: boolean;
   deviceId: string | null;
+  userId?: string | null;
   onSessionSaved?: () => void;
+  // Demo Mode (apps/web/src/lib/demoMode.tsx) — no real device needed at
+  // all; liveReading/connected/deviceId above are ignored internally and a
+  // synthetic reading stream (apps/web/src/lib/demoReading.ts) is used
+  // instead, but every other code path (chart, ring, persisted history,
+  // gamification) runs completely unchanged.
+  isDemo?: boolean;
 }
 
-export default function BreathSession({ liveReading, connected, deviceId, onSessionSaved }: Props) {
+export default function BreathSession({ liveReading, connected, deviceId, userId, onSessionSaved, isDemo = false }: Props) {
   const { format: fmtAcetone, label: unitLbl } = useUnits();
+  const { cardStyle } = useThemeConfig();
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);   // 0-100 within current phase
   const [result, setResult] = useState<SessionSummary | null>(null);
-  const [chartData, setChartData] = useState<{ t: number; mv: number }[]>([]);
+  // Populated after finalize()'s checkin() resolves — null while pending,
+  // 0 if today's check-in was already claimed (no double-award). Threaded
+  // through to DoneCard so the "+N XP" feedback ties directly to *this*
+  // session instead of only ever showing the running lifetime total.
+  const [xpAwarded, setXpAwarded] = useState<number | null>(null);
+  const [chartData, setChartData] = useState<{ t: number; mv: number; kpa: number }[]>([]);
+  // Real-time blow intensity (0-1), smoothed each animation frame from the
+  // live pressure reading — drives the inner ring fill during recording.
+  const [intensity, setIntensity] = useState(0);
+  const intensityRef = useRef(0);
+  const liveReadingRef = useRef<LiveReading | null>(null);
+  // Demo Mode: synthetic reading stream, standing in for the liveReading
+  // prop everywhere below via `effectiveReading`.
+  const [demoReading, setDemoReading] = useState<LiveReading | null>(null);
+  const demoParamsRef = useRef<DemoParams | null>(null);
+  const demoLastSampleRef = useRef(0);
+  const effectiveReading = isDemo ? demoReading : liveReading;
   const [showContextSelector, setShowContextSelector] = useState(false);
   const [contextTag, setContextTag] = useState<ContextTag | null>(null);
+  const [showChecklist, setShowChecklist] = useState(false);
+  const preBlowAnswersRef = useRef<PreBlowAnswers | null>(null);
 
   const t0 = useRef(0);
   const samplesRef = useRef<LiveReading[]>([]);
@@ -128,6 +167,7 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
   const sessionBaseline = useRef<number | null>(null);
   const onSavedRef = useRef(onSessionSaved);
   useEffect(() => { onSavedRef.current = onSessionSaved; }, [onSessionSaved]);
+  useEffect(() => { liveReadingRef.current = liveReading; }, [liveReading]);
 
   function clearScheduled() {
     timerIds.current.forEach((id) => window.clearTimeout(id));
@@ -140,15 +180,15 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
 
   // Collect samples only during the recording phase (normalised to session baseline).
   useEffect(() => {
-    if (phase !== "recording" || !liveReading || liveReading === lastReading.current) return;
-    lastReading.current = liveReading;
+    if (phase !== "recording" || !effectiveReading || effectiveReading === lastReading.current) return;
+    lastReading.current = effectiveReading;
     if (sessionBaseline.current === null) {
-      sessionBaseline.current = liveReading.acetone_delta_mv;
+      sessionBaseline.current = effectiveReading.acetone_delta_mv;
     }
-    samplesRef.current.push(liveReading);
-    const normMv = liveReading.acetone_delta_mv - (sessionBaseline.current ?? 0);
-    setChartData((prev) => [...prev, { t: prev.length, mv: normMv }]);
-  }, [liveReading, phase]);
+    samplesRef.current.push(effectiveReading);
+    const normMv = effectiveReading.acetone_delta_mv - (sessionBaseline.current ?? 0);
+    setChartData((prev) => [...prev, { t: prev.length, mv: normMv, kpa: effectiveReading.pressure_kpa ?? 0 }]);
+  }, [effectiveReading, phase]);
 
   // Calibration phase — 10 s countdown, 3-2-1 beeps, transition to recording
   useEffect(() => {
@@ -186,16 +226,61 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
     sessionBaseline.current = null;
     setChartData([]);
     setProgress(0);
+    intensityRef.current = 0;
+    setIntensity(0);
+    demoLastSampleRef.current = 0;
 
-    if (deviceId) {
+    if (isDemo) {
+      demoParamsRef.current = randomDemoParams();
+    } else if (deviceId) {
       api.sensor.startRecording(deviceId).catch(() => {
         toast.error("เริ่ม session ไม่สำเร็จ");
       });
     }
 
     const tick = () => {
-      const p = Math.min(100, ((Date.now() - t0.current) / RECORDING_MS) * 100);
+      const now = Date.now();
+      const p = Math.min(100, ((now - t0.current) / RECORDING_MS) * 100);
       setProgress(p);
+
+      // Smooth the current pressure reading into a 0-1 intensity so the inner
+      // ring visibly tracks the exhale in real time, not just the wall clock.
+      let targetKpa: number;
+      if (isDemo) {
+        const { mv, kpa } = demoValueAt(p, demoParamsRef.current!);
+        targetKpa = kpa;
+        // Throttle discrete "readings" (chart samples) to a realistic ~2Hz
+        // cadence, matching real device sampling — separate from the ring's
+        // per-frame intensity smoothing below, which stays buttery smooth.
+        if (now - demoLastSampleRef.current > 500) {
+          demoLastSampleRef.current = now;
+          const zone = metabolicZone(convertFromMv(mv, "ppm"));
+          setDemoReading({
+            device_id: "demo",
+            time: new Date().toISOString(),
+            acetone_delta_mv: mv,
+            sensor_voltage: null,
+            baseline_voltage: null,
+            pressure_kpa: kpa,
+            temperature: 25,
+            humidity: 55,
+            // `zone` is a MetabolicZone (fed_resting/transitional/...) — a
+            // different (and, unlike the AcetoneLabel union below, actually
+            // handled by backendLabelToZone's pass-through) label vocabulary
+            // than useDeviceStream's AcetoneLabel type. Pre-existing mismatch,
+            // not introduced here; cast is intentional, not a type error to fix.
+            label: zone as unknown as AcetoneLabel,
+            quality_score: 95,
+            confidence_score: 0.95,
+          });
+        }
+      } else {
+        targetKpa = liveReadingRef.current?.pressure_kpa ?? 0;
+      }
+      const targetIntensity = Math.min(1, Math.max(0, targetKpa / 10));
+      intensityRef.current += (targetIntensity - intensityRef.current) * 0.25;
+      setIntensity(intensityRef.current);
+
       if (p >= 100) {
         beepEnd();
         finalize();
@@ -206,10 +291,10 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
     rafId.current = requestAnimationFrame(tick);
 
     return clearScheduled;
-  }, [phase, deviceId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, deviceId, isDemo]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   async function finalize() {
-    if (deviceId) {
+    if (!isDemo && deviceId) {
       try { await api.sensor.stopRecording(deviceId); } catch { /* non-critical */ }
     }
     const s = samplesRef.current;
@@ -238,11 +323,17 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
       label: modeLabel(s),
       context_tag: contextTag,
     };
-    persist(summary);
+    persist(summary, userId);
     setResult(summary);
     setPhase("done");
     toast.success("บันทึกเซสชั่นแล้ว");
     onSavedRef.current?.();
+    // Streak/XP/quest check-in — unconditional for both real and Demo Mode
+    // sessions by design, so the habit loop counts identically either way.
+    try {
+      const checkin = await api.gamification.checkin();
+      setXpAwarded(checkin.xp_awarded);
+    } catch { /* non-critical */ }
     // Invalidate gamification so home/profile show fresh streak + XP
     qc.invalidateQueries({ queryKey: ["me", "xp"] });
     qc.invalidateQueries({ queryKey: ["me", "streak"] });
@@ -250,17 +341,33 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
   }
 
   async function start() {
-    if (!connected) {
-      toast.error("กรุณาเชื่อมต่ออุปกรณ์ก่อนเริ่มตรวจ", {
-        action: { label: "ไปที่ Device", onClick: () => { window.location.href = "/me/device"; } },
-      });
-      return;
-    }
-    if (!deviceId) {
-      toast.error("ไม่พบอุปกรณ์");
-      return;
+    if (!isDemo) {
+      if (!connected) {
+        toast.error("กรุณาเชื่อมต่ออุปกรณ์ก่อนเริ่มตรวจ", {
+          action: { label: "ไปที่ Device", onClick: () => { window.location.href = "/me/device"; } },
+        });
+        return;
+      }
+      if (!deviceId) {
+        toast.error("ไม่พบอุปกรณ์");
+        return;
+      }
     }
     primeAudio();  // must run on user gesture (iOS Safari)
+    setShowChecklist(true);
+  }
+
+  function handleChecklistFinish(answers: PreBlowAnswers | null) {
+    preBlowAnswersRef.current = answers;
+    setShowChecklist(false);
+    if (answers && userId) {
+      try {
+        localStorage.setItem(
+          `preblow-answers-${userId}`,
+          JSON.stringify({ at: new Date().toISOString(), answers }),
+        );
+      } catch { /* storage full — ignore */ }
+    }
     setShowContextSelector(true);
   }
 
@@ -275,16 +382,20 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
     setPhase("idle");
     setProgress(0);
     setResult(null);
+    setXpAwarded(null);
     setChartData([]);
     setContextTag(null);
     setShowContextSelector(false);
     samplesRef.current = [];
     lastReading.current = null;
+    intensityRef.current = 0;
+    setIntensity(0);
+    setDemoReading(null);
   }
 
   async function reset() {
     clearScheduled();
-    if (deviceId && phase === "recording") {
+    if (!isDemo && deviceId && phase === "recording") {
       try { await api.sensor.stopRecording(deviceId); } catch { /* ignore */ }
     }
     resetToIdle();
@@ -295,7 +406,7 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
   const dashOffset = CIRC * (1 - progress / 100);
   // Live display is normalised to session baseline (first sample) so the number
   // tracks the same shape as the waveform, not raw drift-affected delta.
-  const rawLive = liveReading?.acetone_delta_mv ?? 0;
+  const rawLive = effectiveReading?.acetone_delta_mv ?? 0;
   const liveMv = phase === "recording" && sessionBaseline.current !== null
     ? rawLive - sessionBaseline.current
     : rawLive;
@@ -305,23 +416,45 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
     return (
       <>
         <div className="flex flex-col items-center py-8">
-          <button
-            onClick={start}
-            className="h-28 w-28 rounded-full bg-mint-500/10 border-2 border-mint-500/40 flex flex-col items-center justify-center gap-2 hover:bg-mint-500/20 active:scale-95 transition-all duration-200"
-          >
-            <Wind
-              size={32}
-              className={connected ? "text-mint-500" : "text-text-muted"}
-              strokeWidth={1.6}
-            />
-            <span className={`text-xs font-semibold uppercase tracking-wide ${connected ? "text-mint-500" : "text-text-muted"}`}>
-              START
-            </span>
-          </button>
+          <div className="relative flex items-center justify-center">
+            {(connected || isDemo) && (
+              <div className="absolute pointer-events-none">
+                <BreathPulse size={168} />
+              </div>
+            )}
+            <button
+              onClick={start}
+              className={twMerge(
+                "relative h-32 w-32 rounded-full flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all duration-200",
+                connected || isDemo
+                  ? "btn-premium"
+                  : cardStyle === "neumorphic"
+                    ? "bg-bg-elevated neu-inset"
+                    : cardStyle === "liquidGlass"
+                      ? "liquid-glass"
+                      : "bg-bg-elevated border-2 border-border-soft"
+              )}
+            >
+              <Wind
+                size={34}
+                className={connected || isDemo ? "text-white" : "text-text-disabled"}
+                strokeWidth={1.8}
+              />
+              <span className={`text-sm font-bold uppercase tracking-wide ${connected || isDemo ? "text-white" : "text-text-disabled"}`}>
+                START
+              </span>
+            </button>
+          </div>
           <p className="text-xs text-text-muted mt-4">
-            {connected ? "กดเพื่อเริ่มการตรวจ" : "เชื่อมต่ออุปกรณ์ก่อนเริ่ม"}
+            {connected || isDemo ? "กดเพื่อเริ่มการตรวจ" : "เชื่อมต่ออุปกรณ์ก่อนเริ่ม"}
           </p>
         </div>
+        {showChecklist && (
+          <PreBlowChecklist
+            onFinish={handleChecklistFinish}
+            onClose={() => setShowChecklist(false)}
+          />
+        )}
         {showContextSelector && (
           <ContextSelector
             onSelect={(tag) => beginCalibration(tag)}
@@ -377,53 +510,113 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
     const yMin = mvVals.length > 1 ? Math.min(...mvVals) - 5 : 0;
     const yMax = mvVals.length > 1 ? Math.max(...mvVals) + 5 : 50;
 
+    // Fill height tracks elapsed time (0-100 over the 5s window), not live
+    // intensity — this guarantees the vessel always reaches the top exactly
+    // as recording completes, real hardware or demo, strong blow or weak.
+    // The old dual-ring design tied its inner ring purely to live pressure,
+    // so a shallow/simulated blow (or one that stayed in the gray-slate
+    // fed_resting zone) could sit static and unfilled for the whole 5s,
+    // reading as broken rather than "in progress." Intensity still drives
+    // the surface's liveliness (brightness/saturation + a bobbing meniscus)
+    // so it stays reactive without risking a session that never fills.
+    const fillPct = Math.min(100, Math.max(0, progress));
+    // Continuously-interpolated color (rampColor), not LABEL_STYLE's
+    // discrete per-zone lookup — the discrete version recomputes every
+    // frame from `effectiveReading`, but only ever holds one of ~6 fixed
+    // colors, so crossing a zone threshold (e.g. 2ppm) was a hard color
+    // cut. rampColor blends continuously with the actual rising value, so
+    // the fill eases through the palette instead of snapping between it.
+    const currentColor = rampColor(convertFromMv(liveMv, "ppm"));
+
     return (
       <div className="flex flex-col items-center py-6 gap-4">
-        <div className="relative" style={{ width: SZ, height: SZ }}>
-          <svg width={SZ} height={SZ} className="rotate-[-90deg]">
-            <circle cx={SZ/2} cy={SZ/2} r={RING_R} fill="none" stroke="currentColor" className="text-mint-500/20" strokeWidth={SW} />
-            <circle
-              cx={SZ/2} cy={SZ/2} r={RING_R}
-              fill="none" stroke="currentColor" className="text-mint-500"
-              strokeWidth={SW} strokeLinecap="round"
-              strokeDasharray={CIRC} strokeDashoffset={dashOffset}
+        <div
+          className={twMerge(
+            "relative rounded-full overflow-hidden",
+            cardStyle === "neumorphic" ? "bg-bg-elevated neu-inset" : cardStyle === "liquidGlass" ? "liquid-glass" : "bg-bg-elevated border-2 border-border-soft"
+          )}
+          style={{ width: SZ, height: SZ }}
+        >
+          {/* Liquid fill */}
+          <div
+            className="absolute inset-x-0 bottom-0"
+            style={{
+              height: `${fillPct}%`,
+              background: `linear-gradient(180deg, color-mix(in srgb, ${currentColor}, white 30%) 0%, color-mix(in srgb, ${currentColor}, black 12%) 100%)`,
+              filter: `brightness(${1 + intensity * 0.25}) saturate(${1 + intensity * 0.3})`,
+              transition: "filter 0.15s ease-out",
+            }}
+          >
+            {/* Meniscus — soft highlight riding the surface, gently bobbing
+                so the liquid reads as alive rather than a static color bar. */}
+            <div
+              className="absolute inset-x-0 top-0 h-4 -translate-y-1/2 animate-liquid-bob"
+              style={{ background: "radial-gradient(ellipse 60% 100% at 50% 50%, rgba(255,255,255,0.5), transparent 70%)" }}
             />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-3xl font-bold text-mint-500 leading-none">{secsLeft}</span>
-            <span className="text-[10px] text-text-muted mt-1">{fmtAcetone(liveMv)} {unitLbl}</span>
+          </div>
+
+          {/* Center readout — dark chip keeps this legible over any fill color/level */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rounded-2xl bg-black/25 px-3 py-1.5 flex flex-col items-center">
+              <span className="text-3xl font-bold text-white leading-none" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>
+                {secsLeft}
+              </span>
+              <span className="text-[10px] text-white/85 mt-1">{fmtAcetone(liveMv)} {unitLbl}</span>
+            </div>
           </div>
         </div>
 
         <p className="text-sm font-semibold text-mint-500">เป่าออกยาวๆ ค้างไว้</p>
 
-        <div className="w-full rounded-2xl bg-bg-elevated overflow-hidden" style={{ height: 96 }}>
-          {chartData.length > 1 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="breathGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#00C896" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#00C896" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <YAxis domain={[yMin, yMax]} hide />
-                <Area
-                  type="monotoneX"
-                  dataKey="mv"
-                  stroke="#00C896"
-                  strokeWidth={2}
-                  fill="url(#breathGrad)"
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-xs text-text-muted">รอสัญญาณ...</p>
-            </div>
-          )}
+        <div className="w-full space-y-1.5">
+          <div className="flex items-center justify-center gap-4 text-[10px] text-text-muted">
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-mint-500" />Acetone</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Pressure</span>
+          </div>
+          <div className="w-full rounded-2xl bg-bg-elevated overflow-hidden" style={{ height: 96 }}>
+            {chartData.length > 1 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="breathGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#00C896" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#00C896" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="pressureGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <YAxis yAxisId="acetone" domain={[yMin, yMax]} hide />
+                  <YAxis yAxisId="pressure" domain={[0, 10]} hide />
+                  <Area
+                    yAxisId="pressure"
+                    type="monotoneX"
+                    dataKey="kpa"
+                    stroke="#60A5FA"
+                    strokeWidth={1.5}
+                    fill="url(#pressureGrad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    yAxisId="acetone"
+                    type="monotoneX"
+                    dataKey="mv"
+                    stroke="#00C896"
+                    strokeWidth={2}
+                    fill="url(#breathGrad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-xs text-text-muted">รอสัญญาณ...</p>
+              </div>
+            )}
+          </div>
         </div>
 
         <button
@@ -451,13 +644,14 @@ export default function BreathSession({ liveReading, connected, deviceId, onSess
       fmtAcetone={fmtAcetone}
       unitLbl={unitLbl}
       onReset={reset}
+      xpAwarded={xpAwarded}
     />
   );
 }
 
 /* ── Done result card — shows measurement + live gamification feedback ── */
 function DoneCard({
-  result, lColor, lText, fmtAcetone, unitLbl, onReset,
+  result, lColor, lText, fmtAcetone, unitLbl, onReset, xpAwarded,
 }: {
   result: SessionSummary;
   lColor: string;
@@ -465,6 +659,7 @@ function DoneCard({
   fmtAcetone: (v: number) => string;
   unitLbl: string;
   onReset: () => void;
+  xpAwarded: number | null;
 }) {
   const { data: xpData }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streakData } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
@@ -498,23 +693,37 @@ function DoneCard({
           </p>
         )}
 
-        {/* Gamification feedback — refreshes after invalidation */}
+        {/* Gamification feedback — refreshes after invalidation. The "+N XP"
+            line ties the reward directly to *this* session (xpAwarded, from
+            finalize()'s checkin() response) rather than only ever showing
+            the running lifetime total, which never made clear that the
+            check-in itself is what earns XP. Kept inside this existing
+            secondary panel, below the actual breath result above, so it
+            stays a footnote to the measurement — not competing for
+            attention with it. */}
         {(streakData || xpData) && (
-          <div className="bg-mint-500/10 rounded-xl px-3 py-2.5 flex items-center justify-center gap-5">
-            {streakData && (
-              <div className="flex items-center gap-1.5">
-                <Flame size={14} className="text-peach-500" />
-                <span className="text-sm font-bold text-text-primary">{streakData.current}</span>
-                <span className="text-xs text-text-muted">day streak</span>
-              </div>
+          <div className="bg-mint-500/10 rounded-xl px-3 py-2.5 space-y-1.5">
+            {!!xpAwarded && (
+              <p className="text-center text-xs font-bold text-gold-500">
+                +{xpAwarded} XP earned · redeemable for rewards soon
+              </p>
             )}
-            {xpData && (
-              <div className="flex items-center gap-1.5">
-                <Star size={14} className="text-gold-500" />
-                <span className="text-sm font-bold text-text-primary">{xpData.total.toLocaleString()}</span>
-                <span className="text-xs text-text-muted">XP total</span>
-              </div>
-            )}
+            <div className="flex items-center justify-center gap-5">
+              {streakData && (
+                <div className="flex items-center gap-1.5">
+                  <Flame size={14} className="text-peach-500" />
+                  <span className="text-sm font-bold text-text-primary">{streakData.current}</span>
+                  <span className="text-xs text-text-muted">day streak</span>
+                </div>
+              )}
+              {xpData && (
+                <div className="flex items-center gap-1.5">
+                  <Star size={14} className="text-gold-500" />
+                  <span className="text-sm font-bold text-text-primary">{xpData.total.toLocaleString()}</span>
+                  <span className="text-xs text-text-muted">XP total</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -533,6 +742,7 @@ function DoneCard({
 /* ── Recent sessions list (reads from localStorage) ── */
 export function RecentBreathSessions({ sessions }: { sessions: SessionSummary[] }) {
   const { format: fmt, label: unitLbl } = useUnits();
+  const { formatDate: tzFormatDate, formatTime: tzFormatTime } = useTimezone();
   return (
     <div>
       <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">
@@ -552,12 +762,8 @@ export function RecentBreathSessions({ sessions }: { sessions: SessionSummary[] 
             return (
               <div key={s.id} className="bg-bg-elevated rounded-2xl p-4 flex items-center gap-3">
                 <div className="w-14 text-right">
-                  <p className="text-xs text-text-muted">
-                    {new Date(s.at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                  <p className="text-[10px] text-text-disabled mt-0.5">
-                    {new Date(s.at).toLocaleDateString("th-TH", { month: "short", day: "numeric" })}
-                  </p>
+                  <p className="text-xs text-text-muted">{tzFormatTime(s.at)}</p>
+                  <p className="text-[10px] text-text-disabled mt-0.5">{tzFormatDate(s.at)}</p>
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-text-primary">

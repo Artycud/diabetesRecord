@@ -6,9 +6,10 @@ import type { FlexibilityResponse } from "@/lib/api";
 interface Props {
   data: FlexibilityResponse | null | undefined;
   loading?: boolean;
+  hasDevice?: boolean;
 }
 
-export function FlexibilityBar({ data, loading }: Props) {
+export function FlexibilityBar({ data, loading, hasDevice = true }: Props) {
   if (loading) {
     return (
       <div className="space-y-3 animate-pulse">
@@ -22,6 +23,16 @@ export function FlexibilityBar({ data, loading }: Props) {
     );
   }
 
+  if (!hasDevice) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-4 text-center">
+        <span className="text-3xl">🫁</span>
+        <p className="text-sm font-medium text-text-muted">ยังไม่ได้เชื่อมต่ออุปกรณ์</p>
+        <p className="text-xs text-text-disabled">เชื่อมต่อ MetaBreath เพื่อเริ่มวัด Metabolic Flexibility</p>
+      </div>
+    );
+  }
+
   if (!data) {
     return (
       <div className="space-y-3">
@@ -29,9 +40,7 @@ export function FlexibilityBar({ data, loading }: Props) {
           <span className="text-4xl font-bold text-text-disabled">—</span>
           <span className="text-xs text-text-muted uppercase tracking-widest">Flex Score</span>
         </div>
-        <div className="relative h-3 w-full bg-bg-raised rounded-full overflow-hidden">
-          <div className="absolute inset-0 rounded-full bg-border-subtle" />
-        </div>
+        <div className="relative h-3 w-full bg-bg-raised rounded-full overflow-hidden" />
         <p className="text-xs text-text-muted">วัดอย่างน้อย 3 ครั้งเพื่อดู Flexibility Score</p>
       </div>
     );

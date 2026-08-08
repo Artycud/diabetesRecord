@@ -1,0 +1,71 @@
+{
+  "dataset": {
+    "source_file": "data/processed/longitudinal_synthetic.csv",
+    "n_patients": 100,
+    "sessions_per_patient": 14,
+    "n_features": 8,
+    "trend_labels": [
+      "stable",
+      "increasing",
+      "decreasing",
+      "abnormal"
+    ]
+  },
+  "split": {
+    "strategy": "participant-wise stratified 80/20",
+    "train_patients": 80,
+    "val_patients": 20,
+    "seed": 42
+  },
+  "training": {
+    "batch_size": 16,
+    "learning_rate": 0.001,
+    "dropout": 0.3,
+    "max_epochs": 150,
+    "early_stop_patience": 15,
+    "epochs_run": 72,
+    "best_val_loss": 0.2334
+  },
+  "final_val": {
+    "accuracy": 0.95,
+    "f1_weighted": 0.9495,
+    "f1_macro": 0.9495,
+    "confusion_matrix": [
+      [
+        5,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        5,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        4
+      ]
+    ]
+  },
+  "feature_columns": [
+    "acetone_delta",
+    "pressure_mean",
+    "pressure_std",
+    "breath_duration",
+    "temperature",
+    "humidity",
+    "quality_score",
+    "reliability_score"
+  ],
+  "notes": "LSTM Trend Classifier — 4-class trend detection over 14-session sequences. Labels derived from OLS slope + spike-vs-median rule (app.services.trend_label). No feature in x_t is a function of the sequence-level label, so accuracy above chance reflects genuine temporal signal extraction, not label-feature circularity."
+}

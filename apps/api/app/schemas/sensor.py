@@ -120,6 +120,8 @@ class DeviceOut(BaseModel):
     last_calibrated_at: Optional[datetime]
     firmware_version: Optional[str]
     sensor_model: Optional[str]
+    simulate_acetone: bool
+    simulate_pressure: bool
 
     class Config:
         from_attributes = True

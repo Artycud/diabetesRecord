@@ -2,8 +2,18 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
+// What app.services.signal_processing.classify_acetone actually sends today
+// (confirmed against production logs) is clean|low|moderate|high|unreliable.
+// The Anderson-scheme values are kept for back-compat with any legacy data
+// still using them. See backendLabelToZone (lib/riskLabel.ts) for how each
+// of these maps to a display zone — that map was previously missing
+// low/moderate/high entirely, causing every real reading using them to
+// silently display as "unreliable".
 export type AcetoneLabel =
   | "clean"
+  | "low"
+  | "moderate"
+  | "high"
   | "basal"
   | "light_ketosis"
   | "nutritional_ketosis"

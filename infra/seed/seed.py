@@ -299,6 +299,7 @@ Acetone ในลมหายใจสะท้อนการเผาไขม
 ]
 
 QUESTS = [
+    {"code": "daily_breath_check", "title": "เป่าวัดลมหายใจ",  "description": "ทำ breath check อย่างน้อย 1 ครั้ง", "xp_reward": 20, "goal_types": None},
     {"code": "daily_ketone",   "title": "วัดคีโตนวันนี้",       "description": "บันทึกค่าคีโตนอย่างน้อย 1 ครั้ง",   "xp_reward": 20, "goal_types": None},
     {"code": "daily_water",    "title": "ดื่มน้ำ 8 แก้ว",       "description": "บันทึกการดื่มน้ำครบ 8 แก้ว",       "xp_reward": 15, "goal_types": None},
     {"code": "daily_article",  "title": "อ่านบทความ 1 เรื่อง",  "description": "อ่านบทความจนจบ",                   "xp_reward": 10, "goal_types": None},

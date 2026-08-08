@@ -9,8 +9,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  FlaskConical,
-  Bell, Database, Wrench, Settings, Shield, ChevronRight, Plus, Download,
+  Bell, Settings, Shield, ChevronRight, Plus,
   RefreshCw,
 } from "lucide-react";
 
@@ -65,15 +64,18 @@ export default function DevicePage() {
   const myClaim = sharedDevices?.find((d) => d.claimed_by_me);
   const claimableDevices = sharedDevices?.filter((d) => !d.claimed_by_me) ?? [];
 
-  // Effective primary: owned first, then a shared device the user has claimed
-  const device = ownedDevice ?? (myClaim ? {
+  // Effective primary: an active claim wins over an owned device. Claiming is
+  // a deliberate "use this one now" action — it must not be shadowed by a
+  // device the user happens to own but isn't currently using (e.g. an old
+  // self-paired device that never came online).
+  const device = myClaim ? {
     id: myClaim.id,
     kind: myClaim.kind,
     active: myClaim.active,
     needs_recalibration: myClaim.needs_recalibration,
     last_calibrated_at: null,
     sensor_model: myClaim.sensor_model,
-  } : undefined);
+  } : ownedDevice;
 
   async function handleClaim(id: string) {
     try {
@@ -145,21 +147,48 @@ export default function DevicePage() {
   }
 
   const basicMenuItems: MenuItem[] = [
-    { icon: FlaskConical, label: "Calibration & reports",  href: (id: string) => `/me/device/${id}/report` },
-    { icon: Bell,         label: "Notifications & alerts", href: "#", disabled: true },
-    { icon: Database,     label: "Sensor data & history",  href: "#", disabled: true },
+    { icon: Bell, label: "Notifications & alerts", href: "#", disabled: true },
   ];
 
   const advancedMenuItems: MenuItem[] = [
-    { icon: Download,  label: "Download firmware (.ino)", href: (id: string) => `/me/device/${id}/firmware` },
-    { icon: Wrench,    label: "Sensor settings",          href: "#", disabled: true },
-    { icon: Shield,    label: "Data privacy",             href: "#", disabled: true },
-    { icon: Settings,  label: "Advanced settings",        href: "#", disabled: true },
-    { icon: RefreshCw, label: "Reset device WiFi",        onClick: () => setResetOpen(true), danger: true },
+    { icon: Shield,    label: "Data privacy",      href: "#", disabled: true },
+    { icon: Settings,  label: "Advanced settings", href: "#", disabled: true },
+    { icon: RefreshCw, label: "Reset device WiFi", onClick: () => setResetOpen(true), danger: true },
   ];
 
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-5">
+      {/* Compact status row — shows for any active device, with a quick release
+          button for shared claims. Placed above the hero for quick access. */}
+      {device && (
+        <div className="bg-bg-elevated rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-text-primary">
+                {device.sensor_model ?? "MetaBreath TGS1820"}
+                {myClaim && (
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-mint-500/20 text-mint-500 font-medium align-middle">
+                    shared
+                  </span>
+                )}
+              </p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className={`h-2 w-2 rounded-full ${status.dot}`} />
+                <p className={`text-xs ${status.color}`}>{isLive ? "Connected · Live" : "Disconnected"}</p>
+              </div>
+            </div>
+            {myClaim && (
+              <button
+                onClick={() => handleRelease(myClaim.id)}
+                className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded-lg bg-bg-raised"
+              >
+                ปล่อย
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Device hero card */}
       <div className="bg-bg-elevated rounded-3xl overflow-hidden">
         <div className="h-40 bg-gradient-to-br from-mint-500/10 to-blue-500/10 flex items-center justify-center">
@@ -195,8 +224,9 @@ export default function DevicePage() {
               )}
 
               {/* First-time WiFi setup instructions — only for OWNED devices that never came online.
-                  For claimed shared devices we skip this: the primary owner already provisioned WiFi. */}
-              {linkStatus === "waiting" && ownedDevice && (
+                  For claimed shared devices we skip this: the primary owner already provisioned WiFi,
+                  and an active claim is already displaying that device above, not the owned one. */}
+              {linkStatus === "waiting" && ownedDevice && !myClaim && (
                 <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 space-y-3">
                   <p className="text-xs text-blue-300 font-bold">ตั้งค่าอุปกรณ์ MetaBreath</p>
                   <div className="space-y-1">
@@ -220,6 +250,24 @@ export default function DevicePage() {
               {linkStatus === "waiting" && !ownedDevice && (
                 <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
                   <p className="text-xs text-amber-400">รอสัญญาณจากอุปกรณ์... ให้เจ้าของเปิดเครื่องก่อน</p>
+                </div>
+              )}
+
+              {/* Owned device stopped sending data — give a real way out instead of
+                  a dead "Offline" screen: retry WiFi, or unlink and use a shared one.
+                  Skipped while an active claim is showing (that's a different device). */}
+              {linkStatus === "offline" && ownedDevice && !myClaim && (
+                <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-2">
+                  <p className="text-xs text-amber-400 font-semibold">อุปกรณ์ไม่ได้เชื่อมต่อ</p>
+                  <p className="text-[11px] text-text-disabled leading-relaxed">
+                    ตรวจสอบว่าอุปกรณ์เปิดอยู่และเชื่อม WiFi ได้ปกติ หรือลองรีเซ็ต WiFi ใหม่จากเมนู Advanced ด้านล่าง
+                  </p>
+                  <button
+                    onClick={() => handleUnlink(ownedDevice.id)}
+                    className="w-full mt-1 text-[11px] text-text-muted underline hover:text-red-400 transition-colors"
+                  >
+                    ยกเลิกการเชื่อมต่อ (เลือกเครื่องอื่นจาก shared pool)
+                  </button>
                 </div>
               )}
 
@@ -248,18 +296,11 @@ export default function DevicePage() {
         </div>
       </div>
 
-      {/* If viewing a claimed shared device, offer to release it */}
-      {!ownedDevice && myClaim && (
-        <button
-          onClick={() => handleRelease(myClaim.id)}
-          className="w-full bg-bg-elevated text-text-muted rounded-2xl py-3 text-sm hover:bg-bg-raised transition-colors"
-        >
-          ปล่อยเครื่อง (สำหรับให้คนอื่นใช้)
-        </button>
-      )}
+      {/* Release action moved to the compact status row at the top of the page. */}
 
-      {/* Shared device pool — visible when the user doesn't own any device */}
-      {!ownedDevice && claimableDevices.length > 0 && (
+      {/* Shared device pool — visible when the user has no device, or their
+          owned device has gone offline and they need a working fallback */}
+      {(!ownedDevice || linkStatus === "offline") && claimableDevices.length > 0 && (
         <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
           <div>
             <p className="text-sm font-semibold text-text-primary">อุปกรณ์ที่ใช้ร่วมกัน</p>

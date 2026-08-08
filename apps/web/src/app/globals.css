@@ -2,16 +2,16 @@
 
 @theme {
   /* ─── Brand: Mint ─────────────────────────────────── */
-  --color-mint-50:  #E6FDF8;
-  --color-mint-100: #C0F7EC;
-  --color-mint-200: #87EFDA;
-  --color-mint-300: #4DE5C8;
-  --color-mint-400: #22D6B2;
-  --color-mint-500: #00C896;
-  --color-mint-600: #009B74;
-  --color-mint-700: #007355;
-  --color-mint-800: #004D39;
-  --color-mint-900: #00261C;
+  --color-mint-50:  #E6FEF7;
+  --color-mint-100: #C0FAE9;
+  --color-mint-200: #88F3D5;
+  --color-mint-300: #4EEABD;
+  --color-mint-400: #1EDBA7;
+  --color-mint-500: #01D19B;
+  --color-mint-600: #00A47A;
+  --color-mint-700: #007A5A;
+  --color-mint-800: #00503C;
+  --color-mint-900: #00281E;
 
   /* ─── Brand: Peach ────────────────────────────────── */
   --color-peach-50:  #FFF3EE;
@@ -43,22 +43,36 @@
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 
-  /* ─── Semantic (dark default) ─────────────────────── */
-  --color-bg-primary:  #0A0A0A;
-  --color-bg-surface:  #141414;
-  --color-bg-elevated: #1F1F1F;
-  --color-bg-raised:   #2A2A2A;
-  --color-bg-overlay:  #00000099;
+  /* ─── Neumorphism shadow pair (per-theme — see each [data-theme] block) ── */
+  --neu-light: rgba(255,255,255,0.06);
+  --neu-dark:  rgba(0,0,0,0.35);
 
-  --color-text-primary:   #FAFAFA;
-  --color-text-secondary: #B8B8B8;
-  --color-text-muted:     #7A7A7A;
-  --color-text-disabled:  #4A4A4A;
+  /* User-adjustable via Settings → Theme & appearance (0-1, ThemeProvider
+     writes the resolved value here). Default 1 = the shipped intensity. */
+  --gradient-intensity: 1;
 
-  --color-border-soft:   #262626;
-  --color-border-strong: #383838;
+  /* Color the ambient wash/glass tint actually use — defaults to the raw
+     accent, overridden per-theme below. Separate from --color-mint-500
+     itself (which must stay the true, saturated accent for swatches/data)
+     so a theme can request a softer version just for background washes. */
+  --wash-color: var(--color-mint-500);
 
-  --color-cat-breath:  #00C896;
+  /* ─── Semantic defaults (navy — same as System mode) ── */
+  --color-bg-primary:  #0b1535;
+  --color-bg-surface:  #142552;
+  --color-bg-elevated: #1b3068;
+  --color-bg-raised:   #243d80;
+  --color-bg-overlay:  #0b153599;
+
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #DDEAFF;
+  --color-text-muted:     #B4CBEC;
+  --color-text-disabled:  #7A98C4;
+
+  --color-border-soft:   rgba(255,255,255,0.10);
+  --color-border-strong: rgba(255,255,255,0.18);
+
+  --color-cat-breath:  #01D19B;
   --color-cat-heart:   #FF3B4A;
   --color-cat-sleep:   #A855F7;
   --color-cat-oxygen:  #3B82F6;
@@ -71,36 +85,123 @@
   --color-info:    #3B82F6;
 
   /* Legacy aliases (keep for old components) */
+  --color-surface:   #142552;
+  --color-surface-2: #1b3068;
+  --color-border:    rgba(255,255,255,0.10);
+  --color-muted:     #B4CBEC;
+  --color-muted-bg:  #1b3068;
+  --color-charcoal-500: #FFFFFF;
+  --color-charcoal-600: #DDEAFF;
+}
+
+/* ─── System mode = Navy brand ──────────────────────── */
+[data-theme="system"] {
+  background-color: #0b1535;
+
+  --neu-light: rgba(255,255,255,0.07);
+  --neu-dark:  rgba(0,0,0,0.4);
+
+  --color-bg-primary:  #0b1535;
+  --color-bg-surface:  #142552;
+  --color-bg-elevated: #1b3068;
+  --color-bg-raised:   #243d80;
+  --color-bg-overlay:  #0b153599;
+
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #DDEAFF;
+  --color-text-muted:     #B4CBEC;
+  --color-text-disabled:  #7A98C4;
+
+  --color-border-soft:   rgba(255,255,255,0.10);
+  --color-border-strong: rgba(255,255,255,0.18);
+
+  --color-surface:   #142552;
+  --color-surface-2: #1b3068;
+  --color-border:    rgba(255,255,255,0.10);
+  --color-muted:     #B4CBEC;
+  --color-muted-bg:  #1b3068;
+  --color-charcoal-500: #FFFFFF;
+  --color-charcoal-600: #DDEAFF;
+}
+
+[data-theme="system"] body {
+  background-color: #0b1535;
+}
+[data-theme="system"] body::before {
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--wash-color) 18%, transparent) 0%, transparent 65%);
+}
+
+/* ─── Dark mode = pure black ────────────────────────── */
+[data-theme="dark"] {
+  background-color: #0A0A0A;
+
+  --neu-light: rgba(255,255,255,0.05);
+  --neu-dark:  rgba(0,0,0,0.6);
+
+  --color-bg-primary:  #0A0A0A;
+  --color-bg-surface:  #141414;
+  --color-bg-elevated: #1F1F1F;
+  --color-bg-raised:   #2A2A2A;
+  --color-bg-overlay:  #00000099;
+
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #E8E8E8;
+  --color-text-muted:     #B8B8B8;
+  --color-text-disabled:  #808080;
+
+  --color-border-soft:   #333333;
+  --color-border-strong: #4A4A4A;
+
   --color-surface:   #141414;
   --color-surface-2: #1F1F1F;
-  --color-border:    #262626;
-  --color-muted:     #7A7A7A;
+  --color-border:    #333333;
+  --color-muted:     #B8B8B8;
   --color-muted-bg:  #1F1F1F;
-  --color-charcoal-500: #FAFAFA;
-  --color-charcoal-600: #B8B8B8;
+  --color-charcoal-500: #FFFFFF;
+  --color-charcoal-600: #E8E8E8;
+}
+
+[data-theme="dark"] body {
+  background-color: #0A0A0A;
+}
+[data-theme="dark"] body::before {
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--wash-color) 20%, transparent) 0%, transparent 65%);
 }
 
 /* ─── Light mode override ───────────────────────────── */
 [data-theme="light"] {
+  --neu-light: rgba(255,255,255,0.95);
+  --neu-dark:  rgba(163,177,198,0.6);
+
+  /* The raw accent (vivid, saturated — right for swatches/data) read as
+     "too green, not medical" once used at wash strength against a near-
+     white page. Lightened toward white so the wash reads as a pale
+     clinical tint instead of the brand color itself. */
+  --wash-color: color-mix(in srgb, var(--color-mint-500), white 55%);
+
   --color-bg-primary:  #FAFAF7;
   --color-bg-surface:  #FFFFFF;
-  --color-bg-elevated: #F4F4F1;
-  --color-bg-raised:   #EEEDE8;
-  --color-text-primary:   #0A0A0A;
-  --color-text-secondary: #4A4A4A;
-  --color-text-muted:     #6B6B65;
-  --color-text-disabled:  #B8B8B8;
-  --color-border-soft:    #EEEDE8;
-  --color-border-strong:  #DADADA;
+  /* Widened from bg-primary (#FAFAF7) so cards read as a distinct surface
+     even before the shadow is considered — the old ~6-unit gap was so
+     close to the page background that neumorphism's shadow had to do all
+     the work, and washed out in bright/ambient light. */
+  --color-bg-elevated: #EFEEE9;
+  --color-bg-raised:   #E7E5DD;
+  --color-text-primary:   #000000;
+  --color-text-secondary: #1F1F1F;
+  --color-text-muted:     #3D3D3A;
+  --color-text-disabled:  #7A7A75;
+  --color-border-soft:    #D8D6CF;
+  --color-border-strong:  #B0AEA5;
 
   /* Legacy aliases */
   --color-surface:   #FFFFFF;
-  --color-surface-2: #F4F4F1;
-  --color-border:    #EEEDE8;
-  --color-muted:     #6B6B65;
-  --color-muted-bg:  #F4F4F1;
-  --color-charcoal-500: #0A0A0A;
-  --color-charcoal-600: #4A4A4A;
+  --color-surface-2: #EFEEE9;
+  --color-border:    #D8D6CF;
+  --color-muted:     #3D3D3A;
+  --color-muted-bg:  #EFEEE9;
+  --color-charcoal-500: #000000;
+  --color-charcoal-600: #1F1F1F;
 }
 
 /* ─── Base ──────────────────────────────────────────── */
@@ -114,6 +215,56 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   min-height: 100%;
+  /* Slightly denser default weight so labels/metadata read at a glance
+     without over-scaling the design system. */
+  font-weight: 450;
+}
+/* Ambient premium wash lives on a dedicated fixed pseudo-element rather
+   than body's own background so its opacity (the user's gradient
+   intensity slider, Settings → Theme & appearance) can be scaled
+   independently of page content — scaling body's own opacity would fade
+   the whole page, not just the wash. Reads var(--wash-color) — normally
+   the accent ThemeProvider repoints on --color-mint-500, but lightened
+   toward white in light mode (see that [data-theme="light"] block) so it
+   reads as a pale wash rather than the saturated brand color; per-theme
+   intensity is tuned in each [data-theme] block above. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--gradient-intensity, 1);
+  background-image: radial-gradient(ellipse 130% 55% at 50% -12%, color-mix(in srgb, var(--wash-color) 11%, transparent) 0%, transparent 65%);
+}
+
+/* ─── Readability upgrades ──────────────────────────
+   Applies globally: forbid tiny type (< 12px), and give muted text
+   a heavier weight so it still reads at low contrast without needing
+   another design pass on every card. */
+[class*="text-[10px]"],
+[class*="text-[11px]"] {
+  font-size: 12px !important;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+}
+.text-xs {
+  font-size: 13px;   /* was 12px */
+  font-weight: 500;
+}
+.text-sm {
+  font-weight: 500;   /* was 400 — improves legibility at 14px */
+}
+
+/* Muted / secondary text always at least medium weight so lower contrast
+   is compensated by weight rather than color alone. */
+.text-text-muted,
+.text-muted,
+.text-text-secondary {
+  font-weight: 500;
+}
+.text-text-disabled {
+  font-weight: 500;
 }
 
 /* Numeric stat display */
@@ -122,6 +273,162 @@ body {
   font-weight: 400;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+}
+
+/* Calm entrance for banners/celebrations — fade + slight rise, never bouncy */
+@keyframes fade-rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-rise-in {
+  animation: fade-rise-in var(--motion-slow) var(--ease-emphasized);
+}
+
+/* Breathing recording's liquid-fill meniscus (BreathSession.tsx) — a soft
+   surface highlight that gently rises/falls so the fill reads as liquid,
+   not a static color bar. */
+@keyframes liquid-bob {
+  0%, 100% { transform: translateY(-50%) scaleY(1);   opacity: 0.9; }
+  50%      { transform: translateY(-65%) scaleY(1.35); opacity: 0.6; }
+}
+.animate-liquid-bob {
+  animation: liquid-bob 2.2s ease-in-out infinite;
+}
+
+/* ─── Neumorphism — shell only, never applied to data/status/text ───
+   Shadow pair is derived per-theme (see [data-theme] blocks above) since a
+   formula tuned for the light theme's off-white bg looks wrong reused
+   as-is on navy/dark. .neu-raised = idle/clickable, .neu-inset = pressed —
+   the raised→inset flip on :active is what makes this read as tactile
+   instead of just "low contrast," so anything actionable should use both.
+
+   The [data-card-style="neumorphic"] .bg-bg-elevated selector is the
+   important part: most of the app's surfaces (device/settings/me pages)
+   are plain `bg-bg-elevated` divs that were never migrated to <Card> or
+   given a `neu-raised` class one-by-one, so they rendered with zero
+   shadow — flat next to the few cards that did get it. This gives every
+   one of them the same shadow automatically, sitewide, from one rule,
+   using the data-card-style attribute ThemeProvider mirrors from the
+   picker (parallel to next-themes' own data-theme attribute).
+
+   :not(..., .neu-inset) matters: several toggle tracks/checkboxes/vessels
+   combine `bg-bg-elevated` with an explicit `.neu-inset` for a carved-in
+   look. The attribute selector below is more specific than `.neu-inset`
+   alone, so without this exclusion it silently won that fight and flipped
+   every one of them from concave to convex. */
+.neu-raised,
+[data-card-style="neumorphic"] .bg-bg-elevated:not(input, textarea, select, .neu-inset) {
+  box-shadow: 8px 8px 18px var(--neu-dark), -8px -8px 18px var(--neu-light);
+  transition: box-shadow var(--motion-fast) var(--ease-standard);
+}
+.neu-inset {
+  box-shadow: inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+}
+/* Anything actionable using .neu-raised (buttons, the active nav pill,
+   toggles, checkboxes) automatically "pushes in" on press — this is what
+   makes neumorphism read as clickable/tactile instead of just low-contrast.
+   Extended to plain bg-bg-elevated buttons (back buttons, icon buttons)
+   picking up the blanket shadow above, so they get the same tactile feel. */
+button.neu-raised:active,
+.neu-raised[role="switch"]:active,
+.neu-raised[data-active="true"],
+[data-card-style="neumorphic"] button.bg-bg-elevated:active {
+  box-shadow: inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+}
+
+/* Same accent-following wash as the body gradient, scaled down for card
+   surfaces — reinforces the "soft light source" read of neumorphism
+   instead of competing with it. Slight by design; bumped a touch on
+   darker themes where the same % reads fainter against a near-black base.
+   Also follows the gradient-intensity setting: calc() inside color-mix's
+   percentage argument (not a separate opacity layer, since Card has no
+   pseudo-element to spare here) — supported in evergreen browsers. */
+.card-gradient {
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--wash-color) calc(8% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
+}
+[data-theme="system"] .card-gradient,
+[data-theme="dark"] .card-gradient {
+  background-image: linear-gradient(155deg, color-mix(in srgb, var(--wash-color) calc(13% * var(--gradient-intensity, 1)), transparent) 0%, transparent 55%);
+}
+
+/* ─── Premium CTA — the single primary action button (Breathing START) ───
+   Deliberately opaque regardless of the selected card appearance: at
+   liquid-glass or flat's translucent backgrounds, BreathPulse's glowing
+   core (rendered behind, same centered position) showed straight through
+   and collided with the button's own label. An accent-gradient fill fixes
+   both — legible text and a more "attracting" primary action. */
+.btn-premium {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-mint-500) 85%, white) 0%,
+    var(--color-mint-500) 55%,
+    color-mix(in srgb, var(--color-mint-500) 78%, black) 100%
+  );
+  box-shadow:
+    0 10px 28px -8px color-mix(in srgb, var(--color-mint-500) 55%, transparent),
+    0 2px 10px -2px color-mix(in srgb, var(--color-mint-500) 40%, transparent);
+  transition: box-shadow var(--motion-fast) var(--ease-standard);
+}
+.btn-premium:active {
+  box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--color-mint-500) 50%, transparent);
+}
+
+/* ─── Liquid Glass ───────────────────────────────────
+   Frosted/specular look — backdrop-filter blur/saturate + a highlight
+   pseudo-element. An earlier SVG-displacement "refraction" enhancement
+   (feTurbulence/feDisplacementMap) was removed: filter: url(...) distorts
+   the element's own content, not just its backdrop, so any real text/icons
+   inside a refracted card came out visibly warped. Revisit only with a
+   technique that distorts a backdrop layer behind the content, not the
+   content itself.
+
+   The glass's own fill must carry the accent color, not just rely on
+   backdrop-filter to pick color up from whatever's behind — this app's
+   backgrounds are flat single colors (no photos/vivid content to tint
+   from), so the old fixed rgba(255,255,255,0.06) fill always composited
+   down to a neutral gray/white regardless of accent or light/dark theme.
+   A first attempt fixed that with one flat color-mix() fill, but a single
+   uniform tint across the whole card reads as "painted a color," not
+   glass — real glass catches light unevenly. Using a 3-stop diagonal
+   gradient instead (bright corner → fades near-clear → picks back up)
+   keeps the same accent-follows-picker guarantee while giving the tint
+   visible variation, same direction as the ::before specular highlight
+   below so the two reinforce the same "light source" instead of fighting.
+
+   Outer shadow added on top of the existing inset edge highlight — without
+   one, glass in light mode (where var(--neu-dark) itself is faint against
+   a near-white bg) had nothing lifting it off the page and read as flat.
+   Reuses the same --neu-dark/--neu-light tokens as .neu-raised so glass
+   and neumorphic cards sit at the same visual "height" on every theme. */
+.liquid-glass {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--wash-color) 18%, transparent) 0%,
+    color-mix(in srgb, var(--wash-color) 4%, transparent) 45%,
+    color-mix(in srgb, var(--wash-color) 9%, transparent) 100%
+  );
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid color-mix(in srgb, var(--wash-color) 20%, rgba(255,255,255,0.3));
+  box-shadow:
+    8px 8px 18px var(--neu-dark),
+    -8px -8px 18px var(--neu-light),
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+}
+/* border-radius: inherit (not overflow:hidden on the parent) keeps the
+   highlight clipped to the card's rounded corners — overflow:hidden here
+   would also clip any fixed/absolute-positioned descendant (e.g. a modal)
+   to the card's bounds instead of the viewport, since backdrop-filter
+   already creates a new containing block for those per the CSS spec. */
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 40%);
+  pointer-events: none;
 }
 
 /* ─── Scrollbar ─────────────────────────────────────── */

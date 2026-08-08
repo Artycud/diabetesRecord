@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
+import { LangSwitcher } from "@/components/lang-switcher";
 
 const schema = z.object({
   username: z.string().min(1),
@@ -43,7 +44,10 @@ export default function LoginPage() {
   return (
     <Card>
       <CardContent className="pt-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1 tracking-tight">{t("auth.loginTitle")}</h2>
+        <div className="flex flex-wrap justify-between items-start gap-4 mb-1">
+          <h2 className="text-xl font-semibold text-text-primary tracking-tight">{t("auth.loginTitle")}</h2>
+          <LangSwitcher variant="card" />
+        </div>
         <p className="text-sm text-muted mb-6">{t("auth.loginWelcome")}</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

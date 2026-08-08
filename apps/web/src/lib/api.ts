@@ -200,6 +200,13 @@ export interface QuestOut {
   completed_at: string | null;
 }
 
+export interface CheckinOut {
+  xp_awarded: number;
+  total_xp: number;
+  streak: StreakOut;
+  newly_awarded_badges: string[];
+}
+
 // ─── Content ─────────────────────────────────────────
 export interface ArticleOut {
   slug: string;
@@ -395,6 +402,8 @@ export interface DeviceOut {
   needs_recalibration: boolean;
   last_calibrated_at: string | null;
   sensor_model: string | null;
+  simulate_acetone: boolean;
+  simulate_pressure: boolean;
 }
 
 export interface DailyStat {
@@ -410,6 +419,7 @@ export interface DailyStat {
 
 export interface SessionSummaryOut {
   session_id: string;            // e.g. "sunbright1"
+  device_id: string;
   started_at: string;
   ended_at: string;
   duration_seconds: number;
@@ -468,6 +478,43 @@ export interface ChatResponse {
   reply: string;
   refusal: boolean;
   disclaimer_appended: boolean;
+}
+
+export interface PromptInfo {
+  name: string;
+  title: string | null;
+  description: string | null;
+  text: string;
+}
+
+export interface PromptsResponse {
+  prompts: PromptInfo[];
+}
+
+export type ChatStreamEvent =
+  | { type: "text"; delta: string }
+  | { type: "tool_use"; name: string }
+  | { type: "tool_result"; name: string }
+  | { type: "refusal"; reply: string }
+  | { type: "error"; message: string }
+  | { type: "done" };
+
+export type TrendClass = "stable" | "increasing" | "decreasing" | "abnormal";
+
+export interface TrendClassifyResponse {
+  device_id: string;
+  trend: TrendClass | null;
+  confidence: number;
+  probabilities: Record<TrendClass, number>;
+  sequence_length: number;
+  min_required: number;
+  model_used:
+    | "lstm_trend"
+    | "trend_rule_fallback"
+    | "insufficient_data"
+    | "error"
+    | string;
+  fallback_reason: string | null;
 }
 
 export type ContextTag = "fasting" | "post_meal" | "post_exercise" | "evening";
@@ -609,6 +656,7 @@ export const api = {
     getStreak: () => request<StreakOut>("/me/streak"),
     getBadges: () => request<BadgeOut[]>("/me/badges"),
     getQuestsToday: () => request<QuestOut[]>("/me/quests/today"),
+    checkin: () => request<CheckinOut>("/me/checkin", { method: "POST" }),
   },
   content: {
     listArticles: () => request<ArticleOut[]>("/articles"),
@@ -659,7 +707,7 @@ export const api = {
         `/sensor/device/${deviceId}/calibrate`,
         { method: "POST", body: JSON.stringify(data) }
       ),
-    pairDevice: (data?: { kind?: string; sensor_model?: string; firmware_version?: string }) =>
+    pairDevice: (data?: { kind?: string; sensor_model?: string; firmware_version?: string; mac?: string }) =>
       request<{
         device_id: string; mqtt_topic: string; mqtt_user: string;
         mqtt_broker: string; mqtt_port: number; secret: string; message: string;
@@ -671,6 +719,14 @@ export const api = {
       ),
     unlinkDevice: (deviceId: string) =>
       request<void>(`/sensor/device/${deviceId}`, { method: "DELETE" }),
+    // Self-service escalation of simulate_acetone (hardware-fault workaround)
+    // to also fake pressure — for when the device's pressure sensor is
+    // broken too, not just the gas sensor. Owner-only, no admin needed.
+    setSimulation: (deviceId: string, enabled: boolean) =>
+      request<DeviceOut>(`/sensor/device/${deviceId}/simulation`, {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      }),
     startRecording: (deviceId: string) =>
       request<{ session_id: string; expires_in: number }>(
         `/sensor/device/${deviceId}/recording/start`,
@@ -695,11 +751,58 @@ export const api = {
   ai: {
     getTrend: (deviceId: string, days = 7) =>
       request<TrendResponse>(`/ai/trend?device_id=${deviceId}&days=${days}`),
+    classifyTrend: (deviceId: string, sessions = 14) =>
+      request<TrendClassifyResponse>("/ai/predict/trend", {
+        method: "POST",
+        body: JSON.stringify({ device_id: deviceId, sessions }),
+      }),
     chat: (message: string, deviceId?: string) =>
       request<ChatResponse>("/ai/chat", {
         method: "POST",
         body: JSON.stringify({ message, device_id: deviceId }),
       }),
+    listPrompts: () =>
+      request<PromptsResponse>("/ai/prompts"),
+    chatStream: async (
+      message: string,
+      deviceId: string | undefined,
+      onEvent: (ev: ChatStreamEvent) => void,
+    ): Promise<void> => {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/ai/chat/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message, device_id: deviceId }),
+      });
+      if (!res.ok || !res.body) throw new Error("stream failed");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        // Split by SSE double-newline delimiter
+        let idx;
+        while ((idx = buf.indexOf("\n\n")) !== -1) {
+          const frame = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          for (const line of frame.split("\n")) {
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (!payload) continue;
+            try {
+              onEvent(JSON.parse(payload) as ChatStreamEvent);
+            } catch {
+              /* skip malformed frame */
+            }
+          }
+        }
+      }
+    },
     getFlexibility: (deviceId: string, contextTag?: string, days = 14) =>
       request<FlexibilityResponse>("/ai/flexibility", {
         method: "POST",
@@ -729,6 +832,16 @@ export const api = {
       request<AdminUserOut[]>("/admin/users"),
     ensureManualDevice: (userId: string) =>
       request<AdminDeviceOut>(`/admin/device/ensure/${userId}`, { method: "POST" }),
+    registerMacDevice: (mac: string, userEmail: string) =>
+      request<AdminDeviceOut>("/admin/device/mac", {
+        method: "POST",
+        body: JSON.stringify({ mac, user_email: userEmail }),
+      }),
+    assignDevice: (deviceId: string, userId: string) =>
+      request<AdminDeviceOut>(`/admin/device/${deviceId}/assign`, {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }),
     submitReading: (data: AdminReadingCreate) =>
       request<AdminReadingOut>("/admin/reading", {
         method: "POST",

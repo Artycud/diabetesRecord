@@ -250,6 +250,10 @@ def classify_acetone(acetone_delta_mv: float, confidence: float = 1.0) -> dict:
 
     if acetone_delta_mv is None:
         return {"label": "unreliable", "metabolic_risk_index": None}
+    elif acetone_delta_mv < 0.0:
+        # Sensor voltage below baseline is physically impossible; treat
+        # as a fault rather than clean air so callers can gate/retry.
+        return {"label": "unreliable", "metabolic_risk_index": None}
     elif acetone_delta_mv < 5.0:
         return {"label": "clean", "metabolic_risk_index": 0}
     elif acetone_delta_mv < 30.0:

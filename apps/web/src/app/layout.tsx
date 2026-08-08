@@ -18,7 +18,8 @@ const sarabun = Sarabun({
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",
-  weight: ["400", "500"],
+  weight: ["400", "500", "700", "800"],
+  style: ["normal", "italic"],
   subsets: ["latin"],
   display: "swap",
 });

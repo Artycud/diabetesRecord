@@ -155,6 +155,105 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
   );
 }
 
+// ── Link Device Modal ──────────────────────────────────────────────────────
+function LinkDeviceModal({
+  userId,
+  userEmail,
+  onClose,
+  onLinked,
+}: {
+  userId: string;
+  userEmail: string;
+  onClose: () => void;
+  onLinked: () => void;
+}) {
+  const [tab, setTab] = useState<"mac" | "id">("mac");
+  const [mac, setMac] = useState("");
+  const [deviceId, setDeviceId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleSubmit() {
+    setErr("");
+    setLoading(true);
+    try {
+      if (tab === "mac") {
+        await api.admin.registerMacDevice(mac.trim(), userEmail);
+      } else {
+        await api.admin.assignDevice(deviceId.trim(), userId);
+      }
+      onLinked();
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-semibold text-gray-900 mb-4">Link Device ให้ User นี้</h3>
+
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4">
+          <button
+            onClick={() => setTab("mac")}
+            className={`flex-1 py-1.5 rounded-md text-xs font-medium transition ${tab === "mac" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+          >
+            ลงทะเบียน MAC ใหม่
+          </button>
+          <button
+            onClick={() => setTab("id")}
+            className={`flex-1 py-1.5 rounded-md text-xs font-medium transition ${tab === "id" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+          >
+            โอน Device ที่มีอยู่
+          </button>
+        </div>
+
+        {tab === "mac" ? (
+          <div className="space-y-2">
+            <label className="text-xs text-gray-500">MAC Address (12 hex chars)</label>
+            <input
+              value={mac}
+              onChange={(e) => setMac(e.target.value)}
+              placeholder="เช่น 88F155302810"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-400"
+            />
+            <p className="text-[11px] text-gray-400">จะ link กับ email: <span className="font-mono">{userEmail}</span></p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="text-xs text-gray-500">Device UUID</label>
+            <input
+              value={deviceId}
+              onChange={(e) => setDeviceId(e.target.value)}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-400"
+            />
+            <p className="text-[11px] text-gray-400">Device จะถูกโอนมาอยู่ภายใต้ user นี้ทันที</p>
+          </div>
+        )}
+
+        {err && <p className="text-xs text-red-500 mt-2">{err}</p>}
+
+        <div className="flex gap-2 mt-4">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+            ยกเลิก
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || (tab === "mac" ? !mac.trim() : !deviceId.trim())}
+            className="flex-1 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-40 transition"
+          >
+            {loading ? "กำลัง link..." : "Link Device"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function UserDashboardPage() {
   const params = useParams<{ id: string }>();
@@ -163,6 +262,7 @@ export default function UserDashboardPage() {
   const [data, setData] = useState<UserDashboardOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [linkOpen, setLinkOpen] = useState(false);
 
   // Load dashboard whenever id or window changes
   useEffect(() => {
@@ -219,6 +319,7 @@ export default function UserDashboardPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
@@ -404,7 +505,17 @@ export default function UserDashboardPage() {
 
           {/* Devices */}
           <section className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h2 className="font-semibold text-gray-900 text-sm mb-4">อุปกรณ์ ({data?.devices.length ?? 0})</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900 text-sm">อุปกรณ์ ({data?.devices.length ?? 0})</h2>
+              {data && (
+                <button
+                  onClick={() => setLinkOpen(true)}
+                  className="text-xs text-blue-600 font-medium px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition"
+                >
+                  + Link Device
+                </button>
+              )}
+            </div>
             {loading || !data ? (
               <div className="space-y-2">
                 {[1, 2].map((i) => (
@@ -452,6 +563,32 @@ export default function UserDashboardPage() {
                         </div>
                       </div>
                       <div className="text-[10px] text-gray-300 font-mono mt-2 truncate">{d.id}</div>
+                      <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-100">
+                        <a
+                          href={`/me/device/${d.id}/report`}
+                          className="text-center text-xs text-blue-600 font-medium py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
+                        >
+                          Calibration &amp; reports
+                        </a>
+                        <a
+                          href={`/me/device/${d.id}/history`}
+                          className="text-center text-xs text-indigo-600 font-medium py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                        >
+                          Sensor data &amp; history
+                        </a>
+                        <a
+                          href={`/me/device/${d.id}/settings`}
+                          className="text-center text-xs text-gray-600 font-medium py-1 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          Sensor settings
+                        </a>
+                        <a
+                          href={`/me/device/${d.id}/firmware`}
+                          className="text-center text-xs text-gray-600 font-medium py-1 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          Download firmware (.ino)
+                        </a>
+                      </div>
                     </div>
                   );
                 })}
@@ -523,5 +660,19 @@ export default function UserDashboardPage() {
         )}
       </div>
     </div>
+
+    {linkOpen && data && (
+      <LinkDeviceModal
+        userId={data.user.id}
+        userEmail={data.user.email}
+        onClose={() => setLinkOpen(false)}
+        onLinked={() => {
+          const id = params?.id;
+          if (!id) return;
+          api.admin.userDashboard(id, days).then(setData).catch(() => {});
+        }}
+      />
+    )}
+    </>
   );
 }

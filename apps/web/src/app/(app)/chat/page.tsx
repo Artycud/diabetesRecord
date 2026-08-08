@@ -5,11 +5,14 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { Bot, Send, Wind } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   refusal?: boolean;
+  toolStatus?: string;
 }
 
 const SUGGESTIONS = [
@@ -33,6 +36,22 @@ export default function ChatPage() {
     queryFn: () => api.sensor.listDevices(),
   });
 
+  const { data: promptsData } = useQuery({
+    queryKey: ["ai-prompts"],
+    queryFn: () => api.ai.listPrompts(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const prompts = promptsData?.prompts ?? [];
+
+  const slashOpen = input.startsWith("/") && !input.includes(" ") && prompts.length > 0;
+  const slashQuery = input.slice(1).toLowerCase();
+  const filteredPrompts = slashOpen
+    ? prompts.filter((p) =>
+        (p.title ?? p.name).toLowerCase().includes(slashQuery) ||
+        p.name.toLowerCase().includes(slashQuery)
+      )
+    : [];
+
   useEffect(() => {
     if (devices && devices.length > 0 && !selectedDevice) {
       const active = devices.find((d) => d.active);
@@ -50,21 +69,46 @@ export default function ChatPage() {
     setInput("");
 
     const userMsg: Message = { role: "user", content: trimmed };
-    setMessages((m) => [...m, userMsg]);
+    setMessages((m) => [...m, userMsg, { role: "assistant", content: "" }]);
     setLoading(true);
 
+    const patchAssistant = (patch: Partial<Message>) => {
+      setMessages((m) => {
+        const copy = [...m];
+        const lastIdx = copy.length - 1;
+        if (lastIdx >= 0 && copy[lastIdx].role === "assistant") {
+          copy[lastIdx] = { ...copy[lastIdx], ...patch };
+        }
+        return copy;
+      });
+    };
+    const appendAssistantText = (delta: string) => {
+      setMessages((m) => {
+        const copy = [...m];
+        const lastIdx = copy.length - 1;
+        if (lastIdx >= 0 && copy[lastIdx].role === "assistant") {
+          copy[lastIdx] = { ...copy[lastIdx], content: copy[lastIdx].content + delta };
+        }
+        return copy;
+      });
+    };
+
     try {
-      const res = await api.ai.chat(trimmed, selectedDevice);
-      setMessages((m) => [...m, {
-        role: "assistant",
-        content: res.reply,
-        refusal: res.refusal,
-      }]);
+      await api.ai.chatStream(trimmed, selectedDevice, (ev) => {
+        if (ev.type === "text") {
+          appendAssistantText(ev.delta);
+        } else if (ev.type === "tool_use") {
+          patchAssistant({ toolStatus: `กำลังดึงข้อมูล: ${ev.name}` });
+        } else if (ev.type === "tool_result") {
+          patchAssistant({ toolStatus: undefined });
+        } else if (ev.type === "refusal") {
+          patchAssistant({ content: ev.reply, refusal: true, toolStatus: undefined });
+        } else if (ev.type === "error") {
+          patchAssistant({ content: `เกิดข้อผิดพลาด: ${ev.message}`, toolStatus: undefined });
+        }
+      });
     } catch (e) {
-      setMessages((m) => [...m, {
-        role: "assistant",
-        content: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
-      }]);
+      patchAssistant({ content: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง", toolStatus: undefined });
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -148,30 +192,41 @@ export default function ChatPage() {
                 ? "bg-amber-50 text-amber-800 border border-amber-200 rounded-tl-sm"
                 : "bg-white border border-border-soft text-charcoal-500 rounded-tl-sm"
             }`}>
-              {msg.content.split("\n").map((line, j) => (
-                <span key={j}>
-                  {line}
-                  {j < msg.content.split("\n").length - 1 && <br />}
-                </span>
-              ))}
+              {msg.role === "assistant" ? (
+                <div>
+                  {msg.toolStatus && (
+                    <div className="text-[11px] text-mint-600 italic mb-1 flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-mint-500 animate-pulse" />
+                      {msg.toolStatus}
+                    </div>
+                  )}
+                  {msg.content ? (
+                    <div className="prose prose-sm max-w-none [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_hr]:my-2 [&_hr]:border-border-soft [&_strong]:font-semibold [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px] [&_a]:text-mint-600 [&_a]:underline">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    !msg.toolStatus && (
+                      <div className="flex gap-1 py-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : (
+                msg.content.split("\n").map((line, j) => (
+                  <span key={j}>
+                    {line}
+                    {j < msg.content.split("\n").length - 1 && <br />}
+                  </span>
+                ))
+              )}
             </div>
           </div>
         ))}
-
-        {loading && (
-          <div className="flex justify-start">
-            <div className="w-7 h-7 rounded-lg bg-mint-100 flex items-center justify-center shrink-0 mr-2">
-              <Bot size={14} className="text-mint-600" strokeWidth={1.5} />
-            </div>
-            <div className="bg-white border border-border-soft rounded-2xl rounded-tl-sm px-4 py-3">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            </div>
-          </div>
-        )}
 
         <div ref={bottomRef} />
       </div>
@@ -182,6 +237,36 @@ export default function ChatPage() {
           AI ให้ข้อมูลเพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์
         </p>
       </div>
+
+      {/* Slash command menu */}
+      {slashOpen && filteredPrompts.length > 0 && (
+        <div className="shrink-0 px-4 pb-1 bg-white">
+          <div className="border border-border-soft rounded-xl overflow-hidden bg-white shadow-sm">
+            <div className="text-[10px] uppercase tracking-wide text-muted px-3 pt-2 pb-1">
+              Slash commands
+            </div>
+            {filteredPrompts.slice(0, 6).map((p) => (
+              <button
+                key={p.name}
+                onClick={() => {
+                  setInput("");
+                  send(p.text);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-mint-50 border-t border-border-soft/70"
+              >
+                <div className="text-sm font-medium text-charcoal-500">
+                  /{p.name}{p.title && p.title !== p.name ? ` — ${p.title}` : ""}
+                </div>
+                {p.description && (
+                  <div className="text-[11px] text-muted leading-snug mt-0.5">
+                    {p.description}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <div className="shrink-0 px-4 py-3 border-t border-border-soft bg-white">

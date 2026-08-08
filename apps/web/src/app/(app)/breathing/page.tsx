@@ -6,21 +6,32 @@ import { api, type SharedDeviceOut } from "@/lib/api";
 import { parseServerTime } from "@/lib/time";
 import { useAuth } from "@/lib/auth";
 import { useDeviceStream } from "@/lib/useDeviceStream";
+import { useDemoMode } from "@/lib/demoMode";
 import Link from "next/link";
-import { Settings, Radio, TrendingUp, ChevronRight } from "lucide-react";
+import { Radio, TrendingUp, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useT } from "@/lib/i18n";
-import BreathSession, {
-  RecentBreathSessions,
-  loadSessions,
-  type SessionSummary,
-} from "@/components/BreathSession";
+import BreathSession from "@/components/BreathSession";
+import { AcetoneZoneCard } from "@/components/cards/AcetoneZoneCard";
 
 export default function BreathingPage() {
   const { user } = useAuth();
   const { t } = useT();
+  const { demoMode } = useDemoMode();
   const { reading: liveReading } = useDeviceStream(user?.id);
-  const [sessions, setSessions] = useState<SessionSummary[]>(() => loadSessions());
+  const userId = user?.id;
+  // Session history has moved to /trends. We still fetch it here so (a) after each
+  // blow we can invalidate the cache for /trends, and (b) the AcetoneZoneCard can
+  // show the peak of the most recent session as the "current" value.
+  const { data: sessionsData, refetch: refetchSessions } = useQuery({
+    queryKey: ["sensor", "sessions", userId],
+    queryFn: () => api.sensor.getSessions(30),
+    enabled: !!userId,
+    refetchInterval: 30_000,
+  });
+  const lastSessionPeakMv = sessionsData?.[0]?.peak_acetone_delta ?? null;
+  // Prefer live reading while a recording is streaming; fall back to last session peak.
+  const currentAcetoneMv = liveReading?.acetone_delta_mv ?? lastSessionPeakMv;
 
   const { data: devices } = useQuery({
     queryKey: ["sensor", "devices"],
@@ -58,55 +69,18 @@ export default function BreathingPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-5">
-      {/* Device status */}
-      <div className="bg-bg-elevated rounded-2xl p-4">
-        {primaryDevice ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-text-primary">
-                {primaryDevice.sensor_model ?? "MetaBreath TGS1820"}
-                {myClaim && !ownedDevice && (
-                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-mint-500/20 text-mint-500 font-medium align-middle">
-                    shared
-                  </span>
-                )}
-              </p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className={`h-2 w-2 rounded-full ${connected ? "bg-mint-500 animate-pulse" : "bg-text-disabled"}`} />
-                <p className="text-xs text-text-muted">{connected ? "Connected · Live" : "Disconnected"}</p>
-              </div>
-            </div>
-            {ownedDevice ? (
-              <Link href="/me/device" className="h-9 w-9 rounded-xl bg-bg-raised flex items-center justify-center">
-                <Settings size={16} className="text-text-muted" />
-              </Link>
-            ) : (
-              <button
-                onClick={async () => {
-                  try {
-                    await api.sensor.releaseSharedDevice(primaryDevice.id);
-                    toast.success("ปล่อยเครื่องแล้ว");
-                    refetchPool();
-                  } catch (e) {
-                    toast.error(e instanceof Error ? e.message : "ปล่อยเครื่องไม่สำเร็จ");
-                  }
-                }}
-                className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded-lg bg-bg-raised"
-              >
-                ปล่อย
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-text-muted">{t("breathing.noDevice")}</p>
-            <Link href="/me/device/add" className="text-xs text-mint-500 font-medium">{t("breathing.addDevice")}</Link>
-          </div>
-        )}
-      </div>
+      {/* Device status card removed — same info + release button lives on /me/device now.
+          Users without any device still see the "Add device" prompt via the empty state below.
+          Both this and the shared-pool prompt below are irrelevant once Demo Mode is on. */}
+      {!demoMode && !primaryDevice && (
+        <div className="bg-bg-elevated rounded-2xl p-4 flex items-center justify-between">
+          <p className="text-sm text-text-muted">{t("breathing.noDevice")}</p>
+          <Link href="/me/device/add" className="text-xs text-mint-500 font-medium">{t("breathing.addDevice")}</Link>
+        </div>
+      )}
 
       {/* Shared device pool — show only when I don't own AND haven't claimed */}
-      {!ownedDevice && !myClaim && sharedDevices && sharedDevices.length > 0 && (
+      {!demoMode && !ownedDevice && !myClaim && sharedDevices && sharedDevices.length > 0 && (
         <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Radio size={16} className="text-mint-500" strokeWidth={1.6} />
@@ -126,8 +100,13 @@ export default function BreathingPage() {
         liveReading={liveReading}
         connected={connected}
         deviceId={primaryDevice?.id ?? null}
-        onSessionSaved={() => setSessions(loadSessions())}
+        userId={userId}
+        onSessionSaved={() => refetchSessions()}
+        isDemo={demoMode}
       />
+
+      {/* Metabolic zone — where does the current value sit on the 5-zone ladder */}
+      <AcetoneZoneCard currentMv={currentAcetoneMv} live={!!liveReading && connected} />
 
       {/* Trends shortcut */}
       {primaryDevice && (
@@ -146,8 +125,8 @@ export default function BreathingPage() {
         </Link>
       )}
 
-      {/* Recent sessions — stored locally after each breath session */}
-      <RecentBreathSessions sessions={sessions} />
+      {/* Recent Sessions list removed — session history now lives on /trends
+          ("สรุปรายครั้ง" card) which pulls from the server. */}
     </div>
   );
 }

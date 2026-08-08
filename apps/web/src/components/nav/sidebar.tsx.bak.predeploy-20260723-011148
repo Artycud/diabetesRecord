@@ -27,9 +27,7 @@ export function Sidebar() {
     <aside className="hidden md:flex w-60 flex-col border-r border-border-soft bg-white">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-border-soft">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-soft bg-white">
-          <BrandMark className="h-5 w-5" />
-        </div>
+        <BrandMark className="h-9 w-9 rounded-xl" />
         <div>
           <p className="font-semibold text-charcoal-500 leading-tight tracking-tight">{t("app.name")}</p>
         </div>

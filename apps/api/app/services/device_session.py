@@ -1,9 +1,12 @@
 """Session-based device sharing helpers.
 
 A shared device (Device.is_shared=True) can be claimed by any signed-in user
-via POST /device/{id}/claim. Only one DeviceSession may be `active` per
-device at a time — the partial unique index on device_session enforces this.
-Claim silently ends any prior active session.
+via POST /device/{id}/claim — this is the ONLY way a claim changes hands;
+nothing claims automatically just because a user logs in or opens a page.
+Only one DeviceSession may be `active` per device at a time — the partial
+unique index on device_session enforces this. Claiming again (by the same
+or a different user, i.e. "stealing" the connection) immediately ends the
+prior session. Otherwise a claim just holds for SESSION_TTL.
 
 Attribution rule for ingested readings:
     active session (unexpired) → session.user_id
@@ -20,8 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.health import Device, DeviceSession
 
-# Sliding TTL — a claim stays valid this long without renewal.
-SESSION_TTL = timedelta(minutes=30)
+# A claim lasts this long once made (no sliding renewal — see extend_session).
+SESSION_TTL = timedelta(hours=12)
 
 
 async def resolve_reading_user(

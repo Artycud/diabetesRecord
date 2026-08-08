@@ -612,7 +612,10 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("entry");
 
   // Role-based admin (e.g. the seeded "admin" account) skips the password gate entirely.
-  const isRoleAdmin = currentUser?.role === "admin" || !!currentUser?.is_admin;
+  // NOTE: `is_admin` from /auth/me is broader (also true when email matches ADMIN_EMAIL),
+  // but backend admin endpoints require X-Admin-Password for the email path — so legacy
+  // email admins must still go through PasswordGate to set the header.
+  const isRoleAdmin = currentUser?.role === "admin";
 
   // Check if already unlocked this session
   useEffect(() => {
