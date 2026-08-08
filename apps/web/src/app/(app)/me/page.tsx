@@ -67,7 +67,7 @@ export default function MePage() {
   const statsLoading = !xp || !streak || !badges;
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-5 pb-tabbar space-y-5">
+    <div className="w-full px-4 sm:px-6 md:max-w-2xl md:mx-auto lg:max-w-3xl pt-5 pb-tabbar space-y-5">
       {/* Profile card */}
       <div className="bg-bg-elevated rounded-3xl p-5">
         <div className="flex items-center gap-4">

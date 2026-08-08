@@ -1,45 +1,50 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { MessageCircle, ChevronRight, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { useDeviceStream } from "@/lib/useDeviceStream";
+import { useDemoMode } from "@/lib/demoMode";
 import { parseServerTime } from "@/lib/time";
-import { useUnits } from "@/lib/units";
-import { AcetoneRing } from "@/components/cards/AcetoneRing";
+import { convertFromMv, useUnits } from "@/lib/units";
 import { flexScoreStyle } from "@/lib/riskLabel";
+import { ZONES, zoneOf } from "@/components/cards/AcetoneZoneCard";
 import { TodayMetricCard } from "@/components/cards/TodayMetricCard";
-import { CategoryCard } from "@/components/cards/CategoryCard";
 import { TrendClassCard } from "@/components/cards/TrendClassCard";
 import { BaselineCard } from "@/components/cards/BaselineCard";
-import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
 import { InfoButton } from "@/components/ui/InfoButton";
 import { StatNumber } from "@/components/ui/StatNumber";
 import { Card } from "@/components/ui/card";
-import { DetailsSection } from "@/components/ui/DetailsSection";
+import { Banner } from "@/components/ui/Banner";
+import { BreathPulse } from "@/components/ui/BreathPulse";
 import { SuggestedQuestionChip } from "@/components/ai/SuggestedQuestionChip";
-import { StreakChip } from "@/components/StreakChip";
-import { DailyCheckBanner } from "@/components/DailyCheckBanner";
 import { PlusMenu } from "@/components/nav/PlusMenu";
-import Link from "next/link";
-import { ChevronRight, Check, Trophy } from "lucide-react";
+
+function SectionHeader({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">{children}</p>
+      {action}
+    </div>
+  );
+}
 
 export default function HomePage() {
   const { user } = useAuth();
   const { t, locale } = useT();
-  const name = user?.profile?.display_name ?? user?.username ?? "—";
+  const initial = (user?.profile?.display_name ?? user?.username ?? "U")[0]?.toUpperCase() ?? "U";
   const { reading: liveReading } = useDeviceStream(user?.id);
   const { format: fmtAcetone, label: unitLbl } = useUnits();
-  const [questsOpen, setQuestsOpen] = useState(false);
+  const { demoMode } = useDemoMode();
 
   const liveConnected = !!liveReading &&
     (Date.now() - parseServerTime(liveReading.time).getTime() < 60_000);
 
   const { data: streak } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
   const { data: xp }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
-  const { data: quests } = useQuery({ queryKey: ["me", "quests"], queryFn: api.gamification.getQuestsToday });
 
   const { data: devices } = useQuery({ queryKey: ["sensor", "devices"], queryFn: api.sensor.listDevices });
   const { data: sharedDevices } = useQuery({ queryKey: ["sensor", "shared-devices"], queryFn: api.sensor.listSharedDevices, refetchInterval: 30_000 });
@@ -57,238 +62,205 @@ export default function HomePage() {
     refetchInterval: 30_000,
   });
   const today = dailyStats?.[0];
+  const heroValue = today?.max_acetone_delta ?? null;
+  const heroCount = today?.count ?? 0;
+  const hasReadingToday = heroCount > 0;
 
-  const { data: flexData, isLoading: flexLoading } = useQuery({
+  const { data: flexData } = useQuery({
     queryKey: ["ai", "flexibility", deviceId],
     queryFn:  () => api.ai.getFlexibility(deviceId!, undefined, 14),
-    enabled:  !!deviceId,
+    enabled:  !!deviceId && hasReadingToday,
     staleTime: 5 * 60 * 1000,
+  });
+
+  // Inline AI tip for the hero card — same endpoint AiInterpretCard uses
+  // elsewhere, just folded directly into the hero instead of its own box.
+  const { data: aiInterpret } = useQuery({
+    queryKey: ["ai", "interpret", deviceId, "home", heroCount],
+    queryFn:  () => api.ai.interpret(deviceId!),
+    enabled:  !!deviceId && hasReadingToday,
+    staleTime: 60 * 1000,
   });
 
   const dateLocale = locale === "th" ? "th-TH" : "en-US";
   const dateStr = new Date().toLocaleDateString(dateLocale, { weekday: "short", day: "numeric", month: "short" });
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 11 ? "Good morning" : hour < 17 ? "This afternoon" : "This evening";
 
-  const heroValue = today?.max_acetone_delta ?? liveReading?.acetone_delta_mv ?? null;
-  const heroLabel = today?.dominant_label ?? liveReading?.label ?? null;
-
-  const questDone  = quests?.filter((q) => q.completed_at).length ?? 0;
-  const questTotal = quests?.length ?? 0;
-  const breathQuest = quests?.find((q) => q.code === "daily_breath_check");
-  const checkedInToday = !!breathQuest?.completed_at;
-  // Fires once, right after a check-in crosses a streak milestone — quests
-  // refetch (see BreathSession.tsx finalize()) is what makes this update live.
+  const ppm = heroValue != null ? convertFromMv(heroValue, "ppm") : null;
+  const zone = ppm != null ? zoneOf(ppm) : null;
+  const flexStyle = flexData ? flexScoreStyle(flexData.score) : null;
+  // Fires once, right after a check-in crosses a streak milestone.
   const justCrossedMilestone = !!streak && [7, 30, 100].includes(streak.current);
 
-  const flexStyle = flexData ? flexScoreStyle(flexData.score) : null;
-
   return (
-    <div className="max-w-md mx-auto px-4 pt-5 pb-tabbar space-y-5">
-      {/* Header — quiet, no chrome competing with the hero below */}
-      <div className="flex items-center justify-between gap-3">
+    <div className="w-full px-4 sm:px-6 md:max-w-2xl md:mx-auto lg:max-w-3xl pt-5 pb-tabbar space-y-6">
+      {/* Header — native large-title style */}
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-text-muted">{dateStr}</p>
-          <h1 className="text-xl font-semibold text-text-primary mt-0.5 truncate">
-            {t("health.greeting")}, {name}
-          </h1>
+          <p className="text-xs uppercase tracking-wide text-text-muted">{dateStr}</p>
+          <h1 className="text-[28px] font-bold text-text-primary leading-tight mt-0.5">{t("health.title")}</h1>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <StreakChip current={streak?.current} compact />
-          <PlusMenu />
+        <div className="flex items-center gap-2 shrink-0 mt-1">
+          <Link
+            href="/chat"
+            aria-label="AI assistant"
+            className="h-9 w-9 rounded-full flex items-center justify-center text-text-muted hover:text-mint-500 hover:bg-bg-raised transition-colors"
+          >
+            <MessageCircle size={20} strokeWidth={1.8} />
+          </Link>
+          {streak && (
+            <span className="text-xs font-semibold bg-bg-raised rounded-full px-2.5 py-1.5 whitespace-nowrap">
+              🔥{streak.current}{xp ? ` · Lv.${xp.level}` : ""}
+            </span>
+          )}
+          <Link
+            href="/me"
+            aria-label="Profile"
+            className="h-9 w-9 rounded-full bg-mint-500/20 flex items-center justify-center text-sm font-bold text-mint-500 shrink-0"
+          >
+            {initial}
+          </Link>
         </div>
       </div>
 
-      {/* Hero — "how am I doing right now": the one thing this screen leads
-          with. Acetone ring promoted to the primary hero (was second, below
-          Flexibility); Flexibility itself demotes to a compact inline stat
-          here, with its full breakdown living on /trends. */}
-      <Card padding="lg" className="flex flex-col items-center gap-3 relative">
-        <div className="absolute top-3 right-3">
-          <InfoButton title="Breath Acetone · สูงสุดวันนี้" ariaLabel="รายละเอียด Breath Acetone">
-            <p>
-              ค่า <b>breath acetone สูงสุด</b> ที่วัดได้ใน <b>วันนี้</b> (00:00 – 23:59 ตาม timezone ที่ตั้ง)
-            </p>
-            <p className="text-text-muted">
-              acetone คือสารระเหยที่ร่างกายผลิตเมื่อเผาไขมัน — ยิ่งสูง ยิ่งอยู่ในสถานะ ketosis
-            </p>
-            <div className="bg-bg-elevated rounded-xl p-3 space-y-2">
-              <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">โซนตามค่า (ppm)</p>
-              <ul className="text-xs space-y-1">
-                <li>• <b>&lt; 2</b> fed_resting — เผาน้ำตาลเป็นหลัก</li>
-                <li>• <b>2–8</b> transitional — เริ่มเปลี่ยนไปเผาไขมัน</li>
-                <li>• <b>8–40</b> fat_oxidation — เผาไขมันหลัก (keto/exercise)</li>
-                <li>• <b>40–75</b> extended_fast — อดอาหารต่อเนื่อง</li>
-                <li>• <b>≥ 75</b> safety_alert — สูงผิดปกติ ให้พบแพทย์</li>
-              </ul>
-            </div>
-            <p className="text-xs text-text-muted">
-              ค่าเปลี่ยนได้ตามอาหาร, การอดอาหาร, การออกกำลังกาย, ความชื้น และอุณหภูมิ
-            </p>
-          </InfoButton>
-        </div>
-        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">
-          BREATH ACETONE · สูงสุดวันนี้
-        </p>
-        <AcetoneRing value={heroValue} label={heroLabel} size={216} />
-        <div className="flex items-center gap-2">
-          <div className={`h-2 w-2 rounded-full ${liveConnected ? "bg-mint-500 animate-pulse" : "bg-text-disabled"}`} />
-          <span className="text-xs text-text-muted">
-            {liveConnected ? (
-              <>Live · MetaBreath {liveReading && `(${fmtAcetone(liveReading.acetone_delta_mv)} ${unitLbl})`}</>
-            ) : deviceId ? (
-              <>{t("health.connectDevice") ?? "อุปกรณ์ไม่ได้เชื่อมต่อ"}</>
-            ) : (
-              <Link href="/me/device" className="underline text-mint-500">
-                {t("health.connectDevice")}
-              </Link>
-            )}
-          </span>
-        </div>
-
-        {/* Flexibility — compact inline teaser; full breakdown on /trends */}
-        {deviceId && !flexLoading && flexData && flexStyle && (
-          <Link
-            href="/trends"
-            className="flex items-center gap-1.5 rounded-full bg-bg-raised px-3 py-1.5 mt-1"
-          >
-            <span className="text-xs text-text-muted">Flex</span>
-            <span className="text-sm font-bold" style={{ color: flexStyle.color }}>
-              {flexData.score}
-            </span>
-            <ChevronRight size={12} className="text-text-disabled" />
-          </Link>
-        )}
-      </Card>
-
-      {/* Daily check-in nudge — the clearest CTA, right under the hero it's about */}
-      <DailyCheckBanner
-        checkedInToday={checkedInToday}
-        hasDevice={!!deviceId}
-        celebrate={checkedInToday && justCrossedMilestone}
-      />
-
-      {/* AI, integrated — a short interpretation of today's reading plus one
-          contextual way to ask more, not a floating chatbot. */}
-      {deviceId && (
-        <div className="space-y-2">
-          <AiInterpretCard deviceId={deviceId} refreshKey={today?.count ?? 0} />
-          <SuggestedQuestionChip question="ทำไมค่า acetone วันนี้ถึงเป็นแบบนี้?" deviceId={deviceId} />
-        </div>
-      )}
-
-      {/* Secondary/interpretive detail — collapsed by default so it doesn't
-          compete with the hero and AI insight above. */}
-      {deviceId && (
-        <DetailsSection title="Details">
-          <TrendClassCard deviceId={deviceId} sessions={14} />
-          <BaselineCard deviceId={deviceId} />
-        </DetailsSection>
-      )}
-
-      {/* Quests — one slim status row, not a competing feature card */}
-      <Card padding="md">
-        <button
-          onClick={() => setQuestsOpen((v) => !v)}
-          className="w-full flex items-center gap-3"
-          disabled={questTotal === 0}
-        >
-          <Trophy size={16} className="text-mint-500 shrink-0" />
-          {quests ? (
-            <span className="flex-1 text-left text-sm text-text-primary">
-              <StatNumber value={`${questDone}/${questTotal}`} size="sm" /> quests today
-            </span>
-          ) : (
-            <div className="flex-1 h-4 bg-bg-raised rounded animate-pulse" />
+      {/* TODAY'S HIGHLIGHTS */}
+      <div>
+        <SectionHeader>{t("health.sectionHighlights")}</SectionHeader>
+        <div className="space-y-3">
+          {hasReadingToday && justCrossedMilestone && (
+            <Banner
+              variant="celebration"
+              title="Streak milestone! 🎉"
+              subtitle="New badge unlocked — keep it going."
+              className="animate-fade-rise-in"
+            />
           )}
-          {xp && (
-            <span className="text-xs font-semibold text-gold-500 shrink-0">Lv.{xp.level} · {xp.total.toLocaleString()} XP</span>
-          )}
-          {questTotal > 0 && (
-            <ChevronRight size={14} className={`text-text-disabled transition-transform duration-200 shrink-0 ${questsOpen ? "rotate-90" : ""}`} />
-          )}
-        </button>
-      </Card>
 
-      {/* Quests expanded panel */}
-      {questsOpen && quests && quests.length > 0 && (
-        <div className="bg-bg-elevated rounded-2xl p-4 space-y-3 -mt-2 animate-fade-rise-in">
-          <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">Quest วันนี้</p>
-          {/* Quests without a wired completion path (only breath-check + article
-              currently progress) are muted rather than hidden — honest about
-              what's actually trackable today without hiding the roadmap. */}
-          {[...quests]
-            .sort((a, b) => Number(b.code === "daily_breath_check" || b.code === "daily_article") -
-                            Number(a.code === "daily_breath_check" || a.code === "daily_article"))
-            .map((q) => {
-              const isTrackable = q.code === "daily_breath_check" || q.code === "daily_article";
-              return (
-                <div key={q.id} className={`flex items-center gap-3 ${!isTrackable && !q.completed_at ? "opacity-40" : ""}`}>
-                  <div
-                    className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                      q.completed_at ? "bg-mint-500" : "border-2 border-border-strong"
-                    }`}
+          {!hasReadingToday ? (
+            <div className="space-y-2">
+              <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">
+                {t("health.todayCheckLabel")}
+              </p>
+              <Banner
+                icon={<BreathPulse size={48} />}
+                title={`${timeGreeting}!`}
+                subtitle={
+                  deviceId || demoMode
+                    ? "Take a 10-second breath test to track your metabolic state."
+                    : "No device yet? Try Demo Mode from your profile to see how it works."
+                }
+                action={
+                  <Link
+                    href="/breathing"
+                    className="inline-flex items-center justify-center rounded-full bg-mint-500 text-white text-sm font-semibold px-4 py-2 hover:bg-mint-400 transition-colors"
                   >
-                    {q.completed_at && <Check size={10} className="text-white" strokeWidth={3} />}
+                    {t("health.startCheckin")}
+                  </Link>
+                }
+              />
+            </div>
+          ) : (
+            <Card padding="lg" className="space-y-3 relative">
+              <div className="absolute top-4 right-4">
+                <InfoButton title="Breath Acetone Zones" ariaLabel="Zone details">
+                  <p>ค่า <b>breath acetone สูงสุด</b> ที่วัดได้ใน <b>วันนี้</b></p>
+                  <div className="bg-bg-elevated rounded-xl p-3 space-y-2">
+                    <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">Zones (ppm)</p>
+                    <ul className="text-xs space-y-1">
+                      {ZONES.map((z) => (
+                        <li key={z.n}>
+                          <span style={{ color: z.color }}>●</span>{" "}
+                          <b>{z.name}</b> ({z.rangeText}) — {z.desc}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${q.completed_at ? "text-text-muted line-through" : "text-text-primary"}`}>
-                      {q.title}
+                </InfoButton>
+              </div>
+
+              <div className="flex items-start justify-between gap-3 pr-8">
+                <div>
+                  <StatNumber value={fmtAcetone(heroValue!)} unit={unitLbl} size="xl" />
+                  {zone && (
+                    <span
+                      className="inline-block mt-2 text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={{ background: `${zone.color}22`, color: zone.color }}
+                    >
+                      {zone.name}
+                    </span>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  {liveConnected && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-mint-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-mint-500 animate-pulse" /> Live
+                    </span>
+                  )}
+                  {flexData && flexStyle && (
+                    <p className="text-xs text-text-muted mt-1">
+                      Flex <span className="font-bold" style={{ color: flexStyle.color }}>{flexData.score}</span>
                     </p>
-                    <p className="text-xs text-text-disabled">{q.description}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs text-gold-500 font-semibold">+{q.xp_reward} XP</p>
-                    <p className="text-[10px] text-text-disabled font-mono">{q.progress}/{q.target}</p>
+                  )}
+                </div>
+              </div>
+
+              <Link href="/breathing" className="inline-flex items-center gap-0.5 text-xs text-mint-500 font-medium">
+                {t("health.showDetails")} <ChevronRight size={12} />
+              </Link>
+
+              {aiInterpret?.text && (
+                <div className="pt-3 border-t border-border-soft flex gap-2">
+                  <Sparkles size={14} className="text-mint-500 shrink-0 mt-0.5" strokeWidth={1.6} />
+                  <div className="min-w-0 space-y-2">
+                    <p className="text-sm text-text-primary leading-relaxed">{aiInterpret.text}</p>
+                    <SuggestedQuestionChip question="ทำไมค่า acetone วันนี้ถึงเป็นแบบนี้?" deviceId={deviceId} />
                   </div>
                 </div>
-              );
-            })}
+              )}
+            </Card>
+          )}
+
+          {/* Live snapshot — only while actively streaming; the hero above
+              already covers "no reading" and "today's peak" states. */}
+          {liveReading && (
+            <Card padding="md" className="flex items-center gap-3">
+              <div className="text-right min-w-[44px]">
+                <p className="text-xs text-text-muted">
+                  {parseServerTime(liveReading.time).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-text-primary">{fmtAcetone(liveReading.acetone_delta_mv)} {unitLbl}</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {liveReading.pressure_kpa != null && `${liveReading.pressure_kpa.toFixed(2)} kPa · `}
+                  Q: {liveReading.quality_score?.toFixed(0)}/100
+                </p>
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* TRENDS — plain and always visible, no expand/collapse toggle */}
+      {deviceId && (
+        <div>
+          <SectionHeader>{t("health.sectionTrends")}</SectionHeader>
+          <div className="space-y-3">
+            <TrendClassCard deviceId={deviceId} sessions={14} />
+            <BaselineCard deviceId={deviceId} />
+          </div>
         </div>
       )}
 
-      {/* Daily entry metrics */}
-      <div className="grid grid-cols-3 gap-3">
-        <TodayMetricCard kind="weight" />
-        <TodayMetricCard kind="steps" />
-        <TodayMetricCard kind="calories" />
-      </div>
-
-      {/* Coming-soon categories — Breathing/Trend dropped here since they now
-          duplicate bottom-tab destinations. */}
+      {/* OTHER METRICS */}
       <div>
-        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Coming soon</p>
-        <div className="grid grid-cols-2 gap-3">
-          <CategoryCard icon="💤" title="Sleep" value="—" iconBg="#A855F7" comingSoon />
-          <CategoryCard icon="❤️" title="Heart Rate" value="—" iconBg="#FF3B4A" comingSoon />
+        <SectionHeader action={<PlusMenu />}>{t("health.sectionOtherMetrics")}</SectionHeader>
+        <div className="grid grid-cols-3 gap-3">
+          <TodayMetricCard kind="weight" />
+          <TodayMetricCard kind="steps" />
+          <TodayMetricCard kind="calories" />
         </div>
-      </div>
-
-      {/* Today's readings log */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">{t("health.todaySessions")}</p>
-          <Link href="/breathing" className="flex items-center gap-0.5 text-xs text-mint-500">
-            {t("health.viewAll")} <ChevronRight size={12} />
-          </Link>
-        </div>
-        {liveReading ? (
-          <Card padding="md" className="flex items-center gap-3">
-            <div className="text-right min-w-[44px]">
-              <p className="text-xs text-text-muted">{parseServerTime(liveReading.time).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</p>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-text-primary">{fmtAcetone(liveReading.acetone_delta_mv)} {unitLbl}</p>
-              <p className="text-xs text-text-muted mt-0.5">
-                {liveReading.pressure_kpa != null && `${liveReading.pressure_kpa.toFixed(2)} kPa · `}
-                Q: {liveReading.quality_score?.toFixed(0)}/100
-              </p>
-            </div>
-          </Card>
-        ) : (
-          <Card padding="md" className="text-center">
-            <p className="text-sm text-text-muted">{t("health.noReadingToday")}</p>
-            <Link href="/breathing" className="text-xs text-mint-500 mt-1 block">{t("health.startSession")}</Link>
-          </Card>
-        )}
       </div>
     </div>
   );

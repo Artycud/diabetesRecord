@@ -290,6 +290,13 @@ export const th = {
     viewAll: "ดูทั้งหมด",
     noReadingToday: "ยังไม่มีการตรวจวันนี้",
     startSession: "เริ่มตรวจ →",
+    title: "ภาพรวม",
+    todayCheckLabel: "การตรวจวันนี้",
+    startCheckin: "เริ่มตรวจ",
+    showDetails: "ดูรายละเอียด",
+    sectionHighlights: "จุดเด่นวันนี้",
+    sectionTrends: "แนวโน้ม",
+    sectionOtherMetrics: "ค่าอื่น ๆ",
   },
   breathing: {
     noDevice: "ไม่มีอุปกรณ์ที่จับคู่",

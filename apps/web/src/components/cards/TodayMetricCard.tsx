@@ -121,7 +121,7 @@ export function TodayMetricCard({ kind }: Props) {
       <button
         onClick={handleOpen}
         className={twMerge(
-          "rounded-2xl p-3 text-left border border-border-soft bg-bg-surface card-shadow transition-all active:scale-95 hover:bg-bg-raised"
+          "rounded-2xl p-3 text-left border border-border-card bg-bg-surface card-shadow transition-all active:scale-95 hover:bg-bg-raised"
         )}
       >
         <div className="flex items-center gap-1.5 mb-2">

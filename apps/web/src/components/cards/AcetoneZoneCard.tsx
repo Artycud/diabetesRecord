@@ -11,7 +11,7 @@ type ZoneDetail = {
   body: string;
 };
 
-type Zone = {
+export type Zone = {
   n: 1 | 2 | 3 | 4 | 5;
   name: string;
   rangeText: string;
@@ -22,7 +22,7 @@ type Zone = {
   details: ZoneDetail[];
 };
 
-const ZONES: Zone[] = [
+export const ZONES: Zone[] = [
   {
     n: 1,
     name: "Rest Zone",
@@ -198,7 +198,7 @@ const ZONES: Zone[] = [
   },
 ];
 
-function zoneOf(ppm: number): Zone {
+export function zoneOf(ppm: number): Zone {
   return ZONES.find((z) => ppm >= z.lo && ppm < z.hi) ?? ZONES[ZONES.length - 1];
 }
 

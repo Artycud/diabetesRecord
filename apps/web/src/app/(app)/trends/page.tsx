@@ -329,7 +329,7 @@ export default function TrendsPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-12 md:pt-6 pb-tabbar space-y-5">
+    <div className="w-full px-4 sm:px-6 md:max-w-2xl md:mx-auto lg:max-w-3xl pt-12 md:pt-6 pb-tabbar space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-text-primary tracking-tight">{t("trends.title")}</h1>
         <div className="mt-3 inline-flex gap-1 rounded-xl bg-bg-elevated border border-border-soft p-1">

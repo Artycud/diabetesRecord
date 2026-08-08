@@ -292,6 +292,13 @@ export const en: Dict = {
     viewAll: "View all",
     noReadingToday: "No readings today",
     startSession: "Start →",
+    title: "Summary",
+    todayCheckLabel: "TODAY'S BREATH CHECK",
+    startCheckin: "Start Check-in",
+    showDetails: "Show Details",
+    sectionHighlights: "TODAY'S HIGHLIGHTS",
+    sectionTrends: "TRENDS",
+    sectionOtherMetrics: "OTHER METRICS",
   },
   breathing: {
     noDevice: "No paired device",

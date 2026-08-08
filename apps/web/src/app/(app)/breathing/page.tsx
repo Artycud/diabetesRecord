@@ -75,7 +75,7 @@ export default function BreathingPage() {
   const connected = recStatus?.online ?? false;
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-5 pb-tabbar space-y-5">
+    <div className="w-full px-4 sm:px-6 md:max-w-2xl md:mx-auto lg:max-w-3xl pt-5 pb-tabbar space-y-5">
       {/* Device status card removed — same info + release button lives on /me/device now.
           Users without any device still see the "Add device" prompt via the empty state below.
           Both this and the shared-pool prompt below are irrelevant once Demo Mode is on. */}
