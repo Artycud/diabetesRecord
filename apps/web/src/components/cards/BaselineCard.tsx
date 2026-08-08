@@ -21,12 +21,9 @@ interface Props {
   deviceId?: string | null;
   days?: number;
   className?: string;
-  /** Render just the inner content, no outer Card — for composing into a
-   *  shared wrapper card (e.g. Home's combined trend+baseline module). */
-  bare?: boolean;
 }
 
-export function BaselineCard({ deviceId, days = 30, className, bare = false }: Props) {
+export function BaselineCard({ deviceId, days = 30, className }: Props) {
   const { t } = useT();
   const { unit: acUnit, label: acUnitLbl } = useUnits();
   const acDecimals = acUnit === "mV" ? 0 : 2;
@@ -38,63 +35,19 @@ export function BaselineCard({ deviceId, days = 30, className, bare = false }: P
   });
 
   if (isLoading) {
-    const skeleton = (
-      <div className={bare ? twMerge("animate-pulse", className) : "animate-pulse"}>
-        <div className="h-3 w-24 rounded bg-bg-raised" />
-        <div className="mt-3 h-7 w-32 rounded bg-bg-raised" />
-        <div className="mt-2 h-3 w-40 rounded bg-bg-raised" />
-      </div>
-    );
-    if (bare) return skeleton;
     return (
       <Card className={twMerge("animate-pulse", className)}>
-        <CardContent>{skeleton}</CardContent>
+        <CardContent>
+          <div className="h-3 w-24 rounded bg-bg-raised" />
+          <div className="mt-3 h-7 w-32 rounded bg-bg-raised" />
+          <div className="mt-2 h-3 w-40 rounded bg-bg-raised" />
+        </CardContent>
       </Card>
     );
   }
 
   if (isError || !data) {
     return null; // non-critical widget — fail quietly rather than blocking the page
-  }
-
-  // Compact glance row for `bare` (Home) — icon, value, range on one line,
-  // dropping the longer "based on N samples over M days" caption that Trends
-  // still shows in full.
-  if (bare) {
-    if (data.insufficient_data) {
-      return (
-        <div className={twMerge("flex items-center gap-3", className)}>
-          <div className="h-9 w-9 rounded-xl bg-bg-raised flex items-center justify-center shrink-0">
-            <Gauge size={16} className="text-text-muted" strokeWidth={1.6} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-text-primary">{t("trends.baseline.insufficientTitle")}</p>
-            <p className="text-xs text-text-muted mt-0.5 truncate">{t("trends.baseline.insufficientDesc")}</p>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className={twMerge("flex items-center gap-3", className)}>
-        <div className="h-9 w-9 rounded-xl bg-mint-500/10 flex items-center justify-center shrink-0">
-          <Gauge size={16} className="text-mint-500" strokeWidth={1.6} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs uppercase tracking-wide text-text-muted">{t("trends.baseline.title")}</p>
-          <p className="text-sm font-semibold text-text-primary truncate">
-            {data.baseline_mean_mv != null ? convertFromMv(data.baseline_mean_mv, acUnit).toFixed(acDecimals) : "—"}{" "}
-            <span className="text-xs font-normal text-text-muted">{acUnitLbl}</span>
-            {data.baseline_range_mv && (
-              <span className="text-xs text-text-muted">
-                {" "}· {convertFromMv(data.baseline_range_mv[0], acUnit).toFixed(acDecimals)}
-                {"–"}
-                {convertFromMv(data.baseline_range_mv[1], acUnit).toFixed(acDecimals)} {acUnitLbl}
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
-    );
   }
 
   const body = data.insufficient_data ? (

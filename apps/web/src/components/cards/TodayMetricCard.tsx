@@ -46,15 +46,9 @@ function isToday(iso: string): boolean {
 
 interface Props {
   kind: MetricKind;
-  /** "tile" (default) is the original bordered/shadowed grid tile. "row" is
-   *  a bare list-row layout for use inside a flat grouped-list section
-   *  (e.g. Home's "Today" section) — same data/tap-to-log modal, just a
-   *  different outer shell. */
-  variant?: "tile" | "row";
-  className?: string;
 }
 
-export function TodayMetricCard({ kind, variant = "tile", className }: Props) {
+export function TodayMetricCard({ kind }: Props) {
   const qc = useQueryClient();
   const { cardStyle } = useThemeConfig();
   const meta = META[kind];
@@ -126,44 +120,26 @@ export function TodayMetricCard({ kind, variant = "tile", className }: Props) {
 
   return (
     <>
-      {variant === "row" ? (
-        <button
-          onClick={handleOpen}
-          className={twMerge(
-            "flex items-center gap-3 w-full py-3 text-left transition-colors hover:bg-bg-raised rounded-xl -mx-1 px-1",
-            className
-          )}
-        >
-          <span className="text-lg shrink-0">{meta.icon}</span>
-          <span className="flex-1 min-w-0 text-sm text-text-primary">{meta.label}</span>
-          <span className="flex items-baseline gap-1 shrink-0">
-            <span className="text-sm font-semibold text-text-primary">{displayValue ?? "—"}</span>
-            <span className="text-xs text-text-muted">{meta.unit}</span>
-          </span>
-        </button>
-      ) : (
-        <button
-          onClick={handleOpen}
-          className={twMerge(
-            "rounded-2xl p-3 text-left transition-all active:scale-95",
-            cardStyle === "neumorphic"
-              ? "bg-bg-elevated neu-raised"
-              : cardStyle === "liquidGlass"
-                ? "liquid-glass"
-                : "bg-bg-elevated hover:bg-bg-raised",
-            className
-          )}
-        >
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-sm">{meta.icon}</span>
-            <p className="text-[10px] text-text-muted uppercase tracking-widest font-medium">{meta.label}</p>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <p className="text-lg font-bold text-text-primary leading-none">{displayValue ?? "—"}</p>
-            <p className="text-[10px] text-text-muted">{meta.unit}</p>
-          </div>
-        </button>
-      )}
+      <button
+        onClick={handleOpen}
+        className={twMerge(
+          "rounded-2xl p-3 text-left transition-all active:scale-95",
+          cardStyle === "neumorphic"
+            ? "bg-bg-elevated neu-raised"
+            : cardStyle === "liquidGlass"
+              ? "liquid-glass"
+              : "bg-bg-elevated hover:bg-bg-raised"
+        )}
+      >
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-sm">{meta.icon}</span>
+          <p className="text-[10px] text-text-muted uppercase tracking-widest font-medium">{meta.label}</p>
+        </div>
+        <div className="flex items-baseline gap-1">
+          <p className="text-lg font-bold text-text-primary leading-none">{displayValue ?? "—"}</p>
+          <p className="text-[10px] text-text-muted">{meta.unit}</p>
+        </div>
+      </button>
 
       {open && (
         <div
