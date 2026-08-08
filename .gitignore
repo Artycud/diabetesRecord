@@ -64,3 +64,10 @@ apps/api/models/rf_model.joblib
 apps/api/models/xgb_model.joblib
 apps/api/tests/AI_TEST_REPORT.pdf
 apps/api/tests/SMARTBREATH_TEST_REPORT.pdf
+
+# secrets discovered outside prior gitignore coverage (added by Claude, 2026-08-08)
+infra/mosquitto/passwd
+.env.backup.*
+.env.bak*
+.claude/
+.backups/
