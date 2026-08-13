@@ -11,6 +11,7 @@ import {
   DoctorOut,
 } from "@/lib/api";
 import AdminAgreementPanel from "@/components/AdminAgreementPanel";
+import AdminAiFallbackPanel from "@/components/AdminAiFallbackPanel";
 import { useAuth } from "@/lib/auth";
 
 // ─── Label styling ────────────────────────────────────────────────────────────
@@ -709,6 +710,12 @@ export default function AdminPage() {
             ))}
           </div>
         )}
+
+        {/* Global AI fallback keys (OpenAI/Gemini) — server-side only, used
+            when the primary Claude call fails or isn't configured. */}
+        <div className="mb-6">
+          <AdminAiFallbackPanel />
+        </div>
 
         {/* Breath ↔ urine ketone agreement */}
         <div className="mb-6">

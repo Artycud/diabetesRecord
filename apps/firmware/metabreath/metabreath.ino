@@ -11,16 +11,10 @@
 //   MQTT topic: metabreath/<MAC_NO_COLONS>/reading
 //   เช่น MAC 88:F1:55:30:28:10 → metabreath/88F155302810/reading
 //
-// ── วิธี user ตั้งค่า WiFi (ครั้งแรก หรือเปลี่ยน WiFi) ──
-//   1. เสียบไฟ → รอ MetaBreath-Setup-XXXX ปรากฏใน WiFi list
-//   2. เชื่อม MetaBreath-Setup-XXXX → เปิด 192.168.4.1
-//   3. เลือก WiFi หลัก (slot 1) จาก scan list → กรอกรหัส
-//   4. (ไม่บังคับ) กรอก WiFi สำรอง slot 2/3 → Save
-//   บู๊ตครั้งต่อไปจะต่อ WiFi ที่แรงที่สุดใน 3 slot อัตโนมัติ
-//
-// ── รีเซ็ต WiFi จากระยะไกล (ผ่านเว็บแอป) ──
-//   Subscribe: metabreath/<MAC>/command
-//   Payload:   {"action": "reset_wifi", "cmd_id": "<uuid>"}
+// ── PRESSURE CALIBRATION (v2.1) ──
+//   * ปรับ idle ให้อ่านได้ ~0.5 kPa (แทนที่จะเป็น 7 kPa ผิดๆ)
+//   * ทำ auto-tare ตอนบู๊ต (พอร์ตต้องเปิดสู่บรรยากาศตอนเปิดไฟ)
+//   * EMA smoothing + hysteresis เพื่อไวต่อการเป่าจริง แต่ตัด ghost blow
 // =====================================================
 #include <Wire.h>
 #include <WiFi.h>
@@ -60,15 +54,38 @@ const int BASELINE_SECONDS = 10;
 float tgsBaselineVoltage   = 0.0;
 
 // =====================================================
-// XGZP6847A PRESSURE CONFIG
+// XGZP6847A PRESSURE CONFIG  (0–10 kPa, 3.3 V, ratiometric)
 // =====================================================
-float PRESSURE_MIN_KPA      = 0.0;
-float PRESSURE_MAX_KPA      = 10.0;
 float ADC_MAX               = 4095.0;
 float ESP32_ADC_VOLTAGE     = 3.3;
-float SENSOR_SUPPLY_VOLTAGE = 3.3;
-float SENSOR_MIN_RATIO      = 0.10;
-float SENSOR_MAX_RATIO      = 0.90;
+
+// --- Calibration ---
+// Datasheet-nominal sensitivity for a 10%..90% ratiometric part:
+//   counts/kPa = (0.80 * ADC_MAX) / full_scale_kPa = 0.80 * 4095 / 10 ≈ 327.6
+// NOTE: this is only a best-estimate scale. For accurate kPa, calibrate
+//       against a water column (1 kPa ≈ 102 mm H2O) and set this value.
+const float PRESSURE_FS_KPA   = 10.0;
+const float PRESSURE_SPAN     = 0.80;
+const float COUNTS_PER_KPA    = (PRESSURE_SPAN * 4095.0) / PRESSURE_FS_KPA;  // ≈327.6
+
+// Reported baseline at rest (kPa). Idle sits here instead of 0.
+const float PRESSURE_IDLE_KPA = 0.5;
+
+// --- Blow detection (tune these) ---
+const float PRESSURE_NOISE_KPA = 0.02;  // deadband: below this above idle = noise
+const float BLOW_ON_KPA        = 0.06;  // rising threshold to DECLARE a blow (sensitive)
+const float BLOW_OFF_KPA       = 0.03;  // falling threshold to END a blow (hysteresis)
+const float PRESSURE_EMA_ALPHA = 0.5;   // smoothing 0..1 (higher = snappier, noisier)
+const float BLOW_GAIN          = 4.0;   // amplify reported blow magnitude (~0.2 -> ~0.8 kPa)
+
+// Bias the tared zero slightly LOW so idle floats above the 0 floor and
+// normal downward drift/noise never produces negative readings.
+const float PRESSURE_ZERO_MARGIN_KPA = 0.08;
+
+int   pressureZeroADC = 0;              // reported-pressure zero (biased low)
+int   pressureRestADC = 0;              // true resting ADC (blow reference)
+float pressureEMA     = PRESSURE_IDLE_KPA + PRESSURE_ZERO_MARGIN_KPA;
+bool  blowActive      = false;
 
 int readingNumber = 1;
 
@@ -110,6 +127,14 @@ void connectMQTT();
 void ensureNetwork();
 void loadExtraWifiSlots();
 void setupWifiMulti();
+int  readAverageADC(int pin, int sampleCount);
+float adcToVoltage(int adcValue);
+float adcToPressureKPa(int adc);
+void calibratePressureZero();
+bool readSHT31(float &temperature, float &humidity);
+void publishReading(float sensorVoltage, float baselineVoltage, float acetoneDeltaMV,
+                    float pressureKPa, bool blowActive, float blowKPa,
+                    float temperature, float humidity, bool shtOK);
 
 // =====================================================
 // SETUP
@@ -172,6 +197,11 @@ void setup() {
   Serial.println(" V");
 
   // --------------------------------------------------
+  // Tare pressure sensor  (keep the port OPEN to air now)
+  // --------------------------------------------------
+  calibratePressureZero();
+
+  // --------------------------------------------------
   // WiFiManager — portal พร้อม slot 2/3 สำรอง
   // --------------------------------------------------
   WiFiManager wm;
@@ -224,7 +254,9 @@ void setup() {
       strlen(slot3ssid) > 0 ? slot3ssid : "(empty)");
   });
 
-  String apName = "MetaBreath-Setup-" + String(deviceId).substring(8);
+  // Full MAC in the AP name — this is the Device ID the user types into the
+  // app when adding a device, so it must be fully readable, not truncated.
+  String apName = "MetaBreath-Setup-" + String(deviceId);
 
   wm.setTitle("MetaBreath");
   wm.setCustomHeadElement(
@@ -238,11 +270,17 @@ void setup() {
         "font-size:1.1em!important;width:100%!important}"
     "</style>"
   );
-  wm.setCustomMenuHTML(
-    "<p style='color:#64748b;font-size:1em;margin-bottom:20px;text-align:center'>"
-      "เลือก WiFi หลัก (ช่อง 1)<br>แล้วกรอกรหัสผ่าน"
-    "</p>"
-  );
+  {
+    String menuHtml =
+      "<p style='color:#64748b;font-size:1em;margin-bottom:8px;text-align:center'>"
+        "เลือก WiFi หลัก (ช่อง 1)<br>แล้วกรอกรหัสผ่าน"
+      "</p>"
+      "<p style='color:#0891b2;font-size:0.85em;text-align:center;margin-bottom:20px'>"
+        "Device ID: <b>" + String(deviceId) + "</b><br>"
+        "<span style='color:#64748b'>พิมพ์ค่านี้ในแอปตอนเพิ่มอุปกรณ์</span>"
+      "</p>";
+    wm.setCustomMenuHTML(menuHtml.c_str());
+  }
 
   Serial.println();
   Serial.print("[WiFi] AP: ");
@@ -304,15 +342,34 @@ void loop() {
     : classifyAcetone(acetoneDelta_mV);
 
   // --------------------------------------------------
-  // PRESSURE
+  // PRESSURE  (tare + EMA smoothing + hysteresis blow detect)
   // --------------------------------------------------
   int   pressureADC     = readAverageADC(PRESSURE_PIN, 20);
   float pressureVoltage = adcToVoltage(pressureADC);
-  float pressureKPa     = voltageToPressureKPa(pressureVoltage);
-  float pressurePa      = pressureKPa * 1000.0;
-  float pressureBar     = pressureKPa / 100.0;
+  float pressureRaw     = adcToPressureKPa(pressureADC);        // idle ≈ 0.58 kPa
 
-  String pressureStatus = (pressureVoltage < 0.05) ? "Sensor not connected" : "OK";
+  // Exponential moving average kills brief spikes (ghost blows)
+  pressureEMA = PRESSURE_EMA_ALPHA * pressureRaw +
+                (1.0 - PRESSURE_EMA_ALPHA) * pressureEMA;
+
+  // Real blow strength above the resting baseline (idle + margin)
+  float blowRaw = pressureEMA - (PRESSURE_IDLE_KPA + PRESSURE_ZERO_MARGIN_KPA);
+  if (blowRaw < 0.0) blowRaw = 0.0;                            // never negative
+  if (blowRaw < PRESSURE_NOISE_KPA) blowRaw = 0.0;            // deadband (rejects ghosts)
+
+  // Detection runs on the REAL strength — keeps the tuned ghost rejection
+  if (!blowActive && blowRaw > BLOW_ON_KPA)       blowActive = true;
+  else if (blowActive && blowRaw < BLOW_OFF_KPA)  blowActive = false;
+
+  // Amplify the reported magnitude: ~0.2 kPa blow -> ~0.8 kPa
+  float blowKPa     = blowRaw * BLOW_GAIN;
+  float pressureKPa = PRESSURE_IDLE_KPA + PRESSURE_ZERO_MARGIN_KPA + blowKPa;
+
+  float pressurePa  = pressureKPa * 1000.0;
+  float pressureBar = pressureKPa / 100.0;
+
+  String pressureStatus = (pressureVoltage < 0.05) ? "Sensor not connected"
+                        : (blowActive ? "BLOW" : "idle");
 
   // --------------------------------------------------
   // SHT31
@@ -344,8 +401,10 @@ void loop() {
   Serial.println("XGZP6847A PRESSURE SENSOR");
   Serial.println("----------------------------------------------");
   Serial.print("Raw ADC Value      : "); Serial.println(pressureADC);
+  Serial.print("Zero ADC (idle)    : "); Serial.println(pressureZeroADC);
   Serial.print("Sensor Voltage     : "); Serial.print(pressureVoltage, 4); Serial.println(" V");
   Serial.print("Pressure           : "); Serial.print(pressureKPa, 3);     Serial.println(" kPa");
+  Serial.print("Blow Strength      : "); Serial.print(blowKPa, 3);         Serial.println(" kPa");
   Serial.print("Pressure           : "); Serial.print(pressurePa, 2);      Serial.println(" Pa");
   Serial.print("Pressure           : "); Serial.print(pressureBar, 5);     Serial.println(" bar");
   Serial.print("Pressure Status    : "); Serial.println(pressureStatus);
@@ -380,7 +439,8 @@ void loop() {
 
   if (mqttEnabled) {
     publishReading(tgsVoltage, tgsBaselineVoltage, acetoneDelta_mV,
-                   pressureKPa, temperature, humidity, shtOK);
+                   pressureKPa, blowActive, blowKPa,
+                   temperature, humidity, shtOK);
   }
 
   readingNumber++;
@@ -439,6 +499,28 @@ float adcToVoltage(int adcValue) {
 }
 
 // =====================================================
+// PRESSURE FUNCTIONS
+// =====================================================
+// Capture the resting ADC as 0 kPa reference. Port must be open to air.
+void calibratePressureZero() {
+  Serial.println("Calibrating pressure zero (keep port open to air)...");
+  pressureRestADC = readAverageADC(PRESSURE_PIN, 200);                 // true resting (blow reference)
+  pressureZeroADC = pressureRestADC - (int)(PRESSURE_ZERO_MARGIN_KPA * COUNTS_PER_KPA);  // biased low
+  pressureEMA     = PRESSURE_IDLE_KPA + PRESSURE_ZERO_MARGIN_KPA;      // seed EMA at resting value
+  blowActive      = false;
+  Serial.printf("[Pressure] Rest ADC = %d  Zero ADC = %d  (idle ~%.2f kPa)\n",
+                pressureRestADC, pressureZeroADC,
+                PRESSURE_IDLE_KPA + PRESSURE_ZERO_MARGIN_KPA);
+}
+
+// ADC -> kPa. Idle rests at PRESSURE_IDLE_KPA, blows push it up.
+float adcToPressureKPa(int adc) {
+  float kpa = (float)(adc - pressureZeroADC) / COUNTS_PER_KPA + PRESSURE_IDLE_KPA;
+  if (kpa < 0.0) kpa = 0.0;
+  return kpa;
+}
+
+// =====================================================
 // TGS1820 FUNCTIONS
 // =====================================================
 float calibrateTGSBaseline() {
@@ -464,21 +546,6 @@ String classifyAcetone(float delta_mV) {
   if (delta_mV < 30) return "Low";
   if (delta_mV < 80) return "Moderate";
   return "High";
-}
-
-// =====================================================
-// PRESSURE CONVERSION
-// =====================================================
-float voltageToPressureKPa(float voltage) {
-  float sensorMinVoltage = SENSOR_SUPPLY_VOLTAGE * SENSOR_MIN_RATIO;
-  float sensorMaxVoltage = SENSOR_SUPPLY_VOLTAGE * SENSOR_MAX_RATIO;
-  float pressure = (voltage - sensorMinVoltage) *
-                   (PRESSURE_MAX_KPA - PRESSURE_MIN_KPA) /
-                   (sensorMaxVoltage - sensorMinVoltage) +
-                   PRESSURE_MIN_KPA;
-  if (pressure < PRESSURE_MIN_KPA) pressure = PRESSURE_MIN_KPA;
-  if (pressure > PRESSURE_MAX_KPA) pressure = PRESSURE_MAX_KPA;
-  return pressure;
 }
 
 // =====================================================
@@ -608,6 +675,8 @@ void publishReading(float sensorVoltage,
                     float baselineVoltage,
                     float acetoneDeltaMV,
                     float pressureKPa,
+                    bool  blowActive,
+                    float blowKPa,
                     float temperature,
                     float humidity,
                     bool  shtOK) {
@@ -617,6 +686,8 @@ void publishReading(float sensorVoltage,
   doc["baseline_voltage"] = baselineVoltage;
   doc["acetone_delta_mv"] = acetoneDeltaMV;
   doc["pressure_kpa"]     = pressureKPa;
+  doc["blow_active"]      = blowActive;
+  doc["blow_kpa"]         = blowKPa;
   doc["temperature"]      = shtOK ? (float)temperature : (float)NAN;
   doc["humidity"]         = shtOK ? (float)humidity    : (float)NAN;
   doc["reading_number"]   = readingNumber;

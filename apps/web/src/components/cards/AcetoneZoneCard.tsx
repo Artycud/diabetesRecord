@@ -304,12 +304,18 @@ export function AcetoneZoneCard({ currentMv, live = false }: Props) {
   return (
     <>
       <div className="bg-bg-elevated rounded-2xl p-4 space-y-4">
+        {/* Slight brand mark — same quiet eyebrow-label convention Home
+            already uses (text-mint-500, uppercase, tracking-widest), not a
+            new style, just enough presence to say "this is MetaBreath's
+            reading" without competing with the number below it. */}
+        <p className="text-[10px] text-mint-500 font-semibold uppercase tracking-widest">MetaBreath</p>
+
         {/* Header: current value + active zone label */}
         <div className="flex items-baseline justify-between gap-3">
           {ppm != null && activeZone ? (
             <>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-bold text-text-primary">{ppm.toFixed(2)}</span>
+                <span className="stat-mono text-3xl text-text-primary">{ppm.toFixed(2)}</span>
                 <span className="text-sm text-text-muted">ppm</span>
                 {live && (
                   <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-mint-500">
@@ -335,12 +341,31 @@ export function AcetoneZoneCard({ currentMv, live = false }: Props) {
 
         {/* Gradient bar with marker */}
         <div className="relative h-2.5 rounded-full overflow-visible" style={{ background: gradient }}>
-          {markerPct != null && (
-            <div
-              className="absolute -top-1 h-4.5 w-4.5 rounded-full bg-bg-elevated border-2 border-text-primary shadow-md pointer-events-none"
-              style={{ left: `calc(${markerPct}% - 9px)`, height: "1.125rem", width: "1.125rem" }}
-              aria-hidden="true"
-            />
+          {markerPct != null && activeZone && (
+            <>
+              {/* Blurred glow behind the marker, in the active zone's own
+                  color (not riskLabel.ts's LABEL_STYLE — this card's ZONES
+                  palette is independent, so the glow must match the
+                  gradient bar it sits on). Reuses the same 4s breathing
+                  rhythm as FloatingHero's ambient halo, not a new keyframe. */}
+              <div
+                className="absolute rounded-full blur-md pointer-events-none animate-halo-breathe"
+                style={{
+                  left: `calc(${markerPct}% - 18px)`,
+                  top: "-0.5625rem",
+                  height: "2.25rem",
+                  width: "2.25rem",
+                  backgroundColor: activeZone.color,
+                  opacity: 0.4,
+                }}
+                aria-hidden="true"
+              />
+              <div
+                className="absolute -top-1 h-4.5 w-4.5 rounded-full bg-bg-elevated border-2 border-text-primary shadow-md pointer-events-none"
+                style={{ left: `calc(${markerPct}% - 9px)`, height: "1.125rem", width: "1.125rem" }}
+                aria-hidden="true"
+              />
+            </>
           )}
         </div>
 

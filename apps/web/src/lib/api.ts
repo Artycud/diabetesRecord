@@ -265,6 +265,19 @@ export interface DoctorOut {
   display_name: string | null;
 }
 
+export interface AiFallbackProviderOut {
+  key: string;
+  display_name: string;
+  enabled: boolean;
+  priority: number;
+  model: string;
+  configured: boolean;
+}
+
+export interface AiFallbackConfigOut {
+  providers: AiFallbackProviderOut[];
+}
+
 export interface AdminReadingCreate {
   device_id: string;
   time?: string;
@@ -843,11 +856,16 @@ export const api = {
       request<InterpretResponse>("/ai/interpret", {
         method: "POST",
         body: JSON.stringify({ device_id: deviceId, time }),
+        // request() otherwise has no timeout at all. Generous headroom since
+        // the backend may try Claude, then an admin-configured global
+        // OpenAI/Gemini fallback, sequentially (app/services/ai_fallback.py).
+        signal: AbortSignal.timeout(20_000),
       }),
     classifyTrend: (deviceId: string, sessions = 14) =>
       request<TrendClassifyResponse>("/ai/predict/trend", {
         method: "POST",
         body: JSON.stringify({ device_id: deviceId, sessions }),
+        signal: AbortSignal.timeout(10_000),
       }),
     chat: (message: string, deviceId?: string) =>
       request<ChatResponse>("/ai/chat", {
@@ -869,6 +887,11 @@ export const api = {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ message, device_id: deviceId }),
+        // Streaming + a multi-round tool-call loop can legitimately take a
+        // while, plus the backend may attempt an OpenAI/Gemini fallback
+        // afterwards (app/services/ai_fallback.py) — generous headroom so
+        // this doesn't abort a request that's still being served.
+        signal: AbortSignal.timeout(45_000),
       });
       if (!res.ok || !res.body) throw new Error("stream failed");
       const reader = res.body.getReader();
@@ -958,5 +981,15 @@ export const api = {
         `/admin/users/${userId}/assign-doctor`,
         { method: "POST", body: JSON.stringify({ doctor_id: doctorId }) }
       ),
+    getAiFallbackConfig: () =>
+      request<AiFallbackConfigOut>("/admin/ai-fallback"),
+    updateAiFallbackProvider: (
+      providerKey: "openai" | "gemini",
+      body: { api_key?: string; enabled?: boolean }
+    ) =>
+      request<AiFallbackProviderOut>(`/admin/ai-fallback/${providerKey}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
   },
 };

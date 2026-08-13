@@ -21,28 +21,38 @@ interface Props {
   deviceId?: string | null;
   days?: number;
   className?: string;
+  /** Skip the outer Card chrome — for when a parent (Home's unified Details
+   *  container) already supplies the card border/background/padding. */
+  bare?: boolean;
 }
 
-export function BaselineCard({ deviceId, days = 30, className }: Props) {
-  const { t } = useT();
-  const { unit: acUnit, label: acUnitLbl } = useUnits();
-  const acDecimals = acUnit === "mV" ? 0 : 2;
-
-  const { data, isLoading, isError } = useQuery({
+/** Shared by BaselineCard and HomeStatsPillBar — same queryKey as before
+ *  extraction, so both callers share one TanStack Query cache entry. */
+export function useBaselineQuery(deviceId?: string | null, days = 30) {
+  return useQuery({
     queryKey: ["sensor", "baseline", deviceId ?? "all", days],
     queryFn: () => api.sensor.getBaseline({ deviceId: deviceId ?? undefined, days }),
     staleTime: 5 * 60 * 1000,
   });
+}
+
+export function BaselineCard({ deviceId, days = 30, className, bare }: Props) {
+  const { t } = useT();
+  const { unit: acUnit, label: acUnitLbl } = useUnits();
+  const acDecimals = acUnit === "mV" ? 0 : 2;
+
+  const { data, isLoading, isError } = useBaselineQuery(deviceId, days);
 
   if (isLoading) {
-    return (
-      <Card className={twMerge("animate-pulse", className)}>
-        <CardContent>
-          <div className="h-3 w-24 rounded bg-bg-raised" />
-          <div className="mt-3 h-7 w-32 rounded bg-bg-raised" />
-          <div className="mt-2 h-3 w-40 rounded bg-bg-raised" />
-        </CardContent>
-      </Card>
+    const skeleton = (
+      <div className="animate-pulse">
+        <div className="h-3 w-24 rounded bg-bg-raised" />
+        <div className="mt-3 h-7 w-32 rounded bg-bg-raised" />
+        <div className="mt-2 h-3 w-40 rounded bg-bg-raised" />
+      </div>
+    );
+    return bare ? <div className={className}>{skeleton}</div> : (
+      <Card className={className}><CardContent>{skeleton}</CardContent></Card>
     );
   }
 
@@ -93,9 +103,7 @@ export function BaselineCard({ deviceId, days = 30, className }: Props) {
     </div>
   );
 
-  return (
-    <Card className={className}>
-      <CardContent>{body}</CardContent>
-    </Card>
+  return bare ? <div className={className}>{body}</div> : (
+    <Card className={className}><CardContent>{body}</CardContent></Card>
   );
 }

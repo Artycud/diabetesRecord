@@ -8,6 +8,7 @@ import { LocaleProvider } from "@/lib/i18n";
 import { UnitsProvider } from "@/lib/units";
 import { TimezoneProvider } from "@/lib/timezone";
 import { DemoModeProvider } from "@/lib/demoMode";
+import { AccentProvider } from "@/lib/accent";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Toaster as Sonner } from "sonner";
@@ -46,13 +47,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <LocaleProvider>
           <UnitsProvider>
             <TimezoneProvider>
-              <DemoModeProvider>
-                <AuthProvider>
-                  {children}
-                  <Toaster />
-                  <ThemedSonner />
-                </AuthProvider>
-              </DemoModeProvider>
+              <AccentProvider>
+                <DemoModeProvider>
+                  <AuthProvider>
+                    {children}
+                    <Toaster />
+                    <ThemedSonner />
+                  </AuthProvider>
+                </DemoModeProvider>
+              </AccentProvider>
             </TimezoneProvider>
           </UnitsProvider>
         </LocaleProvider>

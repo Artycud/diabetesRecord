@@ -9,6 +9,9 @@ interface Props {
   children: ReactNode;
   defaultOpen?: boolean;
   className?: string;
+  /** Controlled open state — omit to let the section manage its own (default). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -16,13 +19,21 @@ interface Props {
  * interpretive cards (trend classification, baseline, AI take) that
  * shouldn't compete with a screen's primary hero content by default.
  */
-export function DetailsSection({ title, children, defaultOpen = false, className }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
+export function DetailsSection({ title, children, defaultOpen = false, className, open: openProp, onOpenChange }: Props) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : internalOpen;
+
+  function toggle() {
+    const next = !open;
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  }
 
   return (
     <div className={className}>
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="w-full flex items-center justify-between rounded-2xl border border-border-soft bg-bg-surface px-4 py-3 text-left"
       >
         <span className="text-sm font-medium text-text-primary">{title}</span>

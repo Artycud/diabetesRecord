@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Sarabun, Playfair_Display } from "next/font/google";
+import { Inter, Sarabun, Playfair_Display, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -24,6 +24,15 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+// Lab-instrument monospace treatment for acetone ppm readouts (.stat-mono,
+// globals.css) — distinct digit shapes (0/O, 1/l/I) read as telemetry
+// rather than a generic code font.
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "MetaBreath",
   description: "Wellness companion for keto / IF / exercise",
@@ -34,13 +43,17 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F2F2F7" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="th" className={`${inter.variable} ${sarabun.variable} ${playfair.variable} h-full`}>
+    <html lang="th" className={`${inter.variable} ${sarabun.variable} ${playfair.variable} ${jetbrainsMono.variable} h-full`}>
       <body className="h-full antialiased">
         <Providers>{children}</Providers>
       </body>

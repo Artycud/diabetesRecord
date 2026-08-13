@@ -15,7 +15,8 @@ import BreathSession from "@/components/BreathSession";
 import { AcetoneZoneCard } from "@/components/cards/AcetoneZoneCard";
 import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
 import { Card } from "@/components/ui/card";
-import { SuggestedQuestionChip } from "@/components/ai/SuggestedQuestionChip";
+import { NoDeviceNotice } from "@/components/ui/NoDeviceNotice";
+import { BentoTile } from "@/components/ui/BentoTile";
 
 export default function BreathingPage() {
   const { user } = useAuth();
@@ -76,13 +77,21 @@ export default function BreathingPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-tabbar space-y-5">
+      {/* Header — same eyebrow+title grammar as Trends/Me, sitting above
+          BreathSession's own contextual idle copy (same coexistence Home
+          already has between its page h1 and FloatingHero's pills). */}
+      <div>
+        <p className="text-xs text-mint-500 font-semibold uppercase tracking-widest">{t("breathing.eyebrow")}</p>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight mt-0.5">{t("breathing.title")}</h1>
+      </div>
+
       {/* Device status card removed — same info + release button lives on /me/device now.
           Users without any device still see the "Add device" prompt via the empty state below.
           Both this and the shared-pool prompt below are irrelevant once Demo Mode is on. */}
       {!demoMode && !primaryDevice && (
-        <Card padding="md" className="flex items-center justify-between">
-          <p className="text-sm text-text-muted">{t("breathing.noDevice")}</p>
-          <Link href="/me/device/add" className="text-xs text-mint-500 font-medium">{t("breathing.addDevice")}</Link>
+        <Card padding="md" className="flex items-center justify-between gap-3">
+          <NoDeviceNotice description={t("breathing.noDevice")} />
+          <Link href="/me/device/add" className="text-xs text-mint-500 font-medium shrink-0">{t("breathing.addDevice")}</Link>
         </Card>
       )}
 
@@ -123,26 +132,29 @@ export default function BreathingPage() {
           every page load, so it reads as "here's what just happened"
           rather than a permanent fixture. */}
       {lastSavedAt && primaryDevice && (
-        <div className="space-y-2 animate-pop-in">
-          <AiInterpretCard deviceId={primaryDevice.id} refreshKey={lastSavedAt} />
-          <SuggestedQuestionChip question="ครั้งหน้าควรทำอะไรให้ต่างไป?" deviceId={primaryDevice.id} />
+        <div className="animate-pop-in">
+          <AiInterpretCard
+            deviceId={primaryDevice.id}
+            refreshKey={lastSavedAt}
+            questions={["ครั้งหน้าควรทำอะไรให้ต่างไป?", "ค่านี้ปกติไหม?"]}
+          />
         </div>
       )}
 
-      {/* Trends shortcut */}
+      {/* Trends shortcut — same BentoTile row recipe Home uses for its
+          "today's readings" row. */}
       {primaryDevice && (
-        <Link
-          href="/trends"
-          className="flex items-center gap-3 bg-bg-elevated rounded-2xl p-4 hover:bg-bg-raised transition-colors"
-        >
-          <div className="h-9 w-9 rounded-xl bg-blue-500/20 flex items-center justify-center">
-            <TrendingUp size={16} className="text-blue-400" strokeWidth={1.6} />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-text-primary">{t("breathing.trend") ?? "แนวโน้ม"}</p>
-            <p className="text-xs text-text-muted mt-0.5">ดูค่าเฉลี่ยและกราฟย้อนหลัง</p>
-          </div>
-          <ChevronRight size={14} className="text-text-disabled" />
+        <Link href="/trends" className="block group active:scale-[0.99] transition-transform">
+          <BentoTile className="flex-row items-center gap-3 min-h-0 group-hover:bg-bg-raised/60 transition-colors">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+              <TrendingUp size={16} className="text-blue-400" strokeWidth={1.6} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary">{t("breathing.trend")}</p>
+              <p className="text-xs text-text-muted mt-0.5">{t("breathing.trendSubtitle")}</p>
+            </div>
+            <ChevronRight size={14} className="text-text-disabled shrink-0" />
+          </BentoTile>
         </Link>
       )}
 
@@ -182,7 +194,7 @@ function SharedDeviceCard({
   }
 
   return (
-    <div className="bg-bg-raised rounded-xl p-3 flex items-center justify-between gap-3">
+    <div className="bg-bg-raised rounded-2xl p-3 flex items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full shrink-0 ${online ? "bg-mint-500 animate-pulse" : "bg-text-disabled"}`} />
@@ -199,7 +211,7 @@ function SharedDeviceCard({
       <button
         onClick={handleClaim}
         disabled={busy}
-        className="text-xs font-medium px-3 py-2 rounded-lg bg-mint-500 text-black hover:bg-mint-400 transition disabled:opacity-50 shrink-0"
+        className="text-xs font-medium px-3 py-2 rounded-xl bg-mint-500 text-black hover:bg-mint-400 transition disabled:opacity-50 shrink-0"
       >
         {busy ? "..." : "ใช้เครื่องนี้"}
       </button>

@@ -5,7 +5,7 @@ import { twMerge } from "tailwind-merge";
 import type { HTMLAttributes } from "react";
 
 const cardVariants = cva(
-  "rounded-2xl border border-border-soft bg-bg-surface card-shadow transition-[box-shadow,background-color] duration-200",
+  "rounded-3xl border border-border-soft bg-bg-surface card-shadow transition-[box-shadow,background-color] duration-200",
   {
     variants: {
       padding: {

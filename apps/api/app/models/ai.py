@@ -16,6 +16,10 @@ class AIProvider(SQLModel, table=True):
     enabled: bool = Field(default=True)
     model: str = Field(max_length=80)
     timeout_s: int = Field(default=8)
+    # Admin-configured global fallback key (openai/gemini), encrypted at rest
+    # via app.core.secrets (Fernet). Used by app.services.ai_fallback when the
+    # primary Claude call in app/routers/ai.py fails or isn't configured.
+    api_key_encrypted: Optional[str] = Field(default=None)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class AISession(SQLModel, table=True):

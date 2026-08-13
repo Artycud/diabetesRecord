@@ -8,10 +8,22 @@ interface Props {
   title: string;
   children: ReactNode;
   ariaLabel?: string;
+  /** Controlled open state — lets another trigger (e.g. a text link elsewhere
+   *  in the same card) open this same modal. Omit to keep the default
+   *  self-managed state driven only by the "i" icon button. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function InfoButton({ title, children, ariaLabel = "ดูรายละเอียด" }: Props) {
-  const [open, setOpen] = useState(false);
+export function InfoButton({ title, children, ariaLabel = "ดูรายละเอียด", open: openProp, onOpenChange }: Props) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : internalOpen;
+
+  function setOpen(next: boolean) {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  }
 
   return (
     <>

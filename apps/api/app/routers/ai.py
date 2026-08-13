@@ -13,7 +13,7 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User, Profile
 from app.models.health import Device, DeviceCalibration, SensorReading
-from app.services import ml_inference, llm_guardrail, flexibility_engine, chat_tools, baseline
+from app.services import ml_inference, llm_guardrail, flexibility_engine, chat_tools, baseline, ai_fallback
 from app.mcp_context import mcp_scope
 from app.mcp_server import mcp as mcp_server
 
@@ -216,12 +216,12 @@ async def interpret_reading(
     otherwise. Goes through the same llm_guardrail sanitisation as /ai/chat
     — this is still a health-adjacent AI output.
     """
-    device_result = await db.exec(
-        select(Device).where(Device.id == body.device_id, Device.user_id == user.id)
-    )
-    if not device_result.first():
-        raise HTTPException(status_code=404, detail="Device not found")
-
+    # User-scoped, not Device-ownership-gated: works for shared-device users
+    # too (SensorReading.user_id is the real attribution — see /ai/trend,
+    # /ai/predict/trend, /ai/flexibility for the same established pattern in
+    # this file). A strict Device.user_id check here 404s for anyone using a
+    # claimed-but-not-owned shared device, which is the normal case for the
+    # shared device pool.
     # Resolve the target reading: an explicit time, or the user's latest.
     reading_stmt = select(SensorReading).where(
         SensorReading.device_id == body.device_id,
@@ -235,8 +235,8 @@ async def interpret_reading(
 
     if not reading or reading.acetone_delta is None:
         text = (
-            "ยังไม่มีข้อมูลการวัดให้ตีความค่ะ ลองเป่าเครื่องมือแล้วบันทึกผลก่อน "
-            "แล้วค่อยกลับมาดูสรุปนี้อีกครั้งนะคะ"
+            "ยังไม่มีข้อมูลการวัดให้ตีความ ลองเป่าเครื่องมือแล้วบันทึกผลก่อน "
+            "แล้วค่อยกลับมาดูสรุปนี้อีกครั้ง"
         )
         return InterpretResponse(
             text=llm_guardrail.sanitise_response(text, lang="th"),
@@ -294,28 +294,30 @@ async def interpret_reading(
     api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
     model = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 
-    if not api_key:
-        raw_reply = (
-            f"ค่าล่าสุดของคุณอยู่ที่ {acetone_ppm} ppm ({label}) ค่ะ "
-            + (
-                f"เทียบกับ baseline ปกติของคุณ ({personal_baseline['baseline_mean_ppm']} ppm) "
-                f"ถือว่า{'สูงกว่า' if comparison and comparison['direction']=='above_baseline_range' else 'ต่ำกว่า' if comparison and comparison['direction']=='below_baseline_range' else 'ใกล้เคียงกับ'}ปกติค่ะ"
-                if comparison else "ยังไม่มี baseline ส่วนตัวให้เทียบค่ะ"
-            )
-        )
-    else:
+    system_prompt = llm_guardrail.build_system_prompt({
+        "display_name": user.username,
+        "task": "one_shot_reading_interpretation",
+    })
+    # Kept deliberately terse (1-2 sentences, single point, single reason) —
+    # this renders in a compact card (AiInterpretCard), not a chat bubble, so
+    # length/filler that would be fine in /ai/chat reads as bloated here.
+    user_msg = (
+        "สรุปค่านี้ให้ผู้ใช้แบบสั้นกระชับที่สุดใน 1-2 ประโยค เข้าประเด็นทันที "
+        "ไม่ต้องมีคำนำหรือคำเชื่อมที่ไม่จำเป็น พูดใจความสำคัญที่สุดอย่างเดียว "
+        "(ค่าตอนนี้เทียบ baseline เป็นยังไง) ถ้าจะให้เหตุผลประกอบ ให้เลือกเหตุผลเดียว "
+        "ที่เป็นไปได้มากที่สุด อย่าเดาหลายทาง แน่นด้วยข้อมูลจริง ไม่ใช่คำพูดกว้าง ๆ ที่ไม่มีสาระ "
+        "ห้ามใช้เครื่องหมาย — (em dash) ให้ขึ้นประโยคใหม่หรือใช้คอมม่าแทน "
+        "ภาษาไทย น้ำเสียงเหมือนผู้ช่วยส่วนตัวที่เก่งเรื่องสุขภาพ มั่นใจตรงประเด็น สุภาพพอดี ๆ "
+        "ไม่ใช่พนักงานบริการลูกค้าและไม่ใช่หุ่นยนต์ห้วน ๆ ห้ามลงท้ายด้วยค่ะ/ครับ/นะคะ/นะครับเด็ดขาด "
+        "ห้ามวินิจฉัยโรค ห้ามแนะนำยา ห้ามใช้ emoji ห้ามใส่ disclaimer ท้ายข้อความ "
+        "(ระบบจะจัดการ disclaimer เอง). ข้อมูล:\n" + facts_th
+    )
+
+    raw_reply: Optional[str] = None
+    if api_key:
         try:
             import anthropic
             client = anthropic.Anthropic(api_key=api_key)
-            system_prompt = llm_guardrail.build_system_prompt({
-                "display_name": user.username,
-                "task": "one_shot_reading_interpretation",
-            })
-            user_msg = (
-                "สรุปค่าการวัดนี้ให้ผู้ใช้แบบสั้น ๆ 1-3 ประโยค ภาษาไทย เป็นกันเอง "
-                "ห้ามวินิจฉัยโรค ห้ามแนะนำยา ห้ามใช้ emoji ห้ามใส่ disclaimer ท้ายข้อความ "
-                "(ระบบจะจัดการ disclaimer เอง). ข้อมูล:\n" + facts_th
-            )
             response = client.messages.create(
                 model=model,
                 max_tokens=200,
@@ -324,9 +326,18 @@ async def interpret_reading(
             )
             texts = [getattr(b, "text", "") for b in response.content
                      if getattr(b, "type", None) == "text"]
-            raw_reply = "\n".join(t for t in texts if t).strip() or facts_th
+            raw_reply = "\n".join(t for t in texts if t).strip() or None
         except Exception:
-            raw_reply = facts_th
+            raw_reply = None
+
+    if not raw_reply:
+        # Primary (Claude) unavailable or failed — try the admin-configured
+        # global OpenAI/Gemini fallback before the canned deterministic
+        # template below (see app/services/ai_fallback.py).
+        raw_reply = await ai_fallback.try_global_fallback(db, system_prompt, user_msg)
+
+    if not raw_reply:
+        raw_reply = facts_th
 
     safe_reply = llm_guardrail.sanitise_response(raw_reply, lang="th")
 
@@ -341,12 +352,10 @@ async def predict(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    device_result = await db.exec(
-        select(Device).where(Device.id == body.device_id, Device.user_id == user.id)
-    )
-    if not device_result.first():
-        raise HTTPException(status_code=404, detail="Device not found")
-
+    # User-scoped like its siblings (/ai/interpret, /ai/trend, /ai/predict/trend,
+    # /ai/flexibility) rather than Device-ownership-gated — see /ai/interpret's
+    # comment. Nothing here is actually read from/written to the device row;
+    # features come straight from the request body.
     features = body.model_dump(exclude={"device_id"})
     result = ml_inference.predict_risk(features)
 
@@ -469,84 +478,99 @@ async def chat(
 
     api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
     model = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
-    if not api_key:
-        return ChatResponse(
-            reply="ขอโทษนะคะ — MetaBreath ยังไม่พร้อมใช้งานในตอนนี้ (ไม่มี API key) รบกวนลองใหม่ภายหลังค่ะ"
-                  + llm_guardrail.DISCLAIMER_TH,
-            refusal=False,
-            disclaimer_appended=True,
+
+    raw_reply: Optional[str] = None
+
+    if api_key:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+
+            # All MCP tool calls happen inside this scope — tools read user + db
+            # via contextvars set here.
+            async with mcp_scope(user.id, device_id=body.device_id):
+                # Discover tools from the MCP server (real protocol call).
+                mcp_tools = await mcp_server.list_tools()
+                anth_tools = [
+                    {
+                        "name": t.name,
+                        "description": t.description or "",
+                        "input_schema": t.inputSchema,
+                    }
+                    for t in mcp_tools
+                ]
+
+                messages: list[dict] = [{"role": "user", "content": body.message}]
+
+                for _ in range(6):
+                    response = client.messages.create(
+                        model=model,
+                        max_tokens=1024,
+                        system=system_prompt,
+                        tools=anth_tools,
+                        messages=messages,
+                    )
+
+                    if response.stop_reason == "tool_use":
+                        messages.append({"role": "assistant", "content": response.content})
+
+                        tool_results = []
+                        for block in response.content:
+                            if getattr(block, "type", None) != "tool_use":
+                                continue
+                            try:
+                                mcp_result = await mcp_server.call_tool(
+                                    block.name, block.input or {}
+                                )
+                                # MCP returns Sequence[Content] — text-flatten it.
+                                text_out = "\n".join(
+                                    getattr(part, "text", str(part)) for part in mcp_result
+                                )
+                            except Exception as e:
+                                text_out = f'{{"error": "tool {block.name} failed: {e}"}}'
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": text_out,
+                            })
+                        messages.append({"role": "user", "content": tool_results})
+                        continue
+
+                    texts = [
+                        getattr(b, "text", "")
+                        for b in response.content
+                        if getattr(b, "type", None) == "text"
+                    ]
+                    raw_reply = "\n".join(t for t in texts if t).strip() or None
+                    break
+        except Exception:
+            raw_reply = None
+
+    if not raw_reply:
+        # Primary (Claude) unavailable, failed, or ran out its tool-call
+        # rounds without a final answer — try the admin-configured global
+        # OpenAI/Gemini fallback. It can't use MCP tools (Anthropic-specific
+        # tool-calling loop), so it's grounded with a lightweight recent-
+        # readings snapshot instead of live tool calls.
+        fallback_context = ""
+        if body.device_id:
+            try:
+                recent = await chat_tools.tool_get_recent_readings(
+                    db, user, body.device_id, days=30, limit=5,
+                )
+                fallback_context = f"\n\n(ข้อมูลล่าสุดของผู้ใช้: {json.dumps(recent, ensure_ascii=False)})"
+            except Exception:
+                pass
+        raw_reply = await ai_fallback.try_global_fallback(
+            db, system_prompt, body.message + fallback_context,
         )
 
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-
-        # All MCP tool calls happen inside this scope — tools read user + db
-        # via contextvars set here.
-        async with mcp_scope(user.id, device_id=body.device_id):
-            # Discover tools from the MCP server (real protocol call).
-            mcp_tools = await mcp_server.list_tools()
-            anth_tools = [
-                {
-                    "name": t.name,
-                    "description": t.description or "",
-                    "input_schema": t.inputSchema,
-                }
-                for t in mcp_tools
-            ]
-
-            messages: list[dict] = [{"role": "user", "content": body.message}]
-            raw_reply: Optional[str] = None
-
-            for _ in range(6):
-                response = client.messages.create(
-                    model=model,
-                    max_tokens=1024,
-                    system=system_prompt,
-                    tools=anth_tools,
-                    messages=messages,
-                )
-
-                if response.stop_reason == "tool_use":
-                    messages.append({"role": "assistant", "content": response.content})
-
-                    tool_results = []
-                    for block in response.content:
-                        if getattr(block, "type", None) != "tool_use":
-                            continue
-                        try:
-                            mcp_result = await mcp_server.call_tool(
-                                block.name, block.input or {}
-                            )
-                            # MCP returns Sequence[Content] — text-flatten it.
-                            text_out = "\n".join(
-                                getattr(part, "text", str(part)) for part in mcp_result
-                            )
-                        except Exception as e:
-                            text_out = f'{{"error": "tool {block.name} failed: {e}"}}'
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": text_out,
-                        })
-                    messages.append({"role": "user", "content": tool_results})
-                    continue
-
-                texts = [
-                    getattr(b, "text", "")
-                    for b in response.content
-                    if getattr(b, "type", None) == "text"
-                ]
-                raw_reply = "\n".join(t for t in texts if t).strip()
-                break
-
-        if not raw_reply:
-            raw_reply = (
-                "ขอโทษนะคะ MetaBreath ยังคิดคำตอบไม่จบภายในรอบที่กำหนด "
-                "ลองถามใหม่อีกครั้งได้ไหมคะ"
-            )
-    except Exception:
-        raw_reply = "ขอโทษนะคะ เกิดข้อผิดพลาดชั่วคราว รบกวนลองใหม่อีกครั้งค่ะ"
+    if not raw_reply:
+        raw_reply = (
+            "เกิดข้อผิดพลาดชั่วคราว ลองใหม่อีกครั้ง"
+            if api_key else
+            "MetaBreath ยังไม่พร้อมใช้งานในตอนนี้ (ไม่มี API key) ลองใหม่ภายหลัง"
+        )
 
     safe_reply = llm_guardrail.sanitise_response(raw_reply, lang="th")
 
@@ -596,99 +620,122 @@ async def chat_stream(
             yield _sse({"type": "done"})
             return
 
-        if not api_key:
+        full_text = ""
+
+        if api_key:
+            try:
+                import anthropic
+                client = anthropic.Anthropic(api_key=api_key)
+
+                async with mcp_scope(user.id, device_id=body.device_id):
+                    mcp_tools = await mcp_server.list_tools()
+                    anth_tools = [
+                        {"name": t.name, "description": t.description or "",
+                         "input_schema": t.inputSchema}
+                        for t in mcp_tools
+                    ]
+
+                    messages: list[dict] = [{"role": "user", "content": body.message}]
+
+                    for _round in range(6):
+                        assistant_content: list = []
+                        round_text = ""
+
+                        with client.messages.stream(
+                            model=model,
+                            max_tokens=1024,
+                            system=system_prompt,
+                            tools=anth_tools,
+                            messages=messages,
+                        ) as stream:
+                            for event in stream:
+                                etype = getattr(event, "type", "")
+                                if etype == "text":
+                                    delta = getattr(event, "text", "")
+                                    if delta:
+                                        round_text += delta
+                                        yield _sse({"type": "text", "delta": delta})
+
+                            final_msg = stream.get_final_message()
+                            assistant_content = final_msg.content
+                            stop_reason = final_msg.stop_reason
+
+                        full_text += round_text
+
+                        if stop_reason == "tool_use":
+                            messages.append({"role": "assistant", "content": assistant_content})
+                            tool_results = []
+                            for block in assistant_content:
+                                if getattr(block, "type", None) != "tool_use":
+                                    continue
+                                yield _sse({"type": "tool_use", "name": block.name})
+                                try:
+                                    mcp_result = await mcp_server.call_tool(
+                                        block.name, block.input or {}
+                                    )
+                                    text_out = "\n".join(
+                                        getattr(part, "text", str(part)) for part in mcp_result
+                                    )
+                                except Exception as e:
+                                    text_out = f'{{"error": "tool {block.name} failed: {e}"}}'
+                                yield _sse({"type": "tool_result", "name": block.name})
+                                tool_results.append({
+                                    "type": "tool_result",
+                                    "tool_use_id": block.id,
+                                    "content": text_out,
+                                })
+                            messages.append({"role": "user", "content": tool_results})
+                            continue
+
+                        break
+            except Exception:
+                # Fall through to the fallback-check below. Only clean if
+                # no real text was streamed yet this turn (see comment there)
+                pass
+
+        if not full_text.strip():
+            # No primary key at all, or Claude failed/produced nothing before
+            # any real output — try the admin-configured global OpenAI/Gemini
+            # fallback (single-shot, no tool access; see app/services/
+            # ai_fallback.py) before the canned apology text. If Claude had
+            # already streamed *some* real text and then failed mid-turn,
+            # we don't retro-fit a fallback answer on top of a partial one —
+            # that's handled by the `else` branch below instead.
+            fallback_context = ""
+            if body.device_id:
+                try:
+                    recent = await chat_tools.tool_get_recent_readings(
+                        db, user, body.device_id, days=30, limit=5,
+                    )
+                    fallback_context = f"\n\n(ข้อมูลล่าสุดของผู้ใช้: {json.dumps(recent, ensure_ascii=False)})"
+                except Exception:
+                    pass
+            fallback_text = await ai_fallback.try_global_fallback(
+                db, system_prompt, body.message + fallback_context,
+            )
+            if fallback_text:
+                yield _sse({"type": "text", "delta": llm_guardrail.sanitise_response(fallback_text, lang="th")})
+                yield _sse({"type": "done"})
+                return
+
             yield _sse({"type": "text", "delta":
-                "ขอโทษนะคะ — MetaBreath ยังไม่พร้อมใช้งานในตอนนี้ (ไม่มี API key)"})
-            yield _sse({"type": "text", "delta": llm_guardrail.DISCLAIMER_TH})
+                "เกิดข้อผิดพลาดชั่วคราว ลองใหม่อีกครั้ง" if api_key else
+                "MetaBreath ยังไม่พร้อมใช้งานในตอนนี้ (ไม่มี API key)"})
+            if not api_key:
+                yield _sse({"type": "text", "delta": llm_guardrail.DISCLAIMER_TH})
             yield _sse({"type": "done"})
             return
 
-        try:
-            import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
+        # Primary produced real text this turn — sanitize + finish exactly as
+        # before (strip any self-written disclaimer, append the canonical one).
+        sanitised = llm_guardrail.sanitise_response(full_text, lang="th")
+        if sanitised != full_text:
+            tail = sanitised[len(full_text):] if sanitised.startswith(full_text) else \
+                   llm_guardrail.DISCLAIMER_TH
+            if tail:
+                yield _sse({"type": "text", "delta": tail})
 
-            async with mcp_scope(user.id, device_id=body.device_id):
-                mcp_tools = await mcp_server.list_tools()
-                anth_tools = [
-                    {"name": t.name, "description": t.description or "",
-                     "input_schema": t.inputSchema}
-                    for t in mcp_tools
-                ]
-
-                messages: list[dict] = [{"role": "user", "content": body.message}]
-                full_text = ""
-
-                for _round in range(6):
-                    tool_use_blocks: list = []
-                    assistant_content: list = []
-                    round_text = ""
-
-                    with client.messages.stream(
-                        model=model,
-                        max_tokens=1024,
-                        system=system_prompt,
-                        tools=anth_tools,
-                        messages=messages,
-                    ) as stream:
-                        for event in stream:
-                            etype = getattr(event, "type", "")
-                            if etype == "text":
-                                delta = getattr(event, "text", "")
-                                if delta:
-                                    round_text += delta
-                                    yield _sse({"type": "text", "delta": delta})
-                            elif etype == "content_block_stop":
-                                blk = getattr(event, "content_block", None)
-                                if blk and getattr(blk, "type", None) == "tool_use":
-                                    tool_use_blocks.append(blk)
-
-                        final_msg = stream.get_final_message()
-                        assistant_content = final_msg.content
-                        stop_reason = final_msg.stop_reason
-
-                    full_text += round_text
-
-                    if stop_reason == "tool_use":
-                        messages.append({"role": "assistant", "content": assistant_content})
-                        tool_results = []
-                        for block in assistant_content:
-                            if getattr(block, "type", None) != "tool_use":
-                                continue
-                            yield _sse({"type": "tool_use", "name": block.name})
-                            try:
-                                mcp_result = await mcp_server.call_tool(
-                                    block.name, block.input or {}
-                                )
-                                text_out = "\n".join(
-                                    getattr(part, "text", str(part)) for part in mcp_result
-                                )
-                            except Exception as e:
-                                text_out = f'{{"error": "tool {block.name} failed: {e}"}}'
-                            yield _sse({"type": "tool_result", "name": block.name})
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": text_out,
-                            })
-                        messages.append({"role": "user", "content": tool_results})
-                        continue
-
-                    break
-
-            # Sanitize the accumulated text (strip any self-written disclaimer,
-            # then append the canonical one as a final delta).
-            sanitised = llm_guardrail.sanitise_response(full_text, lang="th")
-            if sanitised != full_text:
-                # Send the diff (usually just the disclaimer tail)
-                tail = sanitised[len(full_text):] if sanitised.startswith(full_text) else \
-                       llm_guardrail.DISCLAIMER_TH
-                if tail:
-                    yield _sse({"type": "text", "delta": tail})
-
-            yield _sse({"type": "done"})
-        except Exception as e:
-            yield _sse({"type": "error", "message": str(e)})
-            yield _sse({"type": "done"})
+        yield _sse({"type": "done"})
 
     return StreamingResponse(
         generator(),
@@ -706,18 +753,16 @@ async def predict_lstm(
     db: AsyncSession = Depends(get_db),
 ):
     """Predict risk from a sequence of readings using LSTM temporal model."""
-    device_result = await db.exec(
-        select(Device).where(Device.id == body.device_id, Device.user_id == user.id)
-    )
-    if not device_result.first():
-        raise HTTPException(status_code=404, detail="Device not found")
-
+    # User-scoped like /ai/interpret's sibling endpoints — see that comment.
     if body.sequence:
         sequence = body.sequence
     else:
         readings_result = await db.exec(
             select(SensorReading)
-            .where(SensorReading.device_id == body.device_id)
+            .where(
+                SensorReading.device_id == body.device_id,
+                SensorReading.user_id == user.id,
+            )
             .order_by(SensorReading.time.desc())
             .limit(5)
         )

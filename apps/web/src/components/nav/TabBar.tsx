@@ -16,8 +16,8 @@ interface TabItem {
 
 const TABS: TabItem[] = [
   { href: "/home", labelKey: "nav.home", fallback: "Today", icon: House, match: (p) => p === "/home" },
-  { href: "/trends", labelKey: "nav.trends", fallback: "Trends", icon: LineChart, match: (p) => p.startsWith("/trends") },
   { href: "/breathing", labelKey: "nav.breathing", fallback: "Breathing", icon: Wind, match: (p) => p.startsWith("/breathing") },
+  { href: "/trends", labelKey: "nav.trends", fallback: "Trends", icon: LineChart, match: (p) => p.startsWith("/trends") },
   { href: "/me", labelKey: "nav.profile", fallback: "Profile", icon: CircleUser, match: (p) => p.startsWith("/me") },
 ];
 

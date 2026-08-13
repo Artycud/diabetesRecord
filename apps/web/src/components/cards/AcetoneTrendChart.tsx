@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { twMerge } from "tailwind-merge";
 import { api } from "@/lib/api";
 import { convertFromMv, useUnits } from "@/lib/units";
 import { useTimezone } from "@/lib/timezone";
@@ -17,9 +18,16 @@ const FALLBACK_WINDOW_DAYS = 90;
 
 interface Props {
   deviceId: string | null | undefined;
+  /** "hero" renders the number at the app's largest stat size, wrapped in a
+   *  zone-tinted ring — reserved for the single primary reading on Home.
+   *  Defaults to the original compact presentation used elsewhere. */
+  size?: "md" | "hero";
+  /** One-shot scale beat on the ring, meant for the instant a fresh reading
+   *  lands (see Home's justRevealed flag) — not a loop. */
+  pulse?: boolean;
 }
 
-export function AcetoneTrendChart({ deviceId }: Props) {
+export function AcetoneTrendChart({ deviceId, size = "md", pulse = false }: Props) {
   const { format: fmtAcetone, unit: acUnit, label: unitLbl } = useUnits();
   const { formatTime, formatDate } = useTimezone();
 
@@ -82,6 +90,13 @@ export function AcetoneTrendChart({ deviceId }: Props) {
         ? fallbackDays.at(-1)?.dominant_label ?? null
         : null;
 
+  // Only meaningful in "today" mode — the history fallback aggregates whole
+  // days, which have no single time-of-day to caption.
+  const latestTime =
+    mode === "today"
+      ? [...(todayReadings ?? [])].reverse().find((r) => r.acetone_delta != null)?.time ?? null
+      : null;
+
   const zone = backendLabelToZone(latestLabel);
   const style = LABEL_STYLE[zone] ?? LABEL_STYLE.unreliable;
 
@@ -106,16 +121,51 @@ export function AcetoneTrendChart({ deviceId }: Props) {
     );
   }
 
+  const numberEl = (
+    <StatNumber
+      value={latestRawMv != null ? fmtAcetone(latestRawMv) : "—"}
+      unit={unitLbl}
+      size={size === "hero" ? "hero" : "2xl"}
+      color={latestRawMv != null ? style.color : undefined}
+    />
+  );
+
   return (
     <div className="w-full space-y-2">
       <div className="flex items-baseline justify-center gap-2">
-        <StatNumber value={latestRawMv != null ? fmtAcetone(latestRawMv) : "—"} unit={unitLbl} size="xl" />
-        {latestLabel && (
-          <span className="text-xs font-semibold" style={{ color: style.color }}>
-            {LABEL_TH[zone] ?? latestLabel}
-          </span>
+        {size === "hero" ? (
+          <div
+            className={twMerge(
+              "flex items-center justify-center rounded-full px-8 py-6 sm:px-10 sm:py-7",
+              pulse && "animate-zone-pulse"
+            )}
+            style={{
+              background: `radial-gradient(circle, ${style.color}20, ${style.color}08 65%, transparent 100%)`,
+              boxShadow: `0 0 0 3px ${style.color}30, inset 0 0 0 1px ${style.color}15`,
+            }}
+          >
+            {numberEl}
+          </div>
+        ) : (
+          numberEl
         )}
       </div>
+      {(latestLabel || latestTime) && (
+        <div className="flex items-center justify-center gap-1.5">
+          {latestLabel && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
+              style={{ color: style.color, backgroundColor: `${style.color}18` }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.color }} />
+              {LABEL_TH[zone] ?? latestLabel}
+            </span>
+          )}
+          {latestTime && (
+            <span className="text-xs text-text-disabled">{formatTime(latestTime)}</span>
+          )}
+        </div>
+      )}
       <Sparkline data={points} color={style.color} height={90} />
       <p className="text-center text-[11px] text-text-disabled uppercase tracking-widest">
         {mode === "today" ? "Today" : `Last ${points.length} days with data`}

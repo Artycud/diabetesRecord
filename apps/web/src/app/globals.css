@@ -38,6 +38,10 @@
      the in-app UI no longer uses a display serif anywhere (see .stat-display
      below), so this is deliberately not reused for hero numbers. */
   --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
+  /* Lab-instrument treatment for acetone ppm readouts (.stat-mono below) —
+     a deliberately distinct typographic register from .stat-display's
+     system-sans hero numbers. */
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   /* ─── Motion ───────────────────────────────────────── */
   --motion-fast:   150ms;
@@ -116,6 +120,54 @@
   --color-charcoal-600: #E8E8E8;
 }
 
+/* ─── Accent: Cyan (opt-in, apps/web/src/lib/accent.tsx) ─────────────
+   A second, independent axis from light/dark above — "which brand color",
+   not "how bright". Every existing mint-500-etc. utility across the app
+   already resolves through these same custom properties (that's how the
+   dark-mode block above works too), so overriding them here recolors the
+   whole app the instant data-accent="cyan" is set — none of the existing
+   mint-* usage sites need to change. Defaults to mint (this block simply
+   doesn't apply) so no existing session's look changes unannounced. */
+[data-accent="cyan"] {
+  --color-mint-50:  #E6FAFD;
+  --color-mint-100: #C0F2F9;
+  --color-mint-200: #88E6F2;
+  --color-mint-300: #4ED8EA;
+  --color-mint-400: #1EC8DE;
+  --color-mint-500: #00BCD4;
+  --color-mint-600: #00A0B5;
+  --color-mint-700: #007A8A;
+  --color-mint-800: #00505C;
+  --color-mint-900: #00282E;
+}
+/* Icy pale-cyan page wash — a light-mode-specific effect from the
+   reference design. In dark mode, cyan should tint accents against the
+   existing near-black surfaces, not turn the page pale, so this stays
+   scoped to light mode only. */
+[data-accent="cyan"]:not([data-theme="dark"]) {
+  --color-bg-primary:  #F0F7F9;
+  --color-bg-raised:   #EAF5F7;
+  --color-border-soft: #E0F2F5;
+}
+
+/* ─── Accent: Blue (opt-in) — the #3B82F6 accent from the pre-Apple-Health
+   "dark-first Xiaomi Mi Fitness" redesign (ThemeProvider.tsx's ACCENT_COLORS,
+   July 2026), brought back by request. Most recognizable as "the dark blue
+   theme" when paired with Mode: Dark — no separate light-mode wash like
+   cyan's, since the request was specifically about the dark pairing. */
+[data-accent="blue"] {
+  --color-mint-50:  #EFF6FF;
+  --color-mint-100: #DBEAFE;
+  --color-mint-200: #BFDBFE;
+  --color-mint-300: #93C5FD;
+  --color-mint-400: #60A5FA;
+  --color-mint-500: #3B82F6;
+  --color-mint-600: #2563EB;
+  --color-mint-700: #1D4ED8;
+  --color-mint-800: #1E40AF;
+  --color-mint-900: #1E3A8A;
+}
+
 /* ─── Base ──────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -171,6 +223,17 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Lab-instrument readout — used for the acetone ppm metric specifically
+   (FloatingHero's hero number, AcetoneZoneCard's header value), not stat
+   numbers generally. Same font-weight as .stat-display so the two
+   treatments don't visibly clash wherever they sit near each other. */
+.stat-mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Flat card elevation — one shadow tier, light mode only. Dark-mode cards
    rely on the bg-surface/bg-primary color step alone: a drop shadow simply
    doesn't read against a near-black background (iOS drops shadows in dark
@@ -199,6 +262,72 @@ body {
   animation: pop-in var(--motion-base) var(--ease-emphasized);
 }
 
+/* Home hero cross-fade between its three states (needs-device /
+   needs-check-in / result-shown) — a quick opacity fade, not a layout jump,
+   so the state swap reads as intentional. Duration matches --motion-fast. */
+@keyframes hero-state-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-hero-fade {
+  animation: hero-state-fade var(--motion-fast) var(--ease-standard);
+}
+
+/* One-shot beat on the zone-color ring when a fresh reading lands (Home
+   hero) — a restrained scale bump, not a loop, so it reads as "something
+   just arrived" without nagging on every re-render. */
+@keyframes zone-ring-pulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.animate-zone-pulse {
+  animation: zone-ring-pulse 600ms var(--ease-emphasized);
+}
+
+/* Looping variant for Home's bento CTA icon badge — "tap me", not the
+   loading-skeleton connotation Tailwind's built-in animate-pulse already
+   carries everywhere else in this app (skeletons, live-status dots). */
+@keyframes cta-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+.animate-cta-pulse {
+  animation: cta-pulse 2.2s var(--ease-emphasized) infinite;
+}
+
+/* Ambient halo behind the hero ring (FloatingHero.tsx) — a slow ~4s
+   breathing-pace glow, distinct from the CTA's snappier tap-cue pulse
+   above. Scale-only (no opacity animation) so the color/alpha set inline
+   per-zone by the caller stays the single source of truth for intensity. */
+@keyframes halo-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+.animate-halo-breathe {
+  animation: halo-breathe 4s ease-in-out infinite;
+}
+
+/* Breathe hero's idle "breathing orb" (BreathPulse's variant="breathing") —
+   a true breathe-in/breathe-out loop across the concentric rings + core,
+   at the same 4s cadence as halo-breathe above, so idle-breathing and the
+   result hero's ambient glow read as one shared rhythm app-wide. */
+@keyframes breathe-orb-ring {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50%      { transform: scale(1.15); opacity: 0.25; }
+}
+.animate-breathe-orb-ring {
+  animation: breathe-orb-ring 4s ease-in-out infinite;
+}
+
+@keyframes breathe-orb-core {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 18px 6px rgba(72,199,140,0.35); }
+  50%      { transform: scale(1.1); box-shadow: 0 0 26px 10px rgba(72,199,140,0.5); }
+}
+.animate-breathe-orb-core {
+  animation: breathe-orb-core 4s ease-in-out infinite;
+}
+
 /* Breathing recording's liquid-fill meniscus (BreathSession.tsx) — a soft
    surface highlight that gently rises/falls so the fill reads as liquid,
    not a static color bar. */
@@ -221,6 +350,12 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }
+
+/* Hides the scrollbar on Home's horizontal stats pill bar while keeping it
+   scrollable — the rule above always paints a thin bar, which reads as
+   chrome on a chip row that should feel like a swipeable strip. */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* ─── Reduced motion ────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

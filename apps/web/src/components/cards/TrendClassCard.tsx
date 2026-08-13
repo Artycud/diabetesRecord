@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { twMerge } from "tailwind-merge";
 import { Activity, ArrowUpRight, ArrowDownRight, AlertTriangle, MinusCircle } from "lucide-react";
@@ -10,9 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { InfoButton } from "@/components/ui/InfoButton";
 
-function TrendInfo() {
+function TrendInfo({ open, onOpenChange }: { open?: boolean; onOpenChange?: (open: boolean) => void }) {
+  const { t } = useT();
   return (
-    <InfoButton title="Long-term trend" ariaLabel="รายละเอียด Long-term trend">
+    <InfoButton title="Long-term trend" ariaLabel="รายละเอียด Long-term trend" open={open} onOpenChange={onOpenChange}>
       <p>
         แนวโน้ม <b>ระยะยาว</b> ของค่า baseline breath acetone ในหลาย session ที่ผ่านมา — บอกว่าค่า
         <b>กำลังไปทางไหน</b> ไม่ใช่ค่าเดี่ยวตอนนี้
@@ -28,6 +30,13 @@ function TrendInfo() {
           <li>• <b>Increasing</b> — baseline ไต่ขึ้น (เช่น เริ่ม keto, ออกกำลังเพิ่ม)</li>
           <li>• <b>Decreasing</b> — baseline ลดลง (เช่น กลับมากินคาร์บ)</li>
           <li>• <b>Abnormal</b> — มี jump ผิดปกติ ให้วัดซ้ำ</li>
+        </ul>
+      </div>
+      <div className="bg-bg-elevated rounded-xl p-3 space-y-2">
+        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest">{t("trendClass.modelSectionTitle")}</p>
+        <ul className="text-xs space-y-1.5">
+          <li>• <b>{t("trendClass.modelLstm")}</b> — {t("trendClass.modelLstmDesc")}</li>
+          <li>• <b>{t("trendClass.modelRule")}</b> — {t("trendClass.modelRuleDesc")}</li>
         </ul>
       </div>
       <p className="text-xs text-text-muted">
@@ -49,6 +58,9 @@ interface Props {
   deviceId: string | undefined;
   sessions?: number;   // how many recent sessions to consider (default 14)
   className?: string;
+  /** Skip the outer Card chrome — for when a parent (Home's unified Details
+   *  container) already supplies the card border/background/padding. */
+  bare?: boolean;
 }
 
 type TrendStyle = {
@@ -60,33 +72,33 @@ type TrendStyle = {
 const STYLES: Record<TrendClass, TrendStyle> = {
   stable: {
     icon: Activity,
-    ring: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    accent: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    ring: "bg-emerald-500/10 text-emerald-600",
+    accent: "bg-emerald-500/15 text-emerald-600",
   },
   increasing: {
     icon: ArrowUpRight,
-    ring: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    accent: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    ring: "bg-amber-500/10 text-amber-600",
+    accent: "bg-amber-500/15 text-amber-600",
   },
   decreasing: {
     icon: ArrowDownRight,
-    ring: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-    accent: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+    ring: "bg-sky-500/10 text-sky-600",
+    accent: "bg-sky-500/15 text-sky-600",
   },
   abnormal: {
     icon: AlertTriangle,
-    ring: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-    accent: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+    ring: "bg-rose-500/10 text-rose-600",
+    accent: "bg-rose-500/15 text-rose-600",
   },
 };
 
 const UNKNOWN_STYLE: TrendStyle = {
   icon: MinusCircle,
-  ring: "bg-muted/40 text-muted",
-  accent: "bg-muted/40 text-muted",
+  ring: "bg-bg-raised text-text-muted",
+  accent: "bg-bg-raised text-text-muted",
 };
 
-export function TrendClassCard({ deviceId, sessions = 14, className }: Props) {
+export function TrendClassCard({ deviceId, sessions = 14, className, bare }: Props) {
   const { t } = useT();
 
   const { data, isLoading, isError } = useQuery({
@@ -98,42 +110,47 @@ export function TrendClassCard({ deviceId, sessions = 14, className }: Props) {
   });
 
   if (!deviceId || isLoading) {
-    return (
-      <Card className={twMerge("animate-pulse", className)}>
-        <CardContent>
-          <div className="h-4 w-24 rounded bg-muted/30" />
-          <div className="mt-3 h-10 w-40 rounded bg-muted/20" />
-          <div className="mt-4 h-3 w-full rounded bg-muted/10" />
-        </CardContent>
-      </Card>
+    const skeleton = (
+      <div className="animate-pulse">
+        <div className="h-4 w-24 rounded bg-bg-raised" />
+        <div className="mt-3 h-10 w-40 rounded bg-bg-raised" />
+        <div className="mt-4 h-3 w-full rounded bg-bg-raised" />
+      </div>
+    );
+    return bare ? <div className={className}>{skeleton}</div> : (
+      <Card className={className}><CardContent>{skeleton}</CardContent></Card>
     );
   }
 
   if (isError || !data) {
-    return (
-      <Card className={className}>
-        <CardContent>
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm text-muted">{t("trendClass.title")}</p>
-            <TrendInfo />
-          </div>
-          <p className="mt-2 text-sm text-fg">{t("trendClass.unknown")}</p>
-        </CardContent>
-      </Card>
+    const content = (
+      <>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-text-muted">{t("trendClass.title")}</p>
+          <TrendInfo />
+        </div>
+        <p className="mt-2 text-sm text-text-primary">{t("trendClass.unknown")}</p>
+      </>
+    );
+    return bare ? <div className={className}>{content}</div> : (
+      <Card className={className}><CardContent>{content}</CardContent></Card>
     );
   }
 
-  return <TrendClassCardBody data={data} className={className} />;
+  return <TrendClassCardBody data={data} className={className} bare={bare} />;
 }
 
 function TrendClassCardBody({
   data,
   className,
+  bare,
 }: {
   data: TrendClassifyResponse;
   className?: string;
+  bare?: boolean;
 }) {
   const { t } = useT();
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const insufficient =
     data.model_used === "insufficient_data" || data.trend === null;
@@ -153,19 +170,19 @@ function TrendClassCardBody({
 
   const lowConfidence = !insufficient && data.confidence < 0.6;
 
-  return (
-    <Card className={className}>
-      <CardContent className="flex flex-col gap-4">
+  const content = (
+    <>
+      <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className={twMerge("flex h-11 w-11 items-center justify-center rounded-xl", style.ring)}>
               <Icon className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted">
+              <p className="text-xs uppercase tracking-wide text-text-muted">
                 {t("trendClass.title")}
               </p>
-              <p className="text-lg font-semibold text-fg">
+              <p className="text-lg font-semibold text-text-primary">
                 {insufficient
                   ? t("trendClass.unknown")
                   : t(`trendClass.${trend}`)}
@@ -178,11 +195,11 @@ function TrendClassCardBody({
                 {Math.round(data.confidence * 100)}%
               </Badge>
             )}
-            <TrendInfo />
+            <TrendInfo open={infoOpen} onOpenChange={setInfoOpen} />
           </div>
         </div>
 
-        <p className="text-sm leading-relaxed text-fg-soft">
+        <p className="text-sm leading-relaxed text-text-secondary">
           {insufficient
             ? t("trendClass.insufficient", {
                 min: data.min_required,
@@ -192,14 +209,20 @@ function TrendClassCardBody({
         </p>
 
         {!insufficient && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
             <span>{t("trendClass.basedOn", { n: data.sequence_length })}</span>
             <span aria-hidden="true">·</span>
-            <span>{modelLabel}</span>
+            <button
+              type="button"
+              onClick={() => setInfoOpen(true)}
+              className="underline decoration-dotted underline-offset-2 text-mint-500 hover:text-mint-600 transition-colors"
+            >
+              {modelLabel}
+            </button>
             {lowConfidence && (
               <>
                 <span aria-hidden="true">·</span>
-                <span className="text-amber-600 dark:text-amber-400">
+                <span className="text-amber-600">
                   {t("trendClass.lowConfidence")}
                 </span>
               </>
@@ -207,10 +230,14 @@ function TrendClassCardBody({
           </div>
         )}
 
-        <p className="text-[11px] leading-snug text-muted">
+        <p className="text-[11px] leading-snug text-text-muted">
           {t("trendClass.disclaimer")}
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </>
+  );
+
+  return bare ? <div className={className}>{content}</div> : (
+    <Card className={className}><CardContent>{content}</CardContent></Card>
   );
 }

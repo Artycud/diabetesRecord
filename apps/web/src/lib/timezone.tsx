@@ -26,6 +26,9 @@ type Ctx = {
   formatDate: (iso: string, opts?: Intl.DateTimeFormatOptions) => string;
   formatTime: (iso: string, opts?: Intl.DateTimeFormatOptions) => string;
   formatDateTime: (iso: string, opts?: Intl.DateTimeFormatOptions) => string;
+  // "Today" / "Yesterday" / else the same short date formatDate uses —
+  // for "when was this measured" captions on historical fallback data.
+  formatRelativeDate: (iso: string) => string;
 };
 
 const TimezoneCtx = createContext<Ctx | null>(null);
@@ -57,6 +60,10 @@ export function TimezoneProvider({ children }: { children: React.ReactNode }) {
       const d = parseServerTime(iso);
       return d.toLocaleString("th-TH", { timeZone: timezone, ...opts });
     };
+    // Calendar-date-only compare, in the same selected timezone as every
+    // other formatter here — comparing in the browser's local tz instead
+    // could disagree with formatTime's own day boundary right at midnight.
+    const ymdInTz = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: timezone });
     return {
       timezone,
       setTimezone,
@@ -66,6 +73,13 @@ export function TimezoneProvider({ children }: { children: React.ReactNode }) {
         fmt(iso, { hour: "2-digit", minute: "2-digit", ...opts }),
       formatDateTime: (iso, opts) =>
         fmt(iso, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", ...opts }),
+      formatRelativeDate: (iso) => {
+        const d = parseServerTime(iso);
+        const dYmd = ymdInTz(d);
+        if (dYmd === ymdInTz(new Date())) return "Today";
+        if (dYmd === ymdInTz(new Date(Date.now() - 86_400_000))) return "Yesterday";
+        return fmt(iso, { day: "numeric", month: "short" });
+      },
     };
   }, [timezone, setTimezone]);
 

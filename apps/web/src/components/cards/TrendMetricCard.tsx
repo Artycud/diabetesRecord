@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 interface Props {
   icon?: ReactNode;
   title: string;
+  /** Small secondary line under the title (e.g. active date range, "per-session" scope). */
+  subtitle?: ReactNode;
   unit?: string;
   /** Big headline number — the Health-app "here's the number" above the chart shape. */
   value?: string | null;
@@ -15,14 +17,17 @@ interface Props {
   children: ReactNode;
 }
 
-export function TrendMetricCard({ icon, title, unit, value, valueLabel, actions, children }: Props) {
+export function TrendMetricCard({ icon, title, subtitle, unit, value, valueLabel, actions, children }: Props) {
   return (
     <Card>
       <CardContent className="pt-5">
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0">
-            {icon}
-            <h2 className="font-semibold text-text-primary tracking-tight truncate">{title}</h2>
+            {icon && <span className="shrink-0">{icon}</span>}
+            <div className="min-w-0">
+              <h2 className="font-semibold text-text-primary tracking-tight truncate">{title}</h2>
+              {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}
+            </div>
           </div>
           {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
         </div>

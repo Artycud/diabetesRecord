@@ -11,7 +11,7 @@
 
 export type MetabolicZone =
   | "fed_resting"    // 0.5–2 ppm  : Rest Zone — fed / resting baseline
-  | "transitional"   // 2–4 ppm    : Fat-Burn Zone — mild fat oxidation onset
+  | "transitional"   // 2–4 ppm    : light_ketosis per Anderson (2015)
   | "fat_oxidation"  // 4–30 ppm   : Deep Burn Zone — active fat oxidation / keto
   | "extended_fast"  // 30–75 ppm  : Peak Zone — extended fast / strict keto
   | "safety_alert"   // ≥ 75 ppm   : Caution Zone — DKA range, consult doctor
@@ -79,6 +79,31 @@ export function metabolicZone(ppm: number | null | undefined): MetabolicZone {
   return "safety_alert";
 }
 
+// [0, 2, 4, 30, 75, Infinity] — 5 zone edges derived from ZONE_THRESHOLDS,
+// the single source of truth for boundaries (not a second copy like
+// AcetoneZoneCard.tsx's own bespoke ZONES array, which exists only for
+// that screen's accordion/modal content).
+const ZONE_EDGES = [0, ...ZONE_THRESHOLDS.map(([t]) => t), Infinity];
+
+/** Position of a ppm value across the whole 5-zone scale (0..1), for a
+ *  radial/linear gauge fill — proportional *within* the current zone
+ *  rather than a flat value/max mapping, so a gauge built on this tracks
+ *  the actual zone boundaries instead of drifting out of sync with them. */
+export function zoneProgress(ppm: number | null | undefined): number {
+  if (ppm == null || ppm < 0) return 0;
+  const n = ZONE_EDGES.length - 1;
+  for (let i = 0; i < n; i++) {
+    const lo = ZONE_EDGES[i];
+    const hi = ZONE_EDGES[i + 1];
+    if (ppm < hi || i === n - 1) {
+      const span = Number.isFinite(hi) ? hi - lo : Math.max(20, lo * 0.2);
+      const frac = Math.min(1, Math.max(0, (ppm - lo) / span));
+      return (i + frac) / n;
+    }
+  }
+  return 1;
+}
+
 interface LabelStyle {
   color: string;
   grad: [string, string];
@@ -141,23 +166,30 @@ export function rampColor(ppm: number): string {
   return COLOR_RAMP[COLOR_RAMP.length - 1][1];
 }
 
+// Zone NAMES are shared, language-agnostic terms — kept in English even in
+// the Thai UI, exactly matching the established naming already used by
+// AcetoneZoneCard.tsx's own 5-zone ladder (Rest/Fat-Burn/Deep Burn/Peak/
+// Caution Zone). Having two different names for the same zone across
+// different cards (this file previously had "Transitional"/"เปลี่ยนผ่าน",
+// then briefly "Light ketosis"/"คีโตอ่อน") reads as inconsistent — one
+// vocabulary for zone names app-wide, not a competing one per screen.
 export const LABEL_TH: Record<string, string> = {
   clean:        "อากาศสะอาด",
-  fed_resting:  "พักฟื้น / หลังกิน",
-  transitional: "เปลี่ยนผ่าน",
-  fat_oxidation:"เผาไขมัน",
-  extended_fast:"อดยาว / คีโตเข้ม",
-  safety_alert: "⚠️ ควรพบแพทย์",
+  fed_resting:  "Rest Zone",
+  transitional: "Fat-Burn Zone",
+  fat_oxidation:"Deep Burn Zone",
+  extended_fast:"Peak Zone",
+  safety_alert: "Caution Zone",
   unreliable:   "ไม่แน่ใจ",
 };
 
 export const LABEL_EN: Record<string, string> = {
   clean:        "Clean air",
-  fed_resting:  "Fed / resting",
-  transitional: "Transitional",
-  fat_oxidation:"Active fat oxidation",
-  extended_fast:"Extended fast / strict keto",
-  safety_alert: "⚠️ DKA risk — consult doctor",
+  fed_resting:  "Rest Zone",
+  transitional: "Fat-Burn Zone",
+  fat_oxidation:"Deep Burn Zone",
+  extended_fast:"Peak Zone",
+  safety_alert: "Caution Zone",
   unreliable:   "Unreliable",
 };
 
@@ -201,7 +233,7 @@ export function zoneContextMessage(
 
   const defaults: Record<string, string> = {
     fed_resting:  "ร่างกายอยู่ในโหมดพักฟื้น — ค่าปกติสำหรับคนที่เพิ่งกินหรืออดไม่นาน",
-    transitional: "ร่างกายกำลังเปลี่ยนผ่าน — อาจเป็นช่วงอดสั้น / ออกกำลังเบา / คาร์บต่ำ",
+    transitional: "ร่างกายเริ่มดึงไขมันสะสมมาใช้เป็นพลังงาน — อาจเป็นช่วงอดสั้น / ออกกำลังเบา / คาร์บต่ำ",
     fat_oxidation:"ร่างกายเผาผลาญไขมันอยู่ — สอดคล้องกับอด / คีโต / ออกกำลังกาย",
     extended_fast:"ค่าสูง — ถ้ารู้สึกปกติดีก็ไม่เป็นไร แต่ควรดื่มน้ำและสังเกตอาการ",
     unreliable:   "คุณภาพสัญญาณต่ำ — ลองวัดใหม่อีกครั้ง",

@@ -17,8 +17,10 @@ import secrets as _secrets
 
 from app.core.config import settings
 from app.core.deps import get_admin_user, get_db
+from app.core.secrets import encrypt_secret
 from app.models.user import User, Profile
 from app.models.health import Device, SensorReading, DeviceCalibration, KetoneLog
+from app.models.ai import AIProvider
 from app.services import signal_processing as sp
 from app.services.auth import deactivate_user
 
@@ -1015,3 +1017,76 @@ async def ketone_agreement(
         interpretation=interp, pairs=pairs, agreement_matrix=matrix,
         bland_altman=bland_altman,
     )
+
+
+# ─── Global AI fallback keys (OpenAI/Gemini) ─────────────────────────────────
+# Admin-configured, server-stored (encrypted) API keys used by
+# app.services.ai_fallback as a second-tier fallback when the primary Claude
+# call in app/routers/ai.py fails or has no key configured at all. Never
+# returns the decrypted key to the client — only whether one is stored.
+
+class AiFallbackProviderOut(BaseModel):
+    key: str
+    display_name: str
+    enabled: bool
+    priority: int
+    model: str
+    configured: bool
+
+
+class AiFallbackConfigOut(BaseModel):
+    providers: List[AiFallbackProviderOut]
+
+
+class AiFallbackProviderUpdate(BaseModel):
+    # Omit to leave the stored key unchanged; "" clears it; a non-empty
+    # string replaces it (encrypted before storage).
+    api_key: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+def _ai_fallback_out(p: AIProvider) -> AiFallbackProviderOut:
+    return AiFallbackProviderOut(
+        key=p.key, display_name=p.display_name, enabled=p.enabled,
+        priority=p.priority, model=p.model, configured=bool(p.api_key_encrypted),
+    )
+
+
+@router.get("/ai-fallback", response_model=AiFallbackConfigOut)
+async def get_ai_fallback_config(
+    _admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.exec(
+        select(AIProvider)
+        .where(AIProvider.key.in_(["openai", "gemini"]))
+        .order_by(AIProvider.priority)
+    )
+    return AiFallbackConfigOut(providers=[_ai_fallback_out(p) for p in result.all()])
+
+
+@router.put("/ai-fallback/{provider_key}", response_model=AiFallbackProviderOut)
+async def update_ai_fallback_provider(
+    provider_key: str,
+    body: AiFallbackProviderUpdate,
+    _admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if provider_key not in ("openai", "gemini"):
+        raise HTTPException(status_code=400, detail="Only openai/gemini fallback keys can be set here")
+
+    result = await db.exec(select(AIProvider).where(AIProvider.key == provider_key))
+    provider = result.first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    if body.api_key is not None:
+        provider.api_key_encrypted = encrypt_secret(body.api_key) if body.api_key else None
+    if body.enabled is not None:
+        provider.enabled = body.enabled
+    provider.updated_at = datetime.utcnow()
+
+    db.add(provider)
+    await db.commit()
+    await db.refresh(provider)
+    return _ai_fallback_out(provider)

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import { Wind, X, RefreshCw, Flame, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ComposedChart, Area, ResponsiveContainer, YAxis } from "recharts";
@@ -13,6 +15,7 @@ import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone, rampColor } f
 import { useTimezone } from "@/lib/timezone";
 import { randomDemoParams, demoValueAt, type DemoParams } from "@/lib/demoReading";
 import { BreathPulse } from "@/components/ui/BreathPulse";
+import { getTimeBucket, type TimeBucket } from "@/lib/timeOfDay";
 import { twMerge } from "tailwind-merge";
 import { ContextSelector } from "./ContextSelector";
 import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
@@ -20,6 +23,16 @@ import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
 const CALIBRATION_MS = 5_000;
 const RECORDING_MS   = 5_000;
 const MAX_STORED  = 20;
+
+// Idle-state contextual copy, one line per time-of-day bucket — matches
+// this component's existing hardcoded-Thai convention rather than adding a
+// new i18n dependency to a component that doesn't use useT() anywhere else.
+const IDLE_CONTEXT_TH: Record<TimeBucket, string> = {
+  morning: "ยังไม่ได้กินอะไรใช่ไหม? ตรวจตอนนี้ได้ค่า baseline ตอนอดอาหารที่แม่นยำ",
+  afternoon: "ห่างจากมื้อล่าสุดสักพักแล้ว เป็นจังหวะดีที่จะเช็กค่า",
+  evening: "ตรวจก่อนนอนช่วยให้เห็นแนวโน้มการเผาผลาญตลอดวันได้ชัดขึ้น",
+  night: "ดึกแล้ว แต่ถ้ายังตื่นอยู่ ตรวจตอนนี้ก็ยังเก็บข้อมูลที่มีประโยชน์ได้",
+};
 
 // Real (non-demo) blow intensity gain — a modest real blow (weaker lungs,
 // a snugger mouthpiece seal, sensor placement) shouldn't read as a dead/flat
@@ -395,6 +408,18 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     setPhase("done");
     toast.success("บันทึกเซสชั่นแล้ว");
     onSavedRef.current?.();
+    // Arms Home's and Trends' post-check reveal (auto-scroll to the now-
+    // fresh Details/chart) — two independent keys so whichever screen the
+    // user visits first doesn't consume the signal the other still needs.
+    // Set regardless of whether the checkin() below succeeds: the flag
+    // means "a session was recorded," not "gamification succeeded."
+    try {
+      sessionStorage.setItem("mb:justChecked:home", String(Date.now()));
+      sessionStorage.setItem("mb:justChecked:trends", String(Date.now()));
+    } catch {
+      // sessionStorage can throw in locked-down/private-browsing contexts —
+      // losing the auto-scroll reveal is harmless, don't block the session.
+    }
     // Streak/XP/quest check-in — unconditional for both real and Demo Mode
     // sessions by design, so the habit loop counts identically either way.
     try {
@@ -501,13 +526,16 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
           <div className="relative flex items-center justify-center">
             {(connected || isDemo) && (
               <div className="absolute pointer-events-none">
-                <BreathPulse size={168} />
+                <BreathPulse size={168} variant="breathing" />
               </div>
             )}
-            <button
+            <motion.button
               onClick={start}
+              whileTap={{ scale: 0.94 }}
+              whileHover={{ scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 400, damping: 22 }}
               className={twMerge(
-                "relative h-32 w-32 rounded-full flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all duration-200",
+                "relative h-32 w-32 rounded-full flex flex-col items-center justify-center gap-1.5",
                 connected || isDemo
                   ? "bg-mint-500 shadow-sm"
                   : "bg-bg-elevated border-2 border-border-soft"
@@ -521,11 +549,19 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
               <span className={`text-sm font-bold uppercase tracking-wide ${connected || isDemo ? "text-white" : "text-text-disabled"}`}>
                 START
               </span>
-            </button>
+            </motion.button>
           </div>
           <p className="text-xs text-text-muted mt-4">
             {connected || isDemo ? "กดเพื่อเริ่มการตรวจ" : "เชื่อมต่ออุปกรณ์ก่อนเริ่ม"}
           </p>
+          {(connected || isDemo) && (
+            <p className="text-xs text-text-disabled mt-1 max-w-xs text-center">
+              {IDLE_CONTEXT_TH[getTimeBucket()]}
+            </p>
+          )}
+          <Link href="/log" className="text-xs text-mint-500 mt-2 underline-offset-2 hover:underline">
+            หรือกรอกข้อมูลด้วยตนเอง
+          </Link>
         </div>
         {showChecklist && (
           <PreBlowChecklist
@@ -543,49 +579,15 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     );
   }
 
-  /* ── calibrating ── */
-  if (phase === "calibrating") {
+  /* ── calibrating / recording — one persistent vessel container, phases
+     crossfade instead of a hard unmount/remount. The Phase state machine
+     itself is unchanged (samples/timers/finalize() still gate on the exact
+     same "recording"/"calibrating" checks elsewhere) — this only smooths
+     the visual transition between the two renders. ── */
+  if (phase === "calibrating" || phase === "recording") {
+    const isRecording = phase === "recording";
     const ringColor = "text-blue-400";
-    return (
-      <div className="flex flex-col items-center py-6 gap-4">
-        <PhaseAnnouncer text="กำลังคาลิเบต" />
-        <div className="relative" style={{ width: SZ, height: SZ }}>
-          <svg width={SZ} height={SZ} className="rotate-[-90deg]">
-            <circle cx={SZ/2} cy={SZ/2} r={RING_R} fill="none" stroke="currentColor" className="text-blue-500/20" strokeWidth={SW} />
-            <circle
-              cx={SZ/2} cy={SZ/2} r={RING_R}
-              fill="none" stroke="currentColor" className={ringColor}
-              strokeWidth={SW} strokeLinecap="round"
-              strokeDasharray={CIRC} strokeDashoffset={dashOffset}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-3xl font-bold text-blue-400 leading-none">{secsLeft}</span>
-            <span className="text-[10px] text-text-muted mt-1 uppercase tracking-widest">Calibrate</span>
-          </div>
-        </div>
 
-        <div className="text-center">
-          <p className="text-sm font-medium text-text-primary">กำลังคาลิเบต</p>
-          <p className="text-xs text-text-muted mt-1">
-            {secsLeft <= 3 ? "เตรียมเป่า..." : "ถืออุปกรณ์นิ่งๆ"}
-          </p>
-        </div>
-
-        <button
-          onClick={reset}
-          aria-label="ยกเลิกการตรวจ"
-          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
-        >
-          <X size={12} />
-          ยกเลิก
-        </button>
-      </div>
-    );
-  }
-
-  /* ── recording ── */
-  if (phase === "recording") {
     const mvVals = chartData.map(d => d.mv);
     const yMin = mvVals.length > 1 ? Math.min(...mvVals) - 5 : 0;
     const yMax = mvVals.length > 1 ? Math.max(...mvVals) + 5 : 50;
@@ -610,92 +612,146 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
     return (
       <div className="flex flex-col items-center py-6 gap-4">
-        <PhaseAnnouncer text="กำลังบันทึกการเป่า" />
+        <PhaseAnnouncer text={isRecording ? "กำลังบันทึกการเป่า" : "กำลังคาลิเบต"} />
+
+        {/* Shared circular vessel — persists across calibrating<->recording;
+            only the inner content crossfades, so the focal circle never
+            hard-cuts from "SVG ring" to "liquid fill" between phases. */}
         <div
           className="relative rounded-full overflow-hidden bg-bg-elevated border-2 border-border-soft"
           style={{ width: SZ, height: SZ }}
         >
-          {/* Liquid fill */}
-          <div
-            className="absolute inset-x-0 bottom-0"
-            style={{
-              height: `${fillPct}%`,
-              background: `linear-gradient(180deg, color-mix(in srgb, ${currentColor}, white 30%) 0%, color-mix(in srgb, ${currentColor}, black 12%) 100%)`,
-              filter: `brightness(${1 + intensity * 0.25}) saturate(${1 + intensity * 0.3})`,
-              transition: "filter 0.15s ease-out",
-            }}
-          >
-            {/* Meniscus — soft highlight riding the surface, gently bobbing
-                so the liquid reads as alive rather than a static color bar. */}
-            <div
-              className="absolute inset-x-0 top-0 h-4 -translate-y-1/2 animate-liquid-bob"
-              style={{ background: "radial-gradient(ellipse 60% 100% at 50% 50%, rgba(255,255,255,0.5), transparent 70%)" }}
-            />
-          </div>
-
-          {/* Center readout — dark chip keeps this legible over any fill color/level */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="rounded-2xl bg-black/25 px-3 py-1.5 flex flex-col items-center">
-              <span className="text-3xl font-bold text-white leading-none" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>
-                {secsLeft}
-              </span>
-              <span className="text-[10px] text-white/85 mt-1">{fmtAcetone(liveMv)} {unitLbl}</span>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-sm font-semibold text-mint-500">เป่าออกยาวๆ ค้างไว้</p>
-
-        <div className="w-full space-y-1.5">
-          <div className="flex items-center justify-center gap-4 text-[10px] text-text-muted">
-            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-mint-500" />Acetone</span>
-            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Pressure</span>
-          </div>
-          <div className="w-full rounded-2xl bg-bg-elevated overflow-hidden" style={{ height: 96 }}>
-            {chartData.length > 1 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="breathGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#00C896" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#00C896" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="pressureGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <YAxis yAxisId="acetone" domain={[yMin, yMax]} hide />
-                  <YAxis yAxisId="pressure" domain={[0, 10]} hide />
-                  <Area
-                    yAxisId="pressure"
-                    type="monotoneX"
-                    dataKey="kpa"
-                    stroke="#60A5FA"
-                    strokeWidth={1.5}
-                    fill="url(#pressureGrad)"
-                    dot={false}
-                    isAnimationActive={false}
+          <AnimatePresence mode="wait" initial={false}>
+            {!isRecording ? (
+              <motion.div
+                key="calibrating"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.22 }}
+              >
+                <svg width={SZ} height={SZ} className="rotate-[-90deg]">
+                  <circle cx={SZ/2} cy={SZ/2} r={RING_R} fill="none" stroke="currentColor" className="text-blue-500/20" strokeWidth={SW} />
+                  <circle
+                    cx={SZ/2} cy={SZ/2} r={RING_R}
+                    fill="none" stroke="currentColor" className={ringColor}
+                    strokeWidth={SW} strokeLinecap="round"
+                    strokeDasharray={CIRC} strokeDashoffset={dashOffset}
                   />
-                  <Area
-                    yAxisId="acetone"
-                    type="monotoneX"
-                    dataKey="mv"
-                    stroke="#00C896"
-                    strokeWidth={2}
-                    fill="url(#breathGrad)"
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-blue-400 leading-none">{secsLeft}</span>
+                  <span className="text-[10px] text-text-muted mt-1 uppercase tracking-widest">Calibrate</span>
+                </div>
+              </motion.div>
             ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-xs text-text-muted">รอสัญญาณ...</p>
-              </div>
+              <motion.div
+                key="recording"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.22 }}
+              >
+                {/* Liquid fill */}
+                <div
+                  className="absolute inset-x-0 bottom-0"
+                  style={{
+                    height: `${fillPct}%`,
+                    background: `linear-gradient(180deg, color-mix(in srgb, ${currentColor}, white 30%) 0%, color-mix(in srgb, ${currentColor}, black 12%) 100%)`,
+                    filter: `brightness(${1 + intensity * 0.25}) saturate(${1 + intensity * 0.3})`,
+                    transition: "filter 0.15s ease-out",
+                  }}
+                >
+                  {/* Meniscus — soft highlight riding the surface, gently bobbing
+                      so the liquid reads as alive rather than a static color bar.
+                      Plain CSS keyframe, not framer-motion — kept off the
+                      motion.div above it so the two animation engines don't fight
+                      over the same element. */}
+                  <div
+                    className="absolute inset-x-0 top-0 h-4 -translate-y-1/2 animate-liquid-bob"
+                    style={{ background: "radial-gradient(ellipse 60% 100% at 50% 50%, rgba(255,255,255,0.5), transparent 70%)" }}
+                  />
+                </div>
+
+                {/* Center readout — dark chip keeps this legible over any fill color/level */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="rounded-2xl bg-black/25 px-3 py-1.5 flex flex-col items-center">
+                    <span className="text-3xl font-bold text-white leading-none" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>
+                      {secsLeft}
+                    </span>
+                    <span className="text-[10px] text-white/85 mt-1">{fmtAcetone(liveMv)} {unitLbl}</span>
+                  </div>
+                </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
         </div>
+
+        {isRecording ? (
+          <>
+            <p className="text-sm font-semibold text-mint-500">เป่าออกยาวๆ ค้างไว้</p>
+
+            <div className="w-full space-y-1.5">
+              <div className="flex items-center justify-center gap-4 text-[10px] text-text-muted">
+                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-mint-500" />Acetone</span>
+                <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Pressure</span>
+              </div>
+              <div className="w-full rounded-2xl bg-bg-elevated overflow-hidden" style={{ height: 96 }}>
+                {chartData.length > 1 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="breathGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#00C896" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#00C896" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="pressureGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <YAxis yAxisId="acetone" domain={[yMin, yMax]} hide />
+                      <YAxis yAxisId="pressure" domain={[0, 10]} hide />
+                      <Area
+                        yAxisId="pressure"
+                        type="monotoneX"
+                        dataKey="kpa"
+                        stroke="#60A5FA"
+                        strokeWidth={1.5}
+                        fill="url(#pressureGrad)"
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                      <Area
+                        yAxisId="acetone"
+                        type="monotoneX"
+                        dataKey="mv"
+                        stroke="#00C896"
+                        strokeWidth={2}
+                        fill="url(#breathGrad)"
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-xs text-text-muted">รอสัญญาณ...</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center">
+            <p className="text-sm font-medium text-text-primary">กำลังคาลิเบต</p>
+            <p className="text-xs text-text-muted mt-1">
+              {secsLeft <= 3 ? "เตรียมเป่า..." : "ถืออุปกรณ์นิ่งๆ"}
+            </p>
+          </div>
+        )}
 
         <button
           onClick={reset}
@@ -714,6 +770,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   const resultZone = backendLabelToZone(result.label);
   const lColor = LABEL_COLOR[resultZone] ?? "text-text-muted";
   const lText = LABEL_TH[resultZone] ?? result.label ?? "—";
+  const zoneColor = (LABEL_STYLE[resultZone] ?? LABEL_STYLE.unreliable).color;
 
   return (
     <>
@@ -722,6 +779,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
         result={result}
         lColor={lColor}
         lText={lText}
+        zoneColor={zoneColor}
         fmtAcetone={fmtAcetone}
         unitLbl={unitLbl}
         onReset={reset}
@@ -733,11 +791,12 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
 
 /* ── Done result card — shows measurement + live gamification feedback ── */
 function DoneCard({
-  result, lColor, lText, fmtAcetone, unitLbl, onReset, xpAwarded,
+  result, lColor, lText, zoneColor, fmtAcetone, unitLbl, onReset, xpAwarded,
 }: {
   result: SessionSummary;
   lColor: string;
   lText: string;
+  zoneColor: string;
   fmtAcetone: (v: number) => string;
   unitLbl: string;
   onReset: () => void;
@@ -749,8 +808,18 @@ function DoneCard({
   return (
     <div className="py-2">
       {/* Session-complete is the app's highest-stakes "did this work" moment —
-          a restrained pop-in beat rather than the result just appearing flat. */}
-      <div className="bg-bg-elevated rounded-2xl p-4 space-y-3 animate-pop-in">
+          a restrained pop-in beat rather than the result just appearing flat.
+          The zone color now tints the card itself (subtle gradient + border),
+          not just the label text — low mix % keeps it a calm cue rather than
+          a solid alarm-colored fill, consistent with riskLabel.ts's
+          neutral (not good/bad) zone philosophy. */}
+      <div
+        className="rounded-2xl p-4 space-y-3 animate-pop-in border"
+        style={{
+          background: `linear-gradient(160deg, color-mix(in srgb, ${zoneColor} 10%, var(--color-bg-elevated)) 0%, var(--color-bg-elevated) 65%)`,
+          borderColor: `color-mix(in srgb, ${zoneColor} 30%, transparent)`,
+        }}
+      >
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-text-primary">ผลการตรวจ</p>
           <span className={`text-sm font-bold ${lColor}`}>{lText}</span>

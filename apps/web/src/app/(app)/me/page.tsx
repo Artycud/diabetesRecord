@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
 import { useDemoMode } from "@/lib/demoMode";
+import { BentoTile } from "@/components/ui/BentoTile";
 
 const XP_PER_LEVEL = 100;
 
@@ -21,11 +22,11 @@ function StatSkeleton() {
   return (
     <div className="grid grid-cols-3 gap-3">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="bg-bg-elevated rounded-2xl p-3 text-center animate-pulse">
+        <BentoTile key={i} className="p-3 min-h-0 items-center text-center gap-1 animate-pulse">
           <div className="h-4 w-4 rounded-full bg-bg-raised mx-auto mb-1" />
           <div className="h-7 bg-bg-raised rounded-lg mx-2 mb-1" />
           <div className="h-3 bg-bg-raised rounded w-10 mx-auto" />
-        </div>
+        </BentoTile>
       ))}
     </div>
   );
@@ -68,11 +69,24 @@ export default function MePage() {
 
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-tabbar space-y-5">
+      {/* Header */}
+      <div>
+        <p className="text-xs text-mint-500 font-semibold uppercase tracking-widest">{t("me.eyebrow")}</p>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight mt-0.5">{t("me.title")}</h1>
+      </div>
+
       {/* Profile card */}
-      <div className="bg-bg-elevated rounded-3xl p-5">
+      <BentoTile>
         <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-2xl bg-mint-500/20 flex items-center justify-center text-2xl font-bold text-mint-500">
-            {user?.profile?.display_name?.[0]?.toUpperCase() ?? "U"}
+          <div className="relative shrink-0">
+            <div
+              className="absolute inset-0 m-auto rounded-full blur-2xl -z-10 animate-halo-breathe bg-mint-500/15"
+              style={{ width: 80, height: 80 }}
+              aria-hidden="true"
+            />
+            <div className="h-16 w-16 rounded-2xl bg-mint-500/20 flex items-center justify-center text-2xl font-bold text-mint-500">
+              {user?.profile?.display_name?.[0]?.toUpperCase() ?? "U"}
+            </div>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-lg font-bold text-text-primary truncate">
@@ -103,37 +117,37 @@ export default function MePage() {
             <div className="h-1.5 bg-bg-raised rounded-full" />
           </div>
         )}
-      </div>
+      </BentoTile>
 
       {/* Stats row */}
       {statsLoading ? <StatSkeleton /> : (
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-bg-elevated rounded-2xl p-3 text-center">
+          <BentoTile className="p-3 min-h-0 items-center text-center gap-1">
             <div className="flex items-center justify-center mb-1">
               <Flame size={14} className="text-peach-500" />
             </div>
             <p className="text-2xl font-bold text-text-primary">{streak!.current}</p>
             <p className="text-xs text-text-muted mt-0.5 uppercase tracking-wider">Streak</p>
-          </div>
-          <div className="bg-bg-elevated rounded-2xl p-3 text-center">
+          </BentoTile>
+          <BentoTile className="p-3 min-h-0 items-center text-center gap-1">
             <div className="flex items-center justify-center mb-1">
               <Star size={14} className="text-gold-500" />
             </div>
             <p className="text-2xl font-bold text-text-primary">{xp!.total}</p>
             <p className="text-xs text-text-muted mt-0.5 uppercase tracking-wider">XP</p>
-          </div>
-          <div className="bg-bg-elevated rounded-2xl p-3 text-center">
+          </BentoTile>
+          <BentoTile className="p-3 min-h-0 items-center text-center gap-1">
             <div className="flex items-center justify-center mb-1">
               <Trophy size={14} className="text-gold-500" />
             </div>
             <p className="text-2xl font-bold text-text-primary">{badges!.length}</p>
             <p className="text-xs text-text-muted mt-0.5 uppercase tracking-wider">Badges</p>
-          </div>
+          </BentoTile>
         </div>
       )}
 
       {/* Competition coming soon */}
-      <div className="bg-bg-elevated rounded-2xl p-4 flex items-center gap-3 opacity-40">
+      <div className="bg-bg-elevated rounded-3xl p-4 flex items-center gap-3 opacity-40">
         <div className="h-9 w-9 rounded-xl bg-gold-500/20 flex items-center justify-center">
           <Trophy size={16} className="text-gold-500" />
         </div>
@@ -149,7 +163,7 @@ export default function MePage() {
           <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Badges</p>
           <div className="grid grid-cols-4 gap-2">
             {badges.slice(0, 8).map((b) => (
-              <div key={b.code} className="bg-bg-elevated rounded-xl p-2.5 text-center">
+              <div key={b.code} className="bg-bg-elevated rounded-2xl p-2.5 text-center">
                 <p className="text-2xl">{b.icon}</p>
                 <p className="text-[10px] text-text-muted mt-1 leading-tight">{b.name}</p>
               </div>
@@ -158,13 +172,13 @@ export default function MePage() {
         </div>
       )}
 
-      {/* Menu */}
-      <div>
-        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Settings</p>
-        <div className="bg-bg-elevated rounded-2xl overflow-hidden">
-          {/* Admin Console — only for admin users */}
-          {user?.is_admin && (
-            <Link href="/admin" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
+      {/* Admin — kept structurally separate from end-user Settings below so
+          it doesn't read as a peer of Language/Units/Theme/Demo mode. */}
+      {user?.is_admin && (
+        <div>
+          <p className="text-xs text-gold-500 font-semibold uppercase tracking-widest mb-3">Administrator</p>
+          <div className="bg-bg-elevated rounded-2xl overflow-hidden">
+            <Link href="/admin" className="flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors">
               <div className="h-8 w-8 rounded-lg bg-gold-500/20 flex items-center justify-center">
                 <Shield size={15} className="text-gold-500" />
               </div>
@@ -172,8 +186,14 @@ export default function MePage() {
               <span className="text-[10px] text-gold-500 bg-gold-500/10 px-2 py-0.5 rounded-full">ADMIN</span>
               <ChevronRight size={14} className="text-text-disabled" />
             </Link>
-          )}
+          </div>
+        </div>
+      )}
 
+      {/* Menu */}
+      <div>
+        <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Settings</p>
+        <div className="bg-bg-elevated rounded-2xl overflow-hidden">
           {/* Health report (Task D3) — printable summary pulling trend,
               baseline, session history, and lifestyle logs into one page. */}
           <Link href="/me/report" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
