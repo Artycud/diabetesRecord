@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlmodel import select
@@ -18,6 +19,15 @@ from app.mcp_context import mcp_scope
 from app.mcp_server import mcp as mcp_server
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+logger = logging.getLogger(__name__)
+
+# Explicit retry budget for the Anthropic client, applied at every call site
+# below — the SDK default already retries transient errors (connection
+# issues, 429, 5xx) with backoff, but a multi-round tool-calling turn can
+# make several sequential calls per request, so a little extra headroom here
+# meaningfully improves survival of a transient rate-limit/overload blip
+# instead of falling straight through to the canned apology text.
+ANTHROPIC_MAX_RETRIES = 3
 
 
 class PredictRequest(BaseModel):
@@ -101,6 +111,28 @@ class DriftResponse(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     device_id: Optional[UUID] = None
+    # Prior turns of the same conversation, replayed by the frontend (see
+    # apps/web/src/app/(app)/chat/page.tsx's buildHistory) so each new
+    # message isn't a blank-context request that has to re-derive everything
+    # via tool calls from scratch. Plain role/content only — never raw
+    # tool_use/tool_result blocks, which aren't preserved across requests.
+    history: Optional[List[dict]] = None
+
+
+def _sanitise_history(history: Optional[List[dict]]) -> list[dict]:
+    """Validate + cap client-supplied history before it reaches the model.
+    Only role/content pass through; anything else (or malformed entries) is
+    dropped rather than raising, so a bad history value degrades to "no
+    history" instead of failing the whole request."""
+    if not history:
+        return []
+    out: list[dict] = []
+    for turn in history[-10:]:
+        role = turn.get("role") if isinstance(turn, dict) else None
+        content = turn.get("content") if isinstance(turn, dict) else None
+        if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+            out.append({"role": role, "content": content})
+    return out
 
 
 class ChatResponse(BaseModel):
@@ -317,7 +349,7 @@ async def interpret_reading(
     if api_key:
         try:
             import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
+            client = anthropic.Anthropic(api_key=api_key, max_retries=ANTHROPIC_MAX_RETRIES)
             response = client.messages.create(
                 model=model,
                 max_tokens=200,
@@ -328,6 +360,7 @@ async def interpret_reading(
                      if getattr(b, "type", None) == "text"]
             raw_reply = "\n".join(t for t in texts if t).strip() or None
         except Exception:
+            logger.exception("ai/interpret: primary Claude call failed")
             raw_reply = None
 
     if not raw_reply:
@@ -484,7 +517,7 @@ async def chat(
     if api_key:
         try:
             import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
+            client = anthropic.Anthropic(api_key=api_key, max_retries=ANTHROPIC_MAX_RETRIES)
 
             # All MCP tool calls happen inside this scope — tools read user + db
             # via contextvars set here.
@@ -500,7 +533,9 @@ async def chat(
                     for t in mcp_tools
                 ]
 
-                messages: list[dict] = [{"role": "user", "content": body.message}]
+                messages: list[dict] = _sanitise_history(body.history) + [
+                    {"role": "user", "content": body.message}
+                ]
 
                 for _ in range(6):
                     response = client.messages.create(
@@ -544,6 +579,7 @@ async def chat(
                     raw_reply = "\n".join(t for t in texts if t).strip() or None
                     break
         except Exception:
+            logger.exception("ai/chat: primary Claude call failed")
             raw_reply = None
 
     if not raw_reply:
@@ -625,7 +661,7 @@ async def chat_stream(
         if api_key:
             try:
                 import anthropic
-                client = anthropic.Anthropic(api_key=api_key)
+                client = anthropic.Anthropic(api_key=api_key, max_retries=ANTHROPIC_MAX_RETRIES)
 
                 async with mcp_scope(user.id, device_id=body.device_id):
                     mcp_tools = await mcp_server.list_tools()
@@ -635,7 +671,9 @@ async def chat_stream(
                         for t in mcp_tools
                     ]
 
-                    messages: list[dict] = [{"role": "user", "content": body.message}]
+                    messages: list[dict] = _sanitise_history(body.history) + [
+                        {"role": "user", "content": body.message}
+                    ]
 
                     for _round in range(6):
                         assistant_content: list = []
@@ -691,7 +729,7 @@ async def chat_stream(
             except Exception:
                 # Fall through to the fallback-check below. Only clean if
                 # no real text was streamed yet this turn (see comment there)
-                pass
+                logger.exception("ai/chat/stream: primary Claude call failed")
 
         if not full_text.strip():
             # No primary key at all, or Claude failed/produced nothing before
@@ -718,11 +756,14 @@ async def chat_stream(
                 yield _sse({"type": "done"})
                 return
 
-            yield _sse({"type": "text", "delta":
-                "เกิดข้อผิดพลาดชั่วคราว ลองใหม่อีกครั้ง" if api_key else
-                "MetaBreath ยังไม่พร้อมใช้งานในตอนนี้ (ไม่มี API key)"})
-            if not api_key:
-                yield _sse({"type": "text", "delta": llm_guardrail.DISCLAIMER_TH})
+            # Both the primary Claude call and the admin-configured fallback
+            # are exhausted — a real terminal failure, not a normal reply, so
+            # it goes out as an `error` event (the frontend already has a
+            # dedicated handler for this that renders a retry action)
+            # instead of masquerading as assistant text.
+            yield _sse({"type": "error", "message":
+                "ลองใหม่อีกครั้ง" if api_key else
+                "ระบบยังไม่พร้อมใช้งาน (ไม่มี API key)"})
             yield _sse({"type": "done"})
             return
 

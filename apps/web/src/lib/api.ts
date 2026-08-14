@@ -576,6 +576,15 @@ export type ChatStreamEvent =
   | { type: "error"; message: string }
   | { type: "done" };
 
+// Prior turns of the same conversation, replayed to the backend so each new
+// message doesn't start from a blank context (see app/routers/ai.py's
+// ChatRequest.history) — plain role/content only, never raw tool_use/
+// tool_result blocks, which aren't preserved across requests.
+export interface ChatHistoryTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export type TrendClass = "stable" | "increasing" | "decreasing" | "abnormal";
 
 export interface TrendClassifyResponse {
@@ -867,10 +876,10 @@ export const api = {
         body: JSON.stringify({ device_id: deviceId, sessions }),
         signal: AbortSignal.timeout(10_000),
       }),
-    chat: (message: string, deviceId?: string) =>
+    chat: (message: string, deviceId?: string, history?: ChatHistoryTurn[]) =>
       request<ChatResponse>("/ai/chat", {
         method: "POST",
-        body: JSON.stringify({ message, device_id: deviceId }),
+        body: JSON.stringify({ message, device_id: deviceId, history }),
       }),
     listPrompts: () =>
       request<PromptsResponse>("/ai/prompts"),
@@ -878,6 +887,7 @@ export const api = {
       message: string,
       deviceId: string | undefined,
       onEvent: (ev: ChatStreamEvent) => void,
+      history?: ChatHistoryTurn[],
     ): Promise<void> => {
       const token = getToken();
       const res = await fetch(`${API_BASE}/ai/chat/stream`, {
@@ -886,7 +896,7 @@ export const api = {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ message, device_id: deviceId }),
+        body: JSON.stringify({ message, device_id: deviceId, history }),
         // Streaming + a multi-round tool-call loop can legitimately take a
         // while, plus the backend may attempt an OpenAI/Gemini fallback
         // afterwards (app/services/ai_fallback.py) — generous headroom so

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wind, X, RefreshCw, Flame, Star } from "lucide-react";
+import { Wind, X, RefreshCw, Flame, Star, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { ComposedChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,10 +11,12 @@ import type { AcetoneLabel, LiveReading } from "@/lib/useDeviceStream";
 import { api } from "@/lib/api";
 import type { ContextTag, SessionSummaryOut } from "@/lib/api";
 import { convertFromMv, useUnits } from "@/lib/units";
-import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone, rampColor } from "@/lib/riskLabel";
+import { LABEL_STYLE, LABEL_TH, backendLabelToZone, metabolicZone, rampColor, zoneContextMessage, zoneProgress } from "@/lib/riskLabel";
 import { useTimezone } from "@/lib/timezone";
 import { randomDemoParams, demoValueAt, type DemoParams } from "@/lib/demoReading";
 import { BreathPulse } from "@/components/ui/BreathPulse";
+import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
+import { BentoTile } from "@/components/ui/BentoTile";
 import { getTimeBucket, type TimeBucket } from "@/lib/timeOfDay";
 import { twMerge } from "tailwind-merge";
 import { ContextSelector } from "./ContextSelector";
@@ -768,7 +770,6 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
   /* ── done ── */
   if (!result) return null;
   const resultZone = backendLabelToZone(result.label);
-  const lColor = LABEL_COLOR[resultZone] ?? "text-text-muted";
   const lText = LABEL_TH[resultZone] ?? result.label ?? "—";
   const zoneColor = (LABEL_STYLE[resultZone] ?? LABEL_STYLE.unreliable).color;
 
@@ -777,71 +778,115 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
       <PhaseAnnouncer text="ตรวจเสร็จแล้ว" />
       <DoneCard
         result={result}
-        lColor={lColor}
         lText={lText}
         zoneColor={zoneColor}
         fmtAcetone={fmtAcetone}
         unitLbl={unitLbl}
         onReset={reset}
         xpAwarded={xpAwarded}
+        deviceId={deviceId}
       />
     </>
   );
 }
 
-/* ── Done result card — shows measurement + live gamification feedback ── */
+// Zone-boundary colors as an ordered 5-stop gradient, built from riskLabel.ts's
+// own LABEL_STYLE palette (the same colors DoneCard already uses for its zone
+// text/pill) — not AcetoneZoneCard.tsx's separate bespoke ZONES palette, which
+// exists only for that card's own accordion/modal content and intentionally
+// isn't reused here.
+type MetabolicZoneKey = keyof typeof LABEL_STYLE;
+const ZONE_BAR_KEYS: MetabolicZoneKey[] = ["fed_resting", "transitional", "fat_oxidation", "extended_fast", "safety_alert"];
+const ZONE_BAR_GRADIENT = `linear-gradient(90deg, ${ZONE_BAR_KEYS.map((k, i) => {
+  const c = LABEL_STYLE[k].color;
+  return `${c} ${(i / ZONE_BAR_KEYS.length) * 100}%, ${c} ${((i + 1) / ZONE_BAR_KEYS.length) * 100}%`;
+}).join(", ")})`;
+
+/* ── Done result card — premium glass-tile conclusion: hero stat, zone
+   context line, zone-position bar, live gamification feedback, and the
+   app's AI insight card embedded directly (not a separate section further
+   down the page) so "ask AI about this" is reachable from the result
+   itself. ── */
 function DoneCard({
-  result, lColor, lText, zoneColor, fmtAcetone, unitLbl, onReset, xpAwarded,
+  result, lText, zoneColor, fmtAcetone, unitLbl, onReset, xpAwarded, deviceId,
 }: {
   result: SessionSummary;
-  lColor: string;
   lText: string;
   zoneColor: string;
   fmtAcetone: (v: number) => string;
   unitLbl: string;
   onReset: () => void;
   xpAwarded: number | null;
+  deviceId: string | null;
 }) {
   const { data: xpData }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streakData } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
 
+  const resultZone = backendLabelToZone(result.label);
+  const contextMsg = zoneContextMessage(resultZone, result.context_tag);
+  const peakPpm = convertFromMv(result.peak_mv, "ppm");
+  const markerPct = zoneProgress(peakPpm) * 100;
+
   return (
-    <div className="py-2">
+    <div className="py-2 space-y-3">
       {/* Session-complete is the app's highest-stakes "did this work" moment —
-          a restrained pop-in beat rather than the result just appearing flat.
-          The zone color now tints the card itself (subtle gradient + border),
-          not just the label text — low mix % keeps it a calm cue rather than
-          a solid alarm-colored fill, consistent with riskLabel.ts's
-          neutral (not good/bad) zone philosophy. */}
-      <div
-        className="rounded-2xl p-4 space-y-3 animate-pop-in border"
+          a restrained pop-in beat on the same frosted-glass surface Home's
+          bento tiles use, rather than a flat box. The zone color tints the
+          card itself (subtle gradient + border) at a low mix %, staying a
+          calm cue rather than a solid alarm-colored fill, consistent with
+          riskLabel.ts's neutral (not good/bad) zone philosophy. */}
+      <BentoTile
+        className="gap-3 animate-pop-in"
         style={{
-          background: `linear-gradient(160deg, color-mix(in srgb, ${zoneColor} 10%, var(--color-bg-elevated)) 0%, var(--color-bg-elevated) 65%)`,
+          background: `linear-gradient(160deg, color-mix(in srgb, ${zoneColor} 14%, var(--color-bg-surface)) 0%, var(--color-bg-surface) 65%)`,
           borderColor: `color-mix(in srgb, ${zoneColor} 30%, transparent)`,
         }}
       >
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-text-primary">ผลการตรวจ</p>
-          <span className={`text-sm font-bold ${lColor}`}>{lText}</span>
+        <p className="text-xs font-semibold uppercase tracking-widest text-text-muted">ผลการตรวจ</p>
+
+        {/* Hero stat — same big stat-mono treatment FloatingHero/AcetoneZoneCard
+            use for their headline ppm number, with the zone as a colored pill
+            beside it rather than a plain text label. */}
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex items-baseline gap-1.5">
+            <span className="stat-mono text-4xl text-text-primary leading-none">{fmtAcetone(result.peak_mv)}</span>
+            <span className="text-sm text-text-muted">{unitLbl}</span>
+          </div>
+          <span
+            className="text-xs font-bold px-2.5 py-1 rounded-full shrink-0"
+            style={{ color: zoneColor, backgroundColor: `color-mix(in srgb, ${zoneColor} 15%, transparent)` }}
+          >
+            {lText}
+          </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          {(
-            [
-              { val: fmtAcetone(result.peak_mv),              label: `Peak (${unitLbl})` },
-              { val: fmtAcetone(result.mean_mv),              label: `Mean (${unitLbl})` },
-              { val: result.quality_score?.toFixed(0) ?? "—", label: "Quality" },
-            ] as const
-          ).map(({ val, label }) => (
-            <div key={label} className="bg-bg-raised rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-text-primary">{val}</p>
-              <p className="text-[10px] text-text-muted mt-0.5">{label}</p>
-            </div>
-          ))}
+        {contextMsg && (
+          <p className="text-xs text-text-muted leading-relaxed -mt-1">{contextMsg}</p>
+        )}
+
+        {/* Zone-position bar — where this peak lands on the 5-zone spectrum,
+            echoing AcetoneZoneCard's gradient-bar+marker pattern in miniature. */}
+        <div className="relative h-2 rounded-full overflow-visible mt-0.5" style={{ background: ZONE_BAR_GRADIENT }}>
+          <div
+            className="absolute -top-0.5 h-3 w-3 rounded-full bg-bg-elevated border-2 shadow-sm pointer-events-none"
+            style={{ left: `calc(${Math.min(100, Math.max(0, markerPct))}% - 6px)`, borderColor: zoneColor }}
+            aria-hidden="true"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-bg-raised rounded-xl p-2.5 text-center">
+            <p className="text-sm font-bold text-text-primary">{fmtAcetone(result.mean_mv)} {unitLbl}</p>
+            <p className="text-[10px] text-text-muted mt-0.5">Mean</p>
+          </div>
+          <div className="bg-bg-raised rounded-xl p-2.5 text-center">
+            <p className="text-sm font-bold text-text-primary">{result.quality_score?.toFixed(0) ?? "—"}</p>
+            <p className="text-[10px] text-text-muted mt-0.5">Quality</p>
+          </div>
         </div>
 
         {result.pressure_mean_kpa != null && (
-          <p className="text-xs text-text-muted text-center">
+          <p className="text-[11px] text-text-disabled text-center">
             แรงดัน {result.pressure_mean_kpa.toFixed(2)} kPa · {result.n_samples} ตัวอย่าง
           </p>
         )}
@@ -850,10 +895,7 @@ function DoneCard({
             line ties the reward directly to *this* session (xpAwarded, from
             finalize()'s checkin() response) rather than only ever showing
             the running lifetime total, which never made clear that the
-            check-in itself is what earns XP. Kept inside this existing
-            secondary panel, below the actual breath result above, so it
-            stays a footnote to the measurement — not competing for
-            attention with it. */}
+            check-in itself is what earns XP. */}
         {(streakData || xpData) && (
           <div className="bg-mint-500/10 rounded-xl px-3 py-2.5 space-y-1.5">
             {!!xpAwarded && (
@@ -880,13 +922,37 @@ function DoneCard({
           </div>
         )}
 
-        <button
-          onClick={onReset}
-          className="w-full rounded-xl border border-border-soft text-text-muted text-sm py-2.5 flex items-center justify-center gap-2 hover:bg-bg-raised transition-colors"
-        >
-          <RefreshCw size={14} />
-          เป่าใหม่
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onReset}
+            className="flex-1 rounded-xl border border-border-soft text-text-muted text-sm py-2.5 flex items-center justify-center gap-2 hover:bg-bg-raised transition-colors"
+          >
+            <RefreshCw size={14} />
+            เป่าใหม่
+          </button>
+          <Link
+            href="/trends"
+            className="flex-1 rounded-xl bg-mint-500 text-white text-sm py-2.5 flex items-center justify-center gap-2 hover:bg-mint-600 transition-colors"
+          >
+            <TrendingUp size={14} />
+            ดูแนวโน้ม
+          </Link>
+        </div>
+      </BentoTile>
+
+      {/* AI insight, embedded directly in the conclusion instead of a
+          separate section further down the page — "ask AI about this
+          result" is now reachable from the result itself. Same component
+          Home uses (loading/error/no-device states, suggested-question
+          chips → in-place deep-dive sheet, "ask more" link to /chat), just
+          relocated so it's part of the conclusion rather than a follow-up
+          the user has to scroll past AcetoneZoneCard to find. */}
+      <div className="animate-pop-in" style={{ animationDelay: "80ms" }}>
+        <AiInterpretCard
+          deviceId={deviceId}
+          refreshKey={result.at}
+          questions={["ครั้งหน้าควรทำอะไรให้ต่างไป?", "ค่านี้ปกติไหม?"]}
+        />
       </div>
     </div>
   );

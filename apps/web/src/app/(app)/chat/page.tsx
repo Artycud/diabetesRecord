@@ -2,10 +2,10 @@
 
 import { Suspense, useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, type ChatHistoryTurn } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Send, Wind } from "lucide-react";
+import { Bot, Send, Wind, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -14,6 +14,35 @@ interface Message {
   content: string;
   refusal?: boolean;
   toolStatus?: string;
+  // Set when this turn ended in a real failure (network error, or both the
+  // primary and fallback AI providers failing server-side) rather than a
+  // normal reply — renders a retry action instead of reading like the AI
+  // actually answered with an apology.
+  failed?: boolean;
+}
+
+// How many prior turns to replay to the backend so each new message isn't a
+// blank-context request (see ChatRequest.history in app/routers/ai.py) — a
+// small cap keeps the request body/token cost bounded for long conversations.
+const HISTORY_LIMIT = 10;
+
+// Anthropic's Messages API requires strict user/assistant alternation, so
+// this only replays complete, successful {user, assistant} pairs — a failed
+// turn drops both its assistant error bubble *and* the user message that
+// triggered it, rather than leaving an orphaned user message with no reply
+// (which would otherwise produce two consecutive user turns).
+function buildHistory(msgs: Message[]): ChatHistoryTurn[] {
+  const out: ChatHistoryTurn[] = [];
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m.role !== "user") continue;
+    const reply = msgs[i + 1];
+    if (reply?.role === "assistant" && reply.content && !reply.failed) {
+      out.push({ role: "user", content: m.content });
+      out.push({ role: "assistant", content: reply.content });
+    }
+  }
+  return out.slice(-HISTORY_LIMIT);
 }
 
 const SUGGESTIONS = [
@@ -80,6 +109,10 @@ function ChatContent() {
     if (!trimmed || loading) return;
     setInput("");
 
+    // Snapshot prior turns *before* appending this one, so the backend gets
+    // "everything before this message" as context, not this message twice.
+    const history = buildHistory(messages);
+
     const userMsg: Message = { role: "user", content: trimmed };
     setMessages((m) => [...m, userMsg, { role: "assistant", content: "" }]);
     setLoading(true);
@@ -116,11 +149,11 @@ function ChatContent() {
         } else if (ev.type === "refusal") {
           patchAssistant({ content: ev.reply, refusal: true, toolStatus: undefined });
         } else if (ev.type === "error") {
-          patchAssistant({ content: `เกิดข้อผิดพลาด: ${ev.message}`, toolStatus: undefined });
+          patchAssistant({ content: `เกิดข้อผิดพลาด: ${ev.message}`, toolStatus: undefined, failed: true });
         }
-      });
+      }, history);
     } catch (e) {
-      patchAssistant({ content: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง", toolStatus: undefined });
+      patchAssistant({ content: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง", toolStatus: undefined, failed: true });
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -228,14 +261,24 @@ function ChatContent() {
                         {msg.content}
                       </ReactMarkdown>
                     </div>
-                  ) : (
-                    !msg.toolStatus && (
-                      <div className="flex gap-1 py-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-                      </div>
-                    )
+                  ) : null}
+                  {msg.failed && (
+                    <button
+                      type="button"
+                      onClick={() => send(messages[i - 1]?.content ?? "")}
+                      disabled={loading}
+                      className="flex items-center gap-1 text-xs text-mint-500 font-medium mt-1.5 disabled:opacity-50"
+                    >
+                      <RotateCcw size={11} />
+                      ลองอีกครั้ง
+                    </button>
+                  )}
+                  {!msg.content && !msg.failed && !msg.toolStatus && (
+                    <div className="flex gap-1 py-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-mint-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
                   )}
                 </div>
               ) : (

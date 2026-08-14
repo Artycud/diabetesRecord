@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import { useT } from "@/lib/i18n";
 import BreathSession from "@/components/BreathSession";
 import { AcetoneZoneCard } from "@/components/cards/AcetoneZoneCard";
-import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
 import { Card } from "@/components/ui/card";
 import { NoDeviceNotice } from "@/components/ui/NoDeviceNotice";
 import { BentoTile } from "@/components/ui/BentoTile";
@@ -24,10 +23,6 @@ export default function BreathingPage() {
   const { demoMode } = useDemoMode();
   const { reading: liveReading } = useDeviceStream(user?.id);
   const userId = user?.id;
-  // Bumped every time a session is saved so AiInterpretCard's query key
-  // changes and re-fetches a fresh interpretation of the just-saved reading,
-  // instead of serving whatever was cached from before this session.
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   // Session history has moved to /trends. We still fetch it here so (a) after each
   // blow we can invalidate the cache for /trends, and (b) the AcetoneZoneCard can
   // show the peak of the most recent session as the "current" value.
@@ -117,29 +112,12 @@ export default function BreathingPage() {
         connected={connected}
         deviceId={primaryDevice?.id ?? null}
         userId={userId}
-        onSessionSaved={() => {
-          refetchSessions();
-          setLastSavedAt(Date.now());
-        }}
+        onSessionSaved={() => refetchSessions()}
         isDemo={demoMode}
       />
 
       {/* Metabolic zone — where does the current value sit on the 5-zone ladder */}
       <AcetoneZoneCard currentMv={currentAcetoneMv} live={!!liveReading && connected} />
-
-      {/* AI interpretation of the just-completed session (Task D2) — only
-          shown once a session has actually been saved this visit, not on
-          every page load, so it reads as "here's what just happened"
-          rather than a permanent fixture. */}
-      {lastSavedAt && primaryDevice && (
-        <div className="animate-pop-in">
-          <AiInterpretCard
-            deviceId={primaryDevice.id}
-            refreshKey={lastSavedAt}
-            questions={["ครั้งหน้าควรทำอะไรให้ต่างไป?", "ค่านี้ปกติไหม?"]}
-          />
-        </div>
-      )}
 
       {/* Trends shortcut — same BentoTile row recipe Home uses for its
           "today's readings" row. */}
