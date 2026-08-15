@@ -12,12 +12,14 @@ export interface DemoParams {
 
 // Randomized once per recording. Floor stays at 20mV/2ppm so it still never
 // lands in the flat gray fed_resting zone (see the original rationale below),
-// but the ceiling is now split ~50/50 across two bands so repeated demo runs
-// show genuinely different zones/colors — not just jitter within one narrow
-// band split by a zone boundary. (The old flat 20-60mV/2-6ppm range straddled
+// and the ceiling is split ~50/50 across two bands so repeated demo runs show
+// genuinely different zones/colors — not just jitter within one narrow band
+// split by a zone boundary. (The original flat 20-60mV/2-6ppm range straddled
 // the 40mV/4ppm transitional/fat_oxidation line almost exactly, so any run
 // landing in "yellow" was mathematically confined to 4.0-6.0ppm — always
-// reading as "the same ~5ppm.")
+// reading as "the same ~5ppm." A wider 4-30ppm high band fixed that but read
+// as too erratic/high for a demo — narrowed back down to a believable
+// ~2-10ppm overall span while keeping the two-band variety.)
 //
 // Original rationale for the 2ppm floor: a 1-3ppm range (as used by the
 // hardware-fault workaround) straddles the fed_resting/transitional boundary
@@ -29,8 +31,8 @@ export interface DemoParams {
 export function randomDemoParams(): DemoParams {
   const highBand = Math.random() < 0.5;
   const targetMv = highBand
-    ? 40 + Math.random() * 260   // 40-300mV = 4-30ppm  (fat_oxidation, full range)
-    : 20 + Math.random() * 20;   // 20-40mV  = 2-4ppm   (transitional)
+    ? 40 + Math.random() * 60    // 40-100mV = 4-10ppm (fat_oxidation, narrow slice)
+    : 20 + Math.random() * 20;   // 20-40mV  = 2-4ppm  (transitional)
   return {
     targetMv,
     targetKpa: 4 + Math.random() * 4,

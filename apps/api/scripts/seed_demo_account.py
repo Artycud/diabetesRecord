@@ -14,8 +14,10 @@ randomization fix uses), and a modest, believable XP/streak trail.
 Run inside the api container:
     docker compose exec api python -m scripts.seed_demo_account
 
-Idempotent: re-running skips creation if a user with USERNAME already exists
-and just prints its login, so it's safe to run more than once.
+Re-runnable: if a user with USERNAME already exists, its prior
+SensorReading/XPLedger/Streak/Device rows are deleted first and regenerated
+fresh — safe to re-run any time the band constants below change (e.g. to
+match a specific real device's typical range).
 """
 import asyncio
 import random
@@ -42,12 +44,16 @@ PASSWORD = "MetaBreathDemo2026!"
 
 DAYS_OF_HISTORY = 21
 
-# Two rough "bands" per day (fasted-morning tends higher, post-meal lower) so
-# the story is coherent, not just noise — mirrors the two-band approach used
-# to fix Demo Mode's own randomization earlier (see demoReading.ts) rather
-# than one flat random range that clusters near a zone boundary.
-MORNING_BAND_MV = (35.0, 95.0)   # mostly moderate, sometimes high (fasted)
-EVENING_BAND_MV = (8.0, 40.0)    # mostly low, sometimes moderate (post-meal)
+# Two rough "bands" per day (fasted-morning tends a bit higher, post-meal
+# lower) so the story is coherent, not just noise — mirrors the two-band
+# approach used to fix Demo Mode's own randomization earlier (see
+# demoReading.ts) rather than one flat random range that clusters near a
+# zone boundary. Capped at 4ppm/40mV — this device's real-world readings
+# never normally go higher than that, so seeding into fat_oxidation+ (4ppm
+# and up) would've looked unrealistic against the presenter's own experience
+# with the actual hardware, even though it's a fine spread in the abstract.
+MORNING_BAND_MV = (15.0, 40.0)   # 1.5-4ppm — fasted, trends toward the cap
+EVENING_BAND_MV = (5.0, 25.0)    # 0.5-2.5ppm — lower, post-meal
 
 
 def _session_samples(base_mv: float, n: int = 7) -> list[float]:
@@ -62,20 +68,46 @@ def _session_samples(base_mv: float, n: int = 7) -> list[float]:
     return out
 
 
+async def _wipe_existing(db: AsyncSession, user: User) -> None:
+    """Delete this demo user's prior seeded rows, in FK-safe order (no
+    ON DELETE CASCADE exists in this schema — see auth.py's deactivate_user
+    for the same constraint), so re-running the script with new band
+    constants regenerates cleanly instead of piling up alongside old data."""
+    device_result = await db.exec(select(Device).where(Device.user_id == user.id))
+    device_ids = [d.id for d in device_result.all()]
+    for device_id in device_ids:
+        reading_result = await db.exec(select(SensorReading).where(SensorReading.device_id == device_id))
+        for reading in reading_result.all():
+            await db.delete(reading)
+
+    xp_result = await db.exec(select(XPLedger).where(XPLedger.user_id == user.id))
+    for entry in xp_result.all():
+        await db.delete(entry)
+
+    streak_result = await db.exec(select(Streak).where(Streak.user_id == user.id))
+    for streak in streak_result.all():
+        await db.delete(streak)
+
+    for device_id in device_ids:
+        device_result2 = await db.exec(select(Device).where(Device.id == device_id))
+        await db.delete(device_result2.first())
+
+    await db.flush()
+
+
 async def seed() -> None:
     async with Session() as db:
         existing = await db.exec(select(User).where(User.username == USERNAME))
         user = existing.first()
         if user:
-            print(f"Already seeded: username={USERNAME!r} (id={user.id}) — not re-creating.")
-            print(f"Login: {USERNAME} / {PASSWORD}")
-            return
+            print(f"Found existing username={USERNAME!r} (id={user.id}) — wiping its prior history first...")
+            await _wipe_existing(db, user)
+        else:
+            user = User(email=EMAIL, username=USERNAME, hashed_password=hash_password(PASSWORD))
+            db.add(user)
+            await db.flush()  # user.id for FKs below
+            db.add(Profile(user_id=user.id, display_name=DISPLAY_NAME, goal_type="keto"))
 
-        user = User(email=EMAIL, username=USERNAME, hashed_password=hash_password(PASSWORD))
-        db.add(user)
-        await db.flush()  # user.id for FKs below
-
-        db.add(Profile(user_id=user.id, display_name=DISPLAY_NAME, goal_type="keto"))
         db.add(Device(
             user_id=user.id,
             kind="breath",
