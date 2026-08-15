@@ -844,12 +844,12 @@ function DoneCard({
       >
         <p className="text-xs font-semibold uppercase tracking-widest text-text-muted">ผลการตรวจ</p>
 
-        {/* Hero stat — same big stat-mono treatment FloatingHero/AcetoneZoneCard
+        {/* Hero stat — same big stat-display treatment FloatingHero/AcetoneZoneCard
             use for their headline ppm number, with the zone as a colored pill
             beside it rather than a plain text label. */}
         <div className="flex items-end justify-between gap-3">
           <div className="flex items-baseline gap-1.5">
-            <span className="stat-mono text-4xl text-text-primary leading-none">{fmtAcetone(result.peak_mv)}</span>
+            <span className="stat-display text-4xl text-text-primary leading-none">{fmtAcetone(result.peak_mv)}</span>
             <span className="text-sm text-text-muted">{unitLbl}</span>
           </div>
           <span

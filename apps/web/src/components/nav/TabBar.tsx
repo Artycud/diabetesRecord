@@ -43,11 +43,11 @@ export function TabBar() {
               <Icon
                 size={24}
                 strokeWidth={active ? 2.2 : 1.8}
-                className={twMerge(active ? "text-mint-500" : "text-text-muted")}
+                className={twMerge("transition-colors duration-200", active ? "text-mint-500" : "text-text-muted")}
               />
               <span
                 className={twMerge(
-                  "text-[11px] font-medium",
+                  "text-[11px] font-medium transition-colors duration-200",
                   active ? "text-mint-500" : "text-text-muted"
                 )}
               >

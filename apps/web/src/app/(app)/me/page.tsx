@@ -11,9 +11,11 @@ import Link from "next/link";
 import {
   Palette, Globe, LogOut, ChevronRight, Ruler,
   Flame, Trophy, Star, Shield, FlaskConical, Radar, FileText,
+  BookOpen, Clock,
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
 import { useDemoMode } from "@/lib/demoMode";
+import { useTimezone } from "@/lib/timezone";
 import { BentoTile } from "@/components/ui/BentoTile";
 
 const XP_PER_LEVEL = 100;
@@ -39,6 +41,7 @@ export default function MePage() {
   const qc = useQueryClient();
   const { unit: acUnit } = useUnits();
   const { demoMode, setDemoMode } = useDemoMode();
+  const { timezone } = useTimezone();
 
   const { data: xp }     = useQuery({ queryKey: ["me", "xp"],     queryFn: api.gamification.getXP });
   const { data: streak } = useQuery({ queryKey: ["me", "streak"], queryFn: api.gamification.getStreak });
@@ -207,6 +210,20 @@ export default function MePage() {
             <ChevronRight size={14} className="text-text-disabled shrink-0" />
           </Link>
 
+          {/* Learn — article library (keto/fasting/exercise/mindfulness/
+              science), read-to-earn XP. Previously had no entry point
+              anywhere in the app despite being fully built. */}
+          <Link href="/learn" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
+            <div className="h-8 w-8 rounded-lg bg-gold-500/20 flex items-center justify-center">
+              <BookOpen size={15} className="text-gold-500" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm text-text-primary font-medium">Learn</p>
+              <p className="text-[11px] text-text-muted truncate">บทความสุขภาพ · รับ XP</p>
+            </div>
+            <ChevronRight size={14} className="text-text-disabled shrink-0" />
+          </Link>
+
           {/* Language toggle */}
           <button
             onClick={() => setLocale(locale === "th" ? "en" : "th")}
@@ -240,6 +257,18 @@ export default function MePage() {
               <Palette size={15} className="text-mint-500" />
             </div>
             <span className="flex-1 text-sm text-mint-500 font-medium">Theme & appearance</span>
+            <ChevronRight size={14} className="text-text-disabled" />
+          </Link>
+
+          {/* Timezone — previously only reachable by typing the URL directly. */}
+          <Link href="/me/settings/timezone" className="flex items-center gap-3 px-4 py-3.5 border-b border-border-soft hover:bg-bg-raised transition-colors">
+            <div className="h-8 w-8 rounded-lg bg-gold-500/20 flex items-center justify-center">
+              <Clock size={15} className="text-gold-500" />
+            </div>
+            <span className="flex-1 text-sm text-text-primary font-medium">Timezone</span>
+            <span className="text-xs text-text-muted font-mono bg-bg-raised px-2 py-0.5 rounded-full truncate max-w-[100px]">
+              {timezone}
+            </span>
             <ChevronRight size={14} className="text-text-disabled" />
           </Link>
 

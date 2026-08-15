@@ -369,7 +369,9 @@ export default function TrendsPage() {
           ketone entry below. */}
       {effectiveDevice && (
         <div ref={acetoneChartRef}>
+        <BentoTile>
         <TrendMetricCard
+          bare
           icon={<Wind size={14} className="text-mint-500" strokeWidth={1.6} />}
           title="Breath Acetone"
           unit={acUnitLbl}
@@ -526,6 +528,7 @@ export default function TrendsPage() {
               </>
             )}
         </TrendMetricCard>
+        </BentoTile>
         </div>
       )}
 
@@ -545,7 +548,9 @@ export default function TrendsPage() {
 
       {/* Daily stats table */}
       {effectiveDevice && (
+        <BentoTile>
         <TrendMetricCard
+          bare
           icon={<CalendarDays size={14} className="text-mint-500" strokeWidth={1.6} />}
           title={`สรุป${t(`trends.granularity.${dailyStatsGranularity}`)}`}
           subtitle={`${days === 1 ? "วันนี้" : `${days} วันล่าสุด`} · หน่วย acetone: ${acUnitLbl}`}
@@ -586,10 +591,13 @@ export default function TrendsPage() {
             </div>
           )}
         </TrendMetricCard>
+        </BentoTile>
       )}
 
       {/* Per-session summary */}
+      <BentoTile>
       <TrendMetricCard
+        bare
         icon={<ListChecks size={14} className="text-mint-500" strokeWidth={1.6} />}
         title="สรุปรายครั้ง"
         subtitle={`แต่ละครั้งที่กด START · ${days === 1 ? "วันนี้" : `${days} วันล่าสุด`}`}
@@ -628,12 +636,15 @@ export default function TrendsPage() {
           </div>
         )}
       </TrendMetricCard>
+      </BentoTile>
 
       {/* Ketone chart — manual lab entry, deprioritized to the very bottom of
           the page. Blood/urine ketone values require a manual entry and are
           commonly empty, so the empty case collapses into a minimal
           "Connect Lab Data" CTA instead of a broken/gray chart placeholder. */}
+      <BentoTile>
       <TrendMetricCard
+        bare
         title={t("trends.ketoneTitle")}
         unit="mmol/L"
         valueLabel={t("trends.avg")}
@@ -656,6 +667,7 @@ export default function TrendsPage() {
           </ResponsiveContainer>
         )}
       </TrendMetricCard>
+      </BentoTile>
     </div>
   );
 }

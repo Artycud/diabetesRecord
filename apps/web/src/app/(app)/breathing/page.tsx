@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import { useT } from "@/lib/i18n";
 import BreathSession from "@/components/BreathSession";
 import { AcetoneZoneCard } from "@/components/cards/AcetoneZoneCard";
-import { Card } from "@/components/ui/card";
 import { NoDeviceNotice } from "@/components/ui/NoDeviceNotice";
 import { BentoTile } from "@/components/ui/BentoTile";
 
@@ -84,15 +83,15 @@ export default function BreathingPage() {
           Users without any device still see the "Add device" prompt via the empty state below.
           Both this and the shared-pool prompt below are irrelevant once Demo Mode is on. */}
       {!demoMode && !primaryDevice && (
-        <Card padding="md" className="flex items-center justify-between gap-3">
+        <BentoTile className="flex-row items-center justify-between gap-3 min-h-0">
           <NoDeviceNotice description={t("breathing.noDevice")} />
           <Link href="/me/device/add" className="text-xs text-mint-500 font-medium shrink-0">{t("breathing.addDevice")}</Link>
-        </Card>
+        </BentoTile>
       )}
 
       {/* Shared device pool — show only when I don't own AND haven't claimed */}
       {!demoMode && !ownedDevice && !myClaim && sharedDevices && sharedDevices.length > 0 && (
-        <Card padding="md" className="space-y-3">
+        <BentoTile className="space-y-3">
           <div className="flex items-center gap-2">
             <Radio size={16} className="text-mint-500" strokeWidth={1.6} />
             <p className="text-sm font-semibold text-text-primary">เครื่องที่ใช้ร่วมกันได้</p>
@@ -103,7 +102,7 @@ export default function BreathingPage() {
               <SharedDeviceCard key={d.id} device={d} onClaimed={() => refetchPool()} />
             ))}
           </div>
-        </Card>
+        </BentoTile>
       )}
 
       {/* Breath session — START button → 5-second count → result card */}

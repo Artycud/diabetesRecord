@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { motion } from "framer-motion";
 import { TabBar } from "@/components/nav/TabBar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -39,7 +40,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen bg-bg-primary">
       <main className="flex-1 overflow-y-auto">
-        {children}
+        {/* Opacity-only fade on navigation, keyed by pathname (never search
+            params — /chat's ?q=/?device= deep-link flow relies on in-place
+            param updates without a remount). Deliberately no
+            AnimatePresence/exit animation: Home/Breathing/Trends all open a
+            live WebSocket + fire queries on mount, and holding the old page
+            mounted during an exit transition would delay the new page's
+            connection — a keyed remount unmounts the old page instantly and
+            starts the new page's fetches immediately, only the entrance
+            fades in. Deliberately opacity-only, never x/y/scale: several
+            components mounted on the Breathing screen (PreBlowChecklist,
+            ContextSelector) render fixed inset-0 overlays without a portal,
+            and a non-none transform on an ancestor becomes the containing
+            block for position:fixed descendants per the CSS spec — a
+            transform here would mis-position those overlays live. */}
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          {children}
+        </motion.div>
       </main>
       {!hideTabBar && <TabBar />}
     </div>

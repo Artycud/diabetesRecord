@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useState, useRef, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { api, type ChatHistoryTurn } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Send, Wind, RotateCcw } from "lucide-react";
+import { Bot, Send, Wind, RotateCcw, ArrowLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -54,6 +54,7 @@ const SUGGESTIONS = [
 
 function ChatContent() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -181,8 +182,18 @@ function ChatContent() {
 
   return (
     <div className="flex flex-col h-screen max-w-2xl mx-auto">
-      {/* Header */}
+      {/* Header — the tab bar is hidden on this route (see (app)/layout.tsx),
+          and chat is deep-linked into from several other screens, so this
+          back button is the only way out of the conversation otherwise. */}
       <div className="shrink-0 px-4 py-4 border-b border-border-soft bg-bg-surface flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="ย้อนกลับ"
+          className="h-9 w-9 rounded-full bg-bg-elevated flex items-center justify-center shrink-0 hover:bg-bg-raised transition-colors"
+        >
+          <ArrowLeft size={18} className="text-text-muted" />
+        </button>
         <div className="h-9 w-9 rounded-xl bg-mint-500/10 border border-mint-500/20 flex items-center justify-center">
           <Bot size={18} className="text-mint-500" strokeWidth={1.5} />
         </div>

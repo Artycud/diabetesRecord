@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, type CalibrationReportOut } from "@/lib/api";
 import { AlertTriangle, CheckCircle, FileText, Wind, ArrowLeft } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { BentoTile } from "@/components/ui/BentoTile";
 
 function Metric({ label, value, unit, status }: {
   label: string; value: string | number; unit?: string; status?: "ok" | "warn" | "bad";
@@ -76,13 +77,14 @@ export default function CalibrationReportPage() {
           <ArrowLeft size={18} className="text-text-muted" />
         </button>
         <div>
+          <p className="text-[10px] text-mint-500 font-semibold uppercase tracking-widest">Calibration</p>
           <h1 className="text-lg font-semibold text-text-primary">Calibration Report</h1>
           <p className="text-xs text-text-muted font-mono mt-0.5">{deviceId.slice(0, 8)}… · {report.n_calibrations} calibrations</p>
         </div>
       </div>
 
       {/* Status banner */}
-      <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 border ${
+      <BentoTile className={`flex-row items-center gap-3 min-h-0 ${
         report.needs_recalibration ? "bg-danger/10 border-danger/20" : "bg-mint-500/10 border-mint-500/20"
       }`}>
         {report.needs_recalibration
@@ -101,10 +103,10 @@ export default function CalibrationReportPage() {
             Calibrate →
           </Link>
         )}
-      </div>
+      </BentoTile>
 
       {/* Metrics grid */}
-      <div>
+      <BentoTile>
         <p className="text-xs text-text-muted font-semibold uppercase tracking-widest mb-3">Performance Metrics</p>
         <div className="grid grid-cols-2 gap-3">
           <Metric label="Limit of Detection (3σ)" value={lodMv.toFixed(1)} unit="mV" status={lodStatus} />
@@ -112,10 +114,10 @@ export default function CalibrationReportPage() {
           <Metric label="Baseline Drift" value={Math.abs(driftMvPerDay).toFixed(1)} unit="mV/day" status={driftStatus} />
           <Metric label="Drift Score" value={(report.latest_drift_score * 100).toFixed(0)} unit="%" status={report.latest_drift_score < 0.3 ? "ok" : report.latest_drift_score < 0.6 ? "warn" : "bad"} />
         </div>
-      </div>
+      </BentoTile>
 
       {/* Reference thresholds */}
-      <div className="bg-bg-elevated rounded-2xl p-4">
+      <BentoTile>
         <p className="text-sm font-semibold text-text-primary mb-3">เกณฑ์อ้างอิง (TGS1820)</p>
         <div className="space-y-2">
           {[
@@ -132,13 +134,13 @@ export default function CalibrationReportPage() {
             </div>
           ))}
         </div>
-      </div>
+      </BentoTile>
 
       {/* Cross-sensitivity note */}
-      <div className="bg-warning/10 border border-warning/20 rounded-2xl p-4">
+      <BentoTile className="bg-warning/10 border-warning/20">
         <p className="text-xs text-warning font-semibold mb-1">Cross-Sensitivity Note</p>
         <p className="text-xs text-text-secondary">{report.cross_sensitivity_note}</p>
-      </div>
+      </BentoTile>
 
       {/* Wind icon context */}
       <div className="flex items-center gap-2 text-xs text-text-muted">

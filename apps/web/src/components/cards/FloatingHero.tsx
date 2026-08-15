@@ -112,7 +112,6 @@ export function FloatingHero({ deviceId, state, justRevealed, recentSessions }: 
             value={hasDisplayValue ? fmtAcetone(displayRawMv ?? 0) : isTrulyEmpty ? "--.--" : "—"}
             size="hero"
             color={hasDisplayValue ? style.color : undefined}
-            font="mono"
           />
           {hasDisplayValue && <span className="text-lg font-medium text-text-muted">{unitLbl}</span>}
         </div>

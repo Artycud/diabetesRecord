@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { useDeviceStream } from "@/lib/useDeviceStream";
 import Link from "next/link";
 import { CheckCircle, Info, ArrowLeft, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { BentoTile } from "@/components/ui/BentoTile";
 
 type Step = "intro" | "ambient" | "confirm" | "done";
 
@@ -120,6 +121,7 @@ export default function CalibratePage() {
           <ArrowLeft size={18} className="text-text-muted" />
         </button>
         <div className="flex-1">
+          <p className="text-[10px] text-mint-500 font-semibold uppercase tracking-widest">Calibration</p>
           <h1 className="text-lg font-semibold text-text-primary">Calibrate อุปกรณ์</h1>
           <p className="text-xs text-text-muted font-mono">{deviceId.slice(0, 8)}…</p>
         </div>
@@ -156,7 +158,7 @@ export default function CalibratePage() {
 
       {/* Step: Intro */}
       {step === "intro" && (
-        <div className="bg-bg-elevated rounded-2xl p-5 space-y-4">
+        <BentoTile className="space-y-4">
           <div className="flex gap-3 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
             <Info size={18} className="text-blue-400 shrink-0 mt-0.5" strokeWidth={1.5} />
             <div className="text-sm text-blue-300">
@@ -191,12 +193,12 @@ export default function CalibratePage() {
           <Link href={`/me/device/${deviceId}/report`} className="block text-center text-xs text-mint-500 hover:underline">
             ดู Calibration Report →
           </Link>
-        </div>
+        </BentoTile>
       )}
 
       {/* Step: Ambient reading */}
       {step === "ambient" && (
-        <div className="bg-bg-elevated rounded-2xl p-5 space-y-4">
+        <BentoTile className="space-y-4">
           {/* Live reading card */}
           {latest?.ambient_voc != null && (
             <div className="bg-mint-500/10 border border-mint-500/20 rounded-xl p-3">
@@ -279,12 +281,12 @@ export default function CalibratePage() {
             ถัดไป
           </button>
           {error && <p className="text-danger text-sm text-center">{error}</p>}
-        </div>
+        </BentoTile>
       )}
 
       {/* Step: Confirm */}
       {step === "confirm" && (
-        <div className="bg-bg-elevated rounded-2xl p-5 space-y-4">
+        <BentoTile className="space-y-4">
           <p className="font-semibold text-text-primary text-sm">ยืนยันค่า Calibration</p>
 
           <div className="space-y-0">
@@ -312,12 +314,12 @@ export default function CalibratePage() {
               {loading ? "กำลังบันทึก..." : "ยืนยัน"}
             </button>
           </div>
-        </div>
+        </BentoTile>
       )}
 
       {/* Step: Done */}
       {step === "done" && result && (
-        <div className="bg-bg-elevated rounded-2xl p-8 text-center space-y-5">
+        <BentoTile className="p-8 text-center space-y-5">
           <div className="w-16 h-16 rounded-full bg-mint-500/20 flex items-center justify-center mx-auto">
             <CheckCircle size={32} className="text-mint-500" strokeWidth={1.5} />
           </div>
@@ -349,7 +351,7 @@ export default function CalibratePage() {
               กลับไปอุปกรณ์
             </Link>
           </div>
-        </div>
+        </BentoTile>
       )}
     </div>
   );

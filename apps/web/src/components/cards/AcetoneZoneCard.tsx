@@ -315,7 +315,7 @@ export function AcetoneZoneCard({ currentMv, live = false }: Props) {
           {ppm != null && activeZone ? (
             <>
               <div className="flex items-baseline gap-1.5">
-                <span className="stat-mono text-3xl text-text-primary">{ppm.toFixed(2)}</span>
+                <span className="stat-display text-3xl text-text-primary">{ppm.toFixed(2)}</span>
                 <span className="text-sm text-text-muted">ppm</span>
                 {live && (
                   <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-mint-500">

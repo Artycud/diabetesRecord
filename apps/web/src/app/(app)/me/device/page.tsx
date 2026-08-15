@@ -12,6 +12,7 @@ import {
   Bell, Settings, Shield, ChevronRight, Plus,
   RefreshCw,
 } from "lucide-react";
+import { BentoTile } from "@/components/ui/BentoTile";
 
 type MenuItem =
   | { icon: React.ElementType; label: string; href: string | ((id: string) => string); danger?: boolean; disabled?: boolean }
@@ -158,11 +159,16 @@ export default function DevicePage() {
 
   return (
     <div className="max-w-md mx-auto px-4 pt-5 pb-24 space-y-5">
+      <div>
+        <p className="text-xs text-mint-500 font-semibold uppercase tracking-widest">การเชื่อมต่อ</p>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight mt-0.5">อุปกรณ์</h1>
+      </div>
+
       {/* Compact status row — shows for any active device, with a quick release
           button for shared claims. Placed above the hero for quick access. */}
       {device && (
-        <div className="bg-bg-elevated rounded-2xl p-4">
-          <div className="flex items-center justify-between">
+        <BentoTile className="flex-row items-center gap-3 min-h-0">
+          <div className="flex-1 min-w-0 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-text-primary">
                 {device.sensor_model ?? "MetaBreath TGS1820"}
@@ -186,11 +192,11 @@ export default function DevicePage() {
               </button>
             )}
           </div>
-        </div>
+        </BentoTile>
       )}
 
       {/* Device hero card */}
-      <div className="bg-bg-elevated rounded-3xl overflow-hidden">
+      <BentoTile className="p-0 overflow-hidden">
         <div className="h-40 bg-gradient-to-br from-mint-500/10 to-blue-500/10 flex items-center justify-center">
           <div className="h-20 w-20 rounded-2xl bg-bg-raised flex items-center justify-center">
             <span className="text-4xl">🫁</span>
@@ -294,14 +300,14 @@ export default function DevicePage() {
             </>
           )}
         </div>
-      </div>
+      </BentoTile>
 
       {/* Release action moved to the compact status row at the top of the page. */}
 
       {/* Shared device pool — visible when the user has no device, or their
           owned device has gone offline and they need a working fallback */}
       {(!ownedDevice || linkStatus === "offline") && claimableDevices.length > 0 && (
-        <div className="bg-bg-elevated rounded-2xl p-4 space-y-3">
+        <BentoTile className="space-y-3">
           <div>
             <p className="text-sm font-semibold text-text-primary">อุปกรณ์ที่ใช้ร่วมกัน</p>
             <p className="text-xs text-text-muted mt-0.5">
@@ -333,7 +339,7 @@ export default function DevicePage() {
               </button>
             </div>
           ))}
-        </div>
+        </BentoTile>
       )}
 
       {/* Menu — Basic */}
