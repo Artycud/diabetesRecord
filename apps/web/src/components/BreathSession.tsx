@@ -18,6 +18,7 @@ import { BreathPulse } from "@/components/ui/BreathPulse";
 import { AiInterpretCard } from "@/components/cards/AiInterpretCard";
 import { BentoTile } from "@/components/ui/BentoTile";
 import { getTimeBucket, type TimeBucket } from "@/lib/timeOfDay";
+import { parseServerTime } from "@/lib/time";
 import { twMerge } from "tailwind-merge";
 import { ContextSelector } from "./ContextSelector";
 import { PreBlowChecklist, type PreBlowAnswers } from "./PreBlowChecklist";
@@ -86,13 +87,6 @@ function trimmedMean(vals: number[]): number {
   const end = vals.length - trim;
   const mid = end > trim ? vals.slice(trim, end) : vals;
   return mid.reduce((a, b) => a + b, 0) / mid.length;
-}
-
-function modeLabel(samples: LiveReading[]): AcetoneLabel | null {
-  const c: Record<string, number> = {};
-  for (const s of samples) if (s.label) c[s.label] = (c[s.label] ?? 0) + 1;
-  const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
-  return (top?.[0] as AcetoneLabel) ?? null;
 }
 
 const LABEL_COLOR: Record<string, string> = Object.fromEntries(
@@ -306,7 +300,12 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
       // result mid-presentation is worse than a seamless simulated one.
       if (!useSimNow && now - t0.current > NO_SIGNAL_GRACE_MS) {
         const r = liveReadingRef.current;
-        const rTime = r?.time ? new Date(r.time).getTime() : 0;
+        // parseServerTime, not raw `new Date()` — the backend emits naive-UTC
+        // timestamps (no Z suffix), which `new Date()` misreads as local time.
+        // In Bangkok (UTC+7) that made rTime compute ~7h behind t0.current,
+        // so isStale was true almost always — a genuinely live reading was
+        // silently swapped for simulated data mid-session, every session.
+        const rTime = r?.time ? parseServerTime(r.time).getTime() : 0;
         const isStale = rTime <= t0.current;
         const isZero = !r || ((r.pressure_kpa ?? 0) === 0 && (r.acetone_delta_mv ?? 0) === 0);
         if (isStale || isZero) {
@@ -391,18 +390,27 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
     const mvs = s.map((r) => r.acetone_delta_mv - base);
     const pressures = s.map((r) => r.pressure_kpa).filter((v): v is number => v != null);
     const qualities = s.map((r) => r.quality_score);
+    const peakMv = Math.max(...mvs);
 
     const summary: SessionSummary = {
       id: crypto.randomUUID(),
       at: new Date().toISOString(),
       n_samples: s.length,
-      peak_mv: Math.max(...mvs),
+      peak_mv: peakMv,
       mean_mv: trimmedMean(mvs),
       pressure_mean_kpa: pressures.length
         ? pressures.reduce((a, b) => a + b, 0) / pressures.length
         : null,
       quality_score: qualities.reduce((a, b) => a + b, 0) / qualities.length,
-      label: modeLabel(s),
+      // Derived from the same peak value the headline number and zone-bar
+      // marker use — not the statistical mode of each raw sample's own
+      // noisy in-flight zone (modeLabel(), removed), which frequently
+      // disagreed with the displayed peak since most samples are taken
+      // while the reading is still rising toward it. MetabolicZone cast
+      // through AcetoneLabel same as the demo-reading path above (line
+      // ~340) — SessionSummary.label predates the 4-zone vocabulary and
+      // backendLabelToZone() already accepts either on the read side.
+      label: metabolicZone(convertFromMv(peakMv, "ppm")) as unknown as AcetoneLabel,
       context_tag: contextTag,
     };
     persist(summary, userId);
@@ -527,9 +535,23 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
         <div className="flex flex-col items-center py-8">
           <div className="relative flex items-center justify-center">
             {(connected || isDemo) && (
-              <div className="absolute pointer-events-none">
-                <BreathPulse size={168} variant="breathing" />
-              </div>
+              <>
+                {/* Soft blurred bloom behind the ring+button, same recipe
+                    FloatingHero uses behind its gauge (blur-3xl + the shared
+                    4s halo-breathe cadence) — idle had the thin-line
+                    BreathPulse rings but no complementary glow, which is why
+                    it read as flatter than Home next to it. Constant mint
+                    tint (not zone-colored) since there's no reading yet. */}
+                <div className="absolute pointer-events-none -z-10">
+                  <div
+                    className="rounded-full blur-3xl animate-halo-breathe"
+                    style={{ width: 170, height: 170, backgroundColor: "color-mix(in srgb, var(--color-mint-500) 20%, transparent)" }}
+                  />
+                </div>
+                <div className="absolute pointer-events-none">
+                  <BreathPulse size={168} variant="breathing" />
+                </div>
+              </>
             )}
             <motion.button
               onClick={start}
@@ -538,10 +560,16 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
               transition={{ type: "spring", stiffness: 400, damping: 22 }}
               className={twMerge(
                 "relative h-32 w-32 rounded-full flex flex-col items-center justify-center gap-1.5",
-                connected || isDemo
-                  ? "bg-mint-500 shadow-sm"
-                  : "bg-bg-elevated border-2 border-border-soft"
+                !(connected || isDemo) && "bg-bg-elevated border-2 border-border-soft"
               )}
+              style={
+                connected || isDemo
+                  ? {
+                      background: "linear-gradient(135deg, var(--color-mint-600), var(--color-mint-700))",
+                      boxShadow: "0 12px 32px color-mix(in srgb, var(--color-mint-600) 35%, transparent)",
+                    }
+                  : undefined
+              }
             >
               <Wind
                 size={34}
@@ -549,7 +577,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
                 strokeWidth={1.8}
               />
               <span className={`text-sm font-bold uppercase tracking-wide ${connected || isDemo ? "text-white" : "text-text-disabled"}`}>
-                START
+                เริ่ม
               </span>
             </motion.button>
           </div>
@@ -561,7 +589,10 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
               {IDLE_CONTEXT_TH[getTimeBucket()]}
             </p>
           )}
-          <Link href="/log" className="text-xs text-mint-500 mt-2 underline-offset-2 hover:underline">
+          <Link
+            href="/log"
+            className="inline-flex items-center rounded-full bg-bg-surface border border-border-soft px-3 py-1 text-xs font-medium text-mint-600 mt-3 hover:border-mint-500/40 transition-colors"
+          >
             หรือกรอกข้อมูลด้วยตนเอง
           </Link>
         </div>
@@ -644,7 +675,7 @@ export default function BreathSession({ liveReading, connected, deviceId, userId
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-3xl font-bold text-blue-400 leading-none">{secsLeft}</span>
-                  <span className="text-[10px] text-text-muted mt-1 uppercase tracking-widest">Calibrate</span>
+                  <span className="text-[10px] text-text-muted mt-1 uppercase tracking-widest">คาลิเบต</span>
                 </div>
               </motion.div>
             ) : (
@@ -877,11 +908,11 @@ function DoneCard({
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-bg-raised rounded-xl p-2.5 text-center">
             <p className="text-sm font-bold text-text-primary">{fmtAcetone(result.mean_mv)} {unitLbl}</p>
-            <p className="text-[10px] text-text-muted mt-0.5">Mean</p>
+            <p className="text-[10px] text-text-muted mt-0.5">ค่าเฉลี่ย</p>
           </div>
           <div className="bg-bg-raised rounded-xl p-2.5 text-center">
             <p className="text-sm font-bold text-text-primary">{result.quality_score?.toFixed(0) ?? "—"}</p>
-            <p className="text-[10px] text-text-muted mt-0.5">Quality</p>
+            <p className="text-[10px] text-text-muted mt-0.5">คุณภาพ</p>
           </div>
         </div>
 

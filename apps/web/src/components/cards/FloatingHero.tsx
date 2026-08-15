@@ -6,7 +6,7 @@ import { api, type SessionSummaryOut } from "@/lib/api";
 import { useUnits } from "@/lib/units";
 import { useTimezone } from "@/lib/timezone";
 import { useT } from "@/lib/i18n";
-import { backendLabelToZone, LABEL_STYLE, LABEL_TH, LABEL_EN, LABEL_RANGE } from "@/lib/riskLabel";
+import { backendLabelToZone, LABEL_STYLE, LABEL_TH, LABEL_EN, LABEL_RANGE, RANGE_REFERENCE_TH, RANGE_REFERENCE_EN } from "@/lib/riskLabel";
 import { StatNumber } from "@/components/ui/StatNumber";
 import { AcetoneRing } from "@/components/cards/AcetoneRing";
 import { InfoButton } from "@/components/ui/InfoButton";
@@ -72,10 +72,21 @@ export function FloatingHero({ deviceId, state, justRevealed, recentSessions }: 
   const statusPill =
     state === "needsDevice" ? t("health.hero.noDevice") : state === "needsCheckIn" ? t("health.hero.notCheckedIn") : null;
 
+  // A historical fallback reading (real data, just not from today) used to
+  // render at identical full-color prominence to a fresh one — the only
+  // "this is old" signal was a small secondary pill easy to miss in a
+  // screenshot, reading as if the hero and the "Not checked in" pill next
+  // to it contradicted each other. Desaturating the color here (ring, stat
+  // number, zone pill) makes a stale reading visually read as stale.
+  const isStaleFallback = !showingToday && hasDisplayValue;
+  const displayColor = isStaleFallback
+    ? `color-mix(in srgb, ${style.color} 35%, var(--color-text-disabled))`
+    : style.color;
+
   // Ambient halo — tracks the ring's own zone color rather than a fixed
   // brand hue, so it never clashes with a red/orange safety-zone reading.
   // Dim gray (LABEL_STYLE.unreliable) in the true-empty state.
-  const haloColor = hasDisplayValue ? style.color : LABEL_STYLE.unreliable.color;
+  const haloColor = hasDisplayValue ? displayColor : LABEL_STYLE.unreliable.color;
 
   return (
     <div className="flex items-center gap-5 sm:gap-8 py-8 sm:py-10 relative">
@@ -94,16 +105,23 @@ export function FloatingHero({ deviceId, state, justRevealed, recentSessions }: 
             </ul>
           </div>
           <p className="text-xs text-text-muted">{t("health.hero.infoFooter")}</p>
+          <p className="text-xs text-text-disabled">{locale === "th" ? RANGE_REFERENCE_TH : RANGE_REFERENCE_EN}</p>
         </InfoButton>
       </div>
 
       <div className="relative shrink-0">
         <div
           className="absolute inset-0 m-auto rounded-full blur-3xl -z-10 animate-halo-breathe"
-          style={{ width: 160, height: 160, backgroundColor: `${haloColor}26` }}
+          style={{ width: 160, height: 160, backgroundColor: `color-mix(in srgb, ${haloColor} 15%, transparent)` }}
           aria-hidden="true"
         />
-        <AcetoneRing value={displayRawMv} label={displayLabel} size={140} hideText pulse={justRevealed && showingToday} />
+        {/* Desaturate + dim the ring itself for a stale historical fallback
+            (AcetoneRing derives its own color from `label` internally, so a
+            filter is the contained way to mute it without changing that
+            shared component's API for every other caller). */}
+        <div className={isStaleFallback ? "opacity-75 saturate-50" : undefined}>
+          <AcetoneRing value={displayRawMv} label={displayLabel} size={140} hideText pulse={justRevealed && showingToday} />
+        </div>
       </div>
 
       <div className="min-w-0 flex-1">
@@ -111,7 +129,7 @@ export function FloatingHero({ deviceId, state, justRevealed, recentSessions }: 
           <StatNumber
             value={hasDisplayValue ? fmtAcetone(displayRawMv ?? 0) : isTrulyEmpty ? "--.--" : "—"}
             size="hero"
-            color={hasDisplayValue ? style.color : undefined}
+            color={hasDisplayValue ? displayColor : undefined}
           />
           {hasDisplayValue && <span className="text-lg font-medium text-text-muted">{unitLbl}</span>}
         </div>
@@ -119,40 +137,39 @@ export function FloatingHero({ deviceId, state, justRevealed, recentSessions }: 
         {isTrulyEmpty ? (
           <p className="text-sm text-text-muted mt-2">{t("health.hero.firstCheckIn")}</p>
         ) : (
-          <>
-            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              {hasDisplayValue && displayLabel && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
-                  style={{ color: style.color, backgroundColor: `${style.color}18` }}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.color }} />
-                  {ZONE_LABEL[zone] ?? displayLabel}
-                </span>
-              )}
-              {statusPill && (
-                <span className="inline-flex items-center rounded-full bg-bg-raised px-2.5 py-1 text-xs font-semibold text-text-muted">
-                  {statusPill}
-                </span>
-              )}
-              {showingToday && displayTime && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-bg-raised px-2.5 py-1 text-xs font-semibold text-text-muted">
-                  <Clock size={11} strokeWidth={2} />
-                  {formatTime(displayTime)}
-                </span>
-              )}
-            </div>
-            {/* Historical-fallback timestamp — only when the number shown
-                isn't from today, so it's clear this isn't a fresh reading. */}
-            {!showingToday && fallbackSession && displayTime && (
-              <p className="mt-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full bg-bg-raised px-2.5 py-1 text-xs font-semibold text-text-muted">
-                  <Clock size={11} strokeWidth={2} />
-                  {formatRelativeDate(displayTime)} • {formatTime(displayTime)}
-                </span>
-              </p>
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {/* Stale-fallback age comes FIRST and reads more assertively
+                (text-primary, not text-muted) than the other pills here —
+                promoted from a small secondary line below the row so it
+                can't be missed next to a "Not checked in" pill the way it
+                could when it was easy to miss underneath. */}
+            {isStaleFallback && fallbackSession && displayTime && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-bg-raised px-2.5 py-1 text-xs font-semibold text-text-primary">
+                <Clock size={11} strokeWidth={2} />
+                {formatRelativeDate(displayTime)} • {formatTime(displayTime)}
+              </span>
             )}
-          </>
+            {hasDisplayValue && displayLabel && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
+                style={{ color: displayColor, backgroundColor: `color-mix(in srgb, ${displayColor} 15%, transparent)` }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: displayColor }} />
+                {ZONE_LABEL[zone] ?? displayLabel}
+              </span>
+            )}
+            {statusPill && (
+              <span className="inline-flex items-center rounded-full bg-bg-raised px-2.5 py-1 text-xs font-semibold text-text-muted">
+                {statusPill}
+              </span>
+            )}
+            {showingToday && displayTime && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-bg-raised px-2.5 py-1 text-xs font-semibold text-text-muted">
+                <Clock size={11} strokeWidth={2} />
+                {formatTime(displayTime)}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

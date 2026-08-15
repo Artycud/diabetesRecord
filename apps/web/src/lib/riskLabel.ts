@@ -201,6 +201,19 @@ export const LABEL_RANGE: Record<string, string> = {
   safety_alert: "≥ 75 ppm",
 };
 
+// These boundaries are sourced from published literature (Anderson JC,
+// Obesity 2015), not from this device's own concentration-response
+// calibration — the in-app "Calibrate" flow only records a single-point
+// ambient-zero baseline (a drift/offset reset), not a curve validated
+// against known ppm concentrations. Surfaced in the UI wherever these
+// ranges are shown so their decimal-looking precision doesn't read as
+// device-measured when it isn't — matches `anderson_reference`, the same
+// citation the backend already returns from GET /ai/thresholds.
+export const RANGE_REFERENCE_TH =
+  "ช่วงตัวเลขอ้างอิงจากงานวิจัย (Anderson, 2015) ไม่ใช่ค่าที่ผ่านการสอบเทียบเฉพาะอุปกรณ์นี้โดยตรง";
+export const RANGE_REFERENCE_EN =
+  "Ranges are reference values from published research (Anderson, 2015), not this device's own calibrated measurements.";
+
 /** Non-judgmental context message shown below the zone — differs by session context */
 export function zoneContextMessage(
   zone: MetabolicZone,

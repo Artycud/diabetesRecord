@@ -10,6 +10,7 @@ import { api, type TrendClass } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useTimezone } from "@/lib/timezone";
 import { convertFromMv, useUnits } from "@/lib/units";
+import { backendLabelToZone, LABEL_TH, LABEL_EN } from "@/lib/riskLabel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -40,7 +41,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export default function HealthReportPage() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const { formatDateTime, formatDate } = useTimezone();
   const { unit: acUnit, label: acUnitLbl } = useUnits();
   const acDecimals = acUnit === "mV" ? 0 : 2;
@@ -238,7 +239,11 @@ export default function HealthReportPage() {
                           <td className="py-2 text-right font-mono text-muted">
                             {s.peak_acetone_delta != null ? convertFromMv(s.peak_acetone_delta, acUnit).toFixed(acDecimals) : "—"}
                           </td>
-                          <td className="py-2 text-right text-muted">{s.dominant_label ?? "—"}</td>
+                          <td className="py-2 text-right text-muted">
+                            {s.dominant_label
+                              ? (locale === "th" ? LABEL_TH : LABEL_EN)[backendLabelToZone(s.dominant_label)]
+                              : "—"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

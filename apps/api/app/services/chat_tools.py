@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User, Profile
 from app.models.health import (
     Device, SensorReading, MealLog, ActivityLog, WeightLog, KetoneLog,
-    DeviceCalibration,
+    DeviceCalibration, DeviceSession,
 )
 from app.services import ml_inference
 
@@ -126,18 +126,56 @@ def _bmi(weight_kg: Optional[float], height_cm: Optional[float]) -> Optional[flo
 async def _pick_device_id(
     db: AsyncSession, user: User, requested: Optional[UUID]
 ) -> Optional[UUID]:
-    """Prefer requested device (if owned by user); else user's active device."""
+    """Prefer requested device (if owned by user); else user's active owned
+    device; else a shared device they currently have an active claim on;
+    else the device behind their most recent reading (even if that device
+    has since been deactivated or the shared claim released).
+
+    This mirrors the fallback chain the frontend already uses to pick a
+    "primary device" on Home/Trends (owned -> claimed shared -> most
+    recently used) — this function used to stop at "active owned device",
+    which made /sensor/report (the only caller relying solely on this
+    helper) resolve to no device at all for accounts in the 2nd/3rd tier,
+    while Home/Trends still found one and rendered real data — the report's
+    "no device connected" banner could show above sections (baseline,
+    session table) that are scoped by user_id alone and don't hit this
+    function, so they'd still render historical data from that same device.
+    """
     if requested:
         res = await db.exec(
             select(Device).where(Device.id == requested, Device.user_id == user.id)
         )
         if res.first():
             return requested
+
     res = await db.exec(
         select(Device).where(Device.user_id == user.id, Device.active == True)  # noqa: E712
     )
     dev = res.first()
-    return dev.id if dev else None
+    if dev:
+        return dev.id
+
+    now = datetime.utcnow()
+    sess_res = await db.exec(
+        select(DeviceSession)
+        .where(
+            DeviceSession.user_id == user.id,
+            DeviceSession.active == True,  # noqa: E712
+            DeviceSession.expires_at > now,
+        )
+        .order_by(DeviceSession.started_at.desc())
+    )
+    session = sess_res.first()
+    if session:
+        return session.device_id
+
+    reading_res = await db.exec(
+        select(SensorReading.device_id)
+        .where(SensorReading.user_id == user.id)
+        .order_by(SensorReading.time.desc())
+        .limit(1)
+    )
+    return reading_res.first()
 
 
 # ─── Tool implementations ────────────────────────────────────────────────────

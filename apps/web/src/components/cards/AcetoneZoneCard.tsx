@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { convertFromMv } from "@/lib/units";
+import { RANGE_REFERENCE_TH } from "@/lib/riskLabel";
 
 // ─── Zone data ──────────────────────────────────────────────────────────────
 
@@ -264,9 +265,12 @@ function ZoneDetailModal({ zone, onClose }: { zone: Zone; onClose: () => void })
             </div>
           ))}
 
-          <div className="bg-bg-elevated rounded-xl p-3 text-xs text-text-muted leading-relaxed">
-            เนื้อหานี้เป็นข้อมูลเชิงสุขภาพทั่วไป ไม่ใช่คำแนะนำทางการแพทย์ —
-            หากมีข้อสงสัยเกี่ยวกับสุขภาพเฉพาะบุคคล ควรปรึกษาแพทย์
+          <div className="bg-bg-elevated rounded-xl p-3 text-xs text-text-muted leading-relaxed space-y-1.5">
+            <p>
+              เนื้อหานี้เป็นข้อมูลเชิงสุขภาพทั่วไป ไม่ใช่คำแนะนำทางการแพทย์ —
+              หากมีข้อสงสัยเกี่ยวกับสุขภาพเฉพาะบุคคล ควรปรึกษาแพทย์
+            </p>
+            <p>{RANGE_REFERENCE_TH}</p>
           </div>
         </div>
       </div>
@@ -320,7 +324,7 @@ export function AcetoneZoneCard({ currentMv, live = false }: Props) {
                 {live && (
                   <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-mint-500">
                     <span className="h-1.5 w-1.5 rounded-full bg-mint-500 animate-pulse" />
-                    LIVE
+                    สด
                   </span>
                 )}
               </div>

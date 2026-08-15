@@ -9,6 +9,7 @@ import { useDeviceStream } from "@/lib/useDeviceStream";
 import Link from "next/link";
 import { CheckCircle, Info, ArrowLeft, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { BentoTile } from "@/components/ui/BentoTile";
+import { parseServerTime } from "@/lib/time";
 
 type Step = "intro" | "ambient" | "confirm" | "done";
 
@@ -56,7 +57,11 @@ export default function CalibratePage() {
   const { reading: liveReading } = useDeviceStream(user?.id);
   const connected = !!liveReading &&
     liveReading.device_id === deviceId &&
-    (Date.now() - new Date(liveReading.time).getTime() < 60_000);
+    // parseServerTime, not raw `new Date()` — backend timestamps are naive
+    // UTC (no Z suffix); in Bangkok (UTC+7) this made a genuinely live
+    // reading always compute as ~7h old, so `connected` was false even
+    // while the device was actively streaming.
+    (Date.now() - parseServerTime(liveReading.time).getTime() < 60_000);
 
   // ดึง reading ล่าสุดจาก API (มี ambient_voc, temperature, humidity)
   const { data: latestReadings, refetch, isFetching } = useQuery({
@@ -142,7 +147,7 @@ export default function CalibratePage() {
           </p>
           {latest && (
             <p className="text-[10px] text-text-disabled mt-0.5">
-              Reading ล่าสุด: {new Date(latest.time).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              Reading ล่าสุด: {parseServerTime(latest.time).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </p>
           )}
         </div>

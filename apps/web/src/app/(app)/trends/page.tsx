@@ -21,7 +21,7 @@ import { useDeviceStream } from "@/lib/useDeviceStream";
 import { convertFromMv, MV_PER_PPM, useUnits } from "@/lib/units";
 import { useTimezone } from "@/lib/timezone";
 import { parseServerTime } from "@/lib/time";
-import { backendLabelToZone, LABEL_STYLE, LABEL_TH } from "@/lib/riskLabel";
+import { backendLabelToZone, LABEL_STYLE, LABEL_TH, LABEL_EN, RANGE_REFERENCE_TH, RANGE_REFERENCE_EN } from "@/lib/riskLabel";
 import { Badge } from "@/components/ui/badge";
 import { Wind, Utensils, Dumbbell, Eye, EyeOff, ChevronDown, CalendarDays, ListChecks } from "lucide-react";
 import { EmptyChartIllustration } from "@/components/brand/empty-chart";
@@ -126,6 +126,12 @@ export default function TrendsPage() {
 
   const dateLocale = locale === "th" ? "th-TH" : "en-US";
   const fmt = (ts: string) => tzFormatDate(ts);
+  // Zone names are language-agnostic for the 5 real zones (LABEL_TH/LABEL_EN
+  // are byte-identical there — see riskLabel.ts), but "clean"/"unreliable"
+  // do differ. Branching here (instead of using LABEL_TH directly, as this
+  // file previously did everywhere below) stops those two from staying
+  // Thai even when the app is set to English.
+  const ZONE_LABELS = locale === "th" ? LABEL_TH : LABEL_EN;
 
   const { data: ketone, isLoading: kLoading } = useQuery({
     queryKey: ["ketone", days],
@@ -263,12 +269,12 @@ export default function TrendsPage() {
         key: classes[i + 1].label,
         valueInUnit: ppmToUnit(boundaryPpm),
         color: LABEL_STYLE[enterZone]?.color ?? "#9CA3AF",
-        labelText: LABEL_TH[enterZone] ?? enterZone,
+        labelText: ZONE_LABELS[enterZone] ?? enterZone,
       });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thresholds, acUnit]);
+  }, [thresholds, acUnit, locale]);
 
   // Same boundary list, formatted into the legend row below the chart —
   // one swatch per zone (including the "below the first boundary" zone and
@@ -282,7 +288,7 @@ export default function TrendsPage() {
       items.push({
         key: zone,
         color: LABEL_STYLE[zone]?.color ?? "#9CA3AF",
-        text: `${LABEL_TH[zone] ?? zone} (<${fmtB(classes[0].upper_bound_ppm)} ${acUnitLbl})`,
+        text: `${ZONE_LABELS[zone] ?? zone} (<${fmtB(classes[0].upper_bound_ppm)} ${acUnitLbl})`,
       });
     }
     for (let i = 0; i < classes.length - 1; i++) {
@@ -291,14 +297,14 @@ export default function TrendsPage() {
       const hiClass = classes[i + 1];
       const zone = backendLabelToZone(hiClass.label);
       const text = hiClass.upper_bound_ppm != null
-        ? `${LABEL_TH[zone] ?? zone} (${fmtB(lo)}-${fmtB(hiClass.upper_bound_ppm)} ${acUnitLbl})`
-        : `${LABEL_TH[zone] ?? zone} (>${fmtB(lo)} ${acUnitLbl})`;
+        ? `${ZONE_LABELS[zone] ?? zone} (${fmtB(lo)}-${fmtB(hiClass.upper_bound_ppm)} ${acUnitLbl})`
+        : `${ZONE_LABELS[zone] ?? zone} (>${fmtB(lo)} ${acUnitLbl})`;
       items.push({ key: zone, color: LABEL_STYLE[zone]?.color ?? "#9CA3AF", text });
     }
-    items.push({ key: "unreliable", color: LABEL_STYLE.unreliable.color, text: LABEL_TH.unreliable });
+    items.push({ key: "unreliable", color: LABEL_STYLE.unreliable.color, text: ZONE_LABELS.unreliable });
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thresholds, acUnit]);
+  }, [thresholds, acUnit, locale]);
 
   // Task D1 — baseline band for the acetone chart (only once there's
   // enough history; `insufficient_data` readings are all-null so this
@@ -512,17 +518,22 @@ export default function TrendsPage() {
                   onClick={() => setLegendOpen((v) => !v)}
                   className="flex items-center gap-1 mt-3 text-xs text-mint-500 font-medium"
                 >
-                  Zone details
+                  {locale === "th" ? "รายละเอียดโซน" : "Zone details"}
                   <ChevronDown size={12} className={twMerge("transition-transform duration-200", legendOpen && "rotate-180")} />
                 </button>
                 {legendOpen && (
-                  <div className="flex gap-3 mt-2 flex-wrap animate-fade-rise-in">
-                    {legendZones.map(({ key, color, text }) => (
-                      <div key={key} className="flex items-center gap-1.5 text-xs text-muted">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-                        {text}
-                      </div>
-                    ))}
+                  <div className="mt-2 animate-fade-rise-in">
+                    <div className="flex gap-3 flex-wrap">
+                      {legendZones.map(({ key, color, text }) => (
+                        <div key={key} className="flex items-center gap-1.5 text-xs text-muted">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+                          {text}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-text-disabled mt-2">
+                      {locale === "th" ? RANGE_REFERENCE_TH : RANGE_REFERENCE_EN}
+                    </p>
                   </div>
                 )}
               </>
@@ -614,12 +625,13 @@ export default function TrendsPage() {
             {sessions!.map((s) => {
               const zone = s.dominant_label ?? "unreliable";
               const zoneColor = zoneColorOf(zone);
+              const zoneLabel = ZONE_LABELS[backendLabelToZone(zone)] ?? zone;
               return (
                 <HistoryRow
                   key={s.session_id}
                   leadingColor={zoneColor}
                   title={tzFormatDate(s.started_at)}
-                  subtitle={`${tzFormatTime(s.started_at)} · ${s.n_samples} น. · ${zone}`}
+                  subtitle={`${tzFormatTime(s.started_at)} · ${s.n_samples} น. · ${zoneLabel}`}
                   primary={
                     s.mean_acetone_delta != null
                       ? `${convertFromMv(s.mean_acetone_delta, acUnit).toFixed(acDecimals)} ${acUnitLbl}`
