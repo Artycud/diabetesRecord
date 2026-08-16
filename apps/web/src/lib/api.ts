@@ -265,6 +265,17 @@ export interface DoctorOut {
   display_name: string | null;
 }
 
+// ─── Doctor ──────────────────────────────────────────
+export interface DoctorPatientOut {
+  id: string;
+  username: string;
+  email: string;
+  display_name: string | null;
+  device_count: number;
+  last_reading_at: string | null;
+  last_label: string | null;
+}
+
 export interface AiFallbackProviderOut {
   key: string;
   display_name: string;
@@ -981,6 +992,11 @@ export const api = {
       request<void>(`/admin/users/${userId}`, { method: "DELETE" }),
     listDoctors: () =>
       request<DoctorOut[]>("/admin/doctors"),
+    createDoctor: (data: { username: string; email: string; password: string; display_name: string }) =>
+      request<DoctorOut>("/admin/doctors", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     setRole: (userId: string, role: "patient" | "doctor" | "admin") =>
       request<{ ok: boolean; role: string }>(`/admin/users/${userId}/role`, {
         method: "POST",
@@ -1000,6 +1016,32 @@ export const api = {
       request<AiFallbackProviderOut>(`/admin/ai-fallback/${providerKey}`, {
         method: "PUT",
         body: JSON.stringify(body),
+      }),
+  },
+  doctor: {
+    listPatients: () =>
+      request<DoctorPatientOut[]>("/doctor/patients"),
+    getPatientDashboard: (patientId: string, days = 7) =>
+      request<UserDashboardOut>(`/doctor/patients/${patientId}/dashboard?days=${days}`),
+    getPatientReport: (patientId: string, params?: {
+      deviceId?: string;
+      sessionDays?: number;
+      logDays?: number;
+      trendReadings?: number;
+    }) =>
+      request<SensorReport>(
+        `/doctor/patients/${patientId}/report?${[
+          params?.deviceId ? `device_id=${params.deviceId}` : null,
+          params?.sessionDays ? `session_days=${params.sessionDays}` : null,
+          params?.logDays ? `log_days=${params.logDays}` : null,
+          params?.trendReadings ? `trend_readings=${params.trendReadings}` : null,
+        ].filter(Boolean).join("&")}`
+      ),
+    interpretPatientReading: (patientId: string, deviceId: string, time?: string) =>
+      request<InterpretResponse>(`/doctor/patients/${patientId}/interpret`, {
+        method: "POST",
+        body: JSON.stringify({ device_id: deviceId, time }),
+        signal: AbortSignal.timeout(20_000),
       }),
   },
 };

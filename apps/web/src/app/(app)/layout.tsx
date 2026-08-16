@@ -16,13 +16,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // /chat is a focused, full-screen conversation surface — hiding the tab
   // bar there avoids fighting its own height calc against a fixed bottom
   // bar, and mirrors how iOS apps treat a "conversation" as its own stack.
-  const hideTabBar = pathname?.startsWith("/chat");
+  // /admin and /doctor are their own consoles with no bottom-tab concept.
+  const hideTabBar = pathname?.startsWith("/chat")
+    || pathname?.startsWith("/admin")
+    || pathname?.startsWith("/doctor");
 
   useEffect(() => {
     if (loading) return;
     if (!user) { router.replace("/login"); return; }
     if (!user.profile?.onboarded_at) { router.replace("/onboarding"); return; }
-  }, [user, loading, router]);
+    // Doctor accounts don't have a personal patient Home — land them on
+    // their patient roster instead. Scoped to just the /home entry point so
+    // a doctor can still reach /me normally (settings, logout, etc.).
+    if (user.role === "doctor" && pathname === "/home") { router.replace("/doctor"); return; }
+  }, [user, loading, router, pathname]);
 
   if (loading) {
     return (

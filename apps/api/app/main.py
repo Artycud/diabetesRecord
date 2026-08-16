@@ -30,7 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import auth, logs, profile, gamification, content, push, sensor, ai, pilot, ws, admin
+from app.routers import auth, logs, profile, gamification, content, push, sensor, ai, pilot, ws, admin, doctor
 app.include_router(auth.router)
 app.include_router(logs.router)
 app.include_router(profile.router)
@@ -42,6 +42,7 @@ app.include_router(ai.router)
 app.include_router(pilot.router)
 app.include_router(ws.router)
 app.include_router(admin.router)
+app.include_router(doctor.router)
 
 @app.get("/healthz", include_in_schema=False)
 async def health():

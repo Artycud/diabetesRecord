@@ -11,7 +11,7 @@ import Link from "next/link";
 import {
   Palette, Globe, LogOut, ChevronRight, Ruler,
   Flame, Trophy, Star, Shield, FlaskConical, Radar, FileText,
-  BookOpen, Clock,
+  BookOpen, Clock, Stethoscope,
 } from "lucide-react";
 import { unitLabel, useUnits } from "@/lib/units";
 import { useDemoMode } from "@/lib/demoMode";
@@ -187,6 +187,23 @@ export default function MePage() {
               </div>
               <span className="flex-1 text-sm text-gold-500 font-medium text-left">Admin Console</span>
               <span className="text-[10px] text-gold-500 bg-gold-500/10 px-2 py-0.5 rounded-full">ADMIN</span>
+              <ChevronRight size={14} className="text-text-disabled" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Doctor — same treatment as Admin above, but mint (not gold) so the
+          two consoles read as visually distinct at a glance. */}
+      {user?.role === "doctor" && (
+        <div>
+          <p className="text-xs text-mint-500 font-semibold uppercase tracking-widest mb-3">Doctor</p>
+          <div className="bg-bg-elevated rounded-2xl overflow-hidden">
+            <Link href="/doctor" className="flex items-center gap-3 px-4 py-3.5 hover:bg-bg-raised transition-colors">
+              <div className="h-8 w-8 rounded-lg bg-mint-500/20 flex items-center justify-center">
+                <Stethoscope size={15} className="text-mint-500" />
+              </div>
+              <span className="flex-1 text-sm text-mint-500 font-medium text-left">Doctor Console</span>
               <ChevronRight size={14} className="text-text-disabled" />
             </Link>
           </div>

@@ -56,3 +56,53 @@ async def get_admin_user(
         return user
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+
+async def get_current_doctor(
+    credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.user import User
+    from sqlmodel import select
+
+    user_id = decode_access_token(credentials.credentials)
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    result = await db.exec(select(User).where(User.id == UUID(user_id)))
+    user = result.first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+
+    if user.role != "doctor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Doctor access required")
+    return user
+
+
+async def get_assigned_patient(
+    patient_id: UUID,
+    doctor=Depends(get_current_doctor),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolve `patient_id` to a User, but only if `doctor` is the currently
+    assigned doctor on that patient's Profile — 404 (not 403) on any mismatch
+    so an unauthorized doctor can't distinguish "not my patient" from
+    "doesn't exist" from the response alone.
+
+    Depends on the calling route using the path parameter name `patient_id`
+    exactly — FastAPI resolves this dependency's own `patient_id` argument by
+    matching that name against the route's path, not by position.
+    """
+    from app.models.user import User, Profile
+    from sqlmodel import select
+
+    profile_result = await db.exec(select(Profile).where(Profile.user_id == patient_id))
+    profile = profile_result.first()
+    if not profile or profile.assigned_doctor_id != doctor.id:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    user_result = await db.exec(select(User).where(User.id == patient_id, User.is_active == True))  # noqa: E712
+    patient = user_result.first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return patient

@@ -5,24 +5,31 @@ seeded "admin" account) or, for backwards compatibility, the legacy path where
 the JWT belongs to ADMIN_EMAIL and the X-Admin-Password header matches
 ADMIN_PASSWORD. See app.core.deps.get_admin_user.
 """
-from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlmodel import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 import math
+import re
 import secrets as _secrets
 
 from app.core.config import settings
 from app.core.deps import get_admin_user, get_db
 from app.core.secrets import encrypt_secret
+from app.core.security import hash_password
 from app.models.user import User, Profile
 from app.models.health import Device, SensorReading, DeviceCalibration, KetoneLog
 from app.models.ai import AIProvider
+from app.models.gamification import Streak
 from app.services import signal_processing as sp
 from app.services.auth import deactivate_user
+from app.services import dashboard_service
+from app.services.dashboard_service import (
+    DashboardDevice, DashboardReading, DashboardKPI, DashboardKetoneLog, UserDashboardOut,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -98,6 +105,39 @@ class DoctorOut(BaseModel):
     id: str
     username: str
     display_name: Optional[str]
+
+
+class CreateDoctorRequest(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    display_name: str
+
+    # Same rules as RegisterRequest (app/schemas/auth.py) — a doctor account
+    # is still a login, so it shouldn't be held to weaker constraints than a
+    # normal signup just because admin is the one creating it.
+    @field_validator("username")
+    @classmethod
+    def username_valid(cls, v: str) -> str:
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z0-9_]{3,30}$", v):
+            raise ValueError("username: 3-30 chars, letters/numbers/underscore only")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def password_strong(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("password must be at least 8 characters")
+        return v
+
+    @field_validator("display_name")
+    @classmethod
+    def display_name_valid(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("display_name is required")
+        return v
 
 
 class RoleUpdateRequest(BaseModel):
@@ -245,6 +285,50 @@ async def list_doctors(
         )
         for d in doctors
     ]
+
+
+# ─── Create a doctor account directly (not a promoted patient) ────────────────
+
+@router.post("/doctors", response_model=DoctorOut, status_code=201)
+async def create_doctor(
+    body: CreateDoctorRequest,
+    _admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Admin-only account creation for a doctor persona — distinct from the
+    normal signup flow (POST /auth/register), which always creates a
+    role="patient" account. Mirrors register_user's duplicate-check +
+    hashing (app/services/auth.py) but sets role="doctor" from the start and
+    marks the profile onboarded immediately: the patient onboarding
+    questionnaire (goal_type, etc.) doesn't apply to a doctor account, so
+    there's nothing to collect before they can use /doctor.
+    """
+    existing = await db.exec(
+        select(User).where((User.username == body.username) | (User.email == body.email))
+    )
+    if existing.first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email already taken")
+
+    user = User(
+        email=body.email,
+        username=body.username,
+        hashed_password=hash_password(body.password),
+        role="doctor",
+    )
+    db.add(user)
+    await db.flush()  # user.id for FKs below
+
+    profile = Profile(
+        user_id=user.id,
+        display_name=body.display_name,
+        onboarded_at=datetime.utcnow(),
+    )
+    db.add(profile)
+    db.add(Streak(user_id=user.id))
+    await db.commit()
+
+    return DoctorOut(id=str(user.id), username=user.username, display_name=profile.display_name)
 
 
 # ─── Set a user's role (needed to create doctors) ─────────────────────────────
@@ -576,77 +660,8 @@ async def submit_reading(
 
 
 # ─── Per-user dashboard ──────────────────────────────────────────────────────
-
-class DashboardDevice(BaseModel):
-    id: str
-    kind: str
-    sensor_model: Optional[str]
-    active: bool
-    needs_recalibration: bool
-    last_calibrated_at: Optional[datetime]
-    last_seen_at: Optional[datetime]
-    baseline_voc: Optional[float]
-    drift_score: Optional[float]
-    total_readings: int
-
-
-class DashboardReading(BaseModel):
-    time: datetime
-    device_id: str
-    # Core acetone / VOC
-    ambient_voc: Optional[float] = None
-    breath_voc: Optional[float] = None
-    acetone_delta: Optional[float] = None
-    voc_ppb: Optional[float] = None
-    ketone_mmol: Optional[float] = None
-    # Environment
-    temp_c: Optional[float] = None
-    humidity_pct: Optional[float] = None
-    pressure_mean: Optional[float] = None
-    pressure_std: Optional[float] = None
-    breath_duration: Optional[float] = None
-    # Quality / signal shape
-    quality_score: Optional[float] = None
-    reliability_score: Optional[float] = None
-    environment_penalty: Optional[float] = None
-    slope: Optional[float] = None
-    time_to_peak: Optional[float] = None
-    recovery_rate: Optional[float] = None
-    # Classification
-    label: Optional[str] = None
-    metabolic_risk_index: Optional[int] = None
-    confidence_score: Optional[float] = None
-    # Raw payload (kept small — used for debug view only)
-    raw: Optional[dict] = None
-
-
-class DashboardKPI(BaseModel):
-    total_readings: int
-    active_days: int
-    avg_acetone_delta: Optional[float]
-    avg_quality_score: Optional[float]
-    avg_reliability_score: Optional[float]
-    last_reading_at: Optional[datetime]
-
-
-class DashboardKetoneLog(BaseModel):
-    ts: datetime
-    ketone_type: str
-    value_mmol: Optional[float]
-    urine_category: Optional[str]
-    source: Optional[str]
-
-
-class UserDashboardOut(BaseModel):
-    user: dict          # id, email, username, display_name, created_at
-    window_days: int
-    kpi: DashboardKPI
-    devices: List[DashboardDevice]
-    label_counts: dict  # {clean, low, moderate, high, unreliable}
-    series: List[DashboardReading]     # ≤ 200 downsampled points for chart
-    recent: List[DashboardReading]     # last 20 raw
-    ketone_logs: List[DashboardKetoneLog]
-
+# Dashboard*/UserDashboardOut + the build logic now live in dashboard_service.py
+# (shared with the doctor-facing GET /doctor/patients/{id}/dashboard route).
 
 @router.get("/user/{user_id}/dashboard", response_model=UserDashboardOut)
 async def user_dashboard(
@@ -656,171 +671,17 @@ async def user_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     """Return everything the admin dashboard needs for a single user."""
-    from datetime import timedelta
-
     try:
         uid = UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid user_id")
-
-    days = max(1, min(days, 90))
-    since = datetime.utcnow() - timedelta(days=days)
 
     user_result = await db.exec(select(User).where(User.id == uid, User.is_active == True))
     user = user_result.first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    profile_result = await db.exec(select(Profile).where(Profile.user_id == uid))
-    profile = profile_result.first()
-
-    # ── Devices for this user ────────────────────────────────────────────────
-    devices_result = await db.exec(select(Device).where(Device.user_id == uid))
-    devices = list(devices_result.all())
-    device_ids = [d.id for d in devices]
-
-    if not device_ids:
-        return UserDashboardOut(
-            user={
-                "id": str(user.id),
-                "email": user.email,
-                "username": user.username,
-                "display_name": profile.display_name if profile else None,
-                "created_at": user.created_at.isoformat(),
-            },
-            window_days=days,
-            kpi=DashboardKPI(total_readings=0, active_days=0, avg_acetone_delta=None,
-                             avg_quality_score=None, avg_reliability_score=None, last_reading_at=None),
-            devices=[], label_counts={}, series=[], recent=[], ketone_logs=[],
-        )
-
-    # ── Readings in window ───────────────────────────────────────────────────
-    readings_result = await db.exec(
-        select(SensorReading)
-        .where(SensorReading.device_id.in_(device_ids), SensorReading.time >= since)
-        .order_by(SensorReading.time.asc())
-    )
-    readings = list(readings_result.all())
-
-    # ── Per-device stats (last_seen, baseline, drift, total) ─────────────────
-    device_out: List[DashboardDevice] = []
-    for d in devices:
-        last_read_result = await db.exec(
-            select(SensorReading)
-            .where(SensorReading.device_id == d.id)
-            .order_by(SensorReading.time.desc())
-        )
-        last_read = last_read_result.first()
-
-        cal_result = await db.exec(
-            select(DeviceCalibration)
-            .where(DeviceCalibration.device_id == d.id)
-            .order_by(DeviceCalibration.calibrated_at.desc())
-        )
-        cal = cal_result.first()
-
-        count_result = await db.exec(
-            select(func.count(SensorReading.time)).where(SensorReading.device_id == d.id)
-        )
-        total = count_result.one() or 0
-
-        device_out.append(DashboardDevice(
-            id=str(d.id),
-            kind=d.kind,
-            sensor_model=d.sensor_model,
-            active=d.active,
-            needs_recalibration=d.needs_recalibration,
-            last_calibrated_at=d.last_calibrated_at,
-            last_seen_at=last_read.time if last_read else None,
-            baseline_voc=cal.baseline_voc if cal else None,
-            drift_score=cal.drift_score if cal else None,
-            total_readings=total,
-        ))
-
-    # ── KPI ──────────────────────────────────────────────────────────────────
-    valid_acetone = [r.acetone_delta for r in readings if r.acetone_delta is not None and r.label != "unreliable"]
-    valid_quality = [r.quality_score for r in readings if r.quality_score is not None]
-    valid_reliab  = [r.reliability_score for r in readings if r.reliability_score is not None]
-    active_days   = len({r.time.date() for r in readings})
-    last_read     = readings[-1] if readings else None
-
-    kpi = DashboardKPI(
-        total_readings=len(readings),
-        active_days=active_days,
-        avg_acetone_delta=round(sum(valid_acetone) / len(valid_acetone), 2) if valid_acetone else None,
-        avg_quality_score=round(sum(valid_quality) / len(valid_quality), 1) if valid_quality else None,
-        avg_reliability_score=round(sum(valid_reliab) / len(valid_reliab), 1) if valid_reliab else None,
-        last_reading_at=last_read.time if last_read else None,
-    )
-
-    # ── Label distribution ───────────────────────────────────────────────────
-    label_counts: dict = {}
-    for r in readings:
-        lbl = r.label or "unknown"
-        label_counts[lbl] = label_counts.get(lbl, 0) + 1
-
-    def _to_dashboard_reading(r: SensorReading, include_raw: bool) -> DashboardReading:
-        return DashboardReading(
-            time=r.time, device_id=str(r.device_id),
-            ambient_voc=r.ambient_voc, breath_voc=r.breath_voc,
-            acetone_delta=r.acetone_delta, voc_ppb=r.voc_ppb, ketone_mmol=r.ketone_mmol,
-            temp_c=r.temp_c, humidity_pct=r.humidity_pct,
-            pressure_mean=r.pressure_mean, pressure_std=r.pressure_std,
-            breath_duration=r.breath_duration,
-            quality_score=r.quality_score, reliability_score=r.reliability_score,
-            environment_penalty=r.environment_penalty,
-            slope=r.slope, time_to_peak=r.time_to_peak, recovery_rate=r.recovery_rate,
-            label=r.label, metabolic_risk_index=r.metabolic_risk_index,
-            confidence_score=r.confidence_score,
-            raw=r.raw if include_raw else None,
-        )
-
-    # ── Downsample series → ≤ 200 points (skip raw JSON to keep payload lean) ─
-    MAX_POINTS = 200
-    stride = max(1, len(readings) // MAX_POINTS)
-    sampled = readings[::stride][:MAX_POINTS]
-    series = [_to_dashboard_reading(r, include_raw=False) for r in sampled]
-
-    # ── Recent 20 raw (full detail, incl. raw JSONB for expand-row view) ─────
-    recent_result = await db.exec(
-        select(SensorReading)
-        .where(SensorReading.device_id.in_(device_ids))
-        .order_by(SensorReading.time.desc())
-    )
-    recent_all = list(recent_result.all())[:20]
-    recent = [_to_dashboard_reading(r, include_raw=True) for r in recent_all]
-
-    # ── Ketone logs (last 30 days) ───────────────────────────────────────────
-    ket_result = await db.exec(
-        select(KetoneLog)
-        .where(KetoneLog.user_id == uid, KetoneLog.ts >= datetime.utcnow() - timedelta(days=30))
-        .order_by(KetoneLog.ts.desc())
-    )
-    ketone_logs = [
-        DashboardKetoneLog(
-            ts=k.ts, ketone_type=k.ketone_type,
-            value_mmol=k.value_mmol, urine_category=k.urine_category,
-            source=k.source,
-        )
-        for k in ket_result.all()
-    ]
-
-    return UserDashboardOut(
-        user={
-            "id": str(user.id),
-            "email": user.email,
-            "username": user.username,
-            "display_name": profile.display_name if profile else None,
-            "created_at": user.created_at.isoformat(),
-        },
-        window_days=days,
-        kpi=kpi,
-        devices=device_out,
-        label_counts=label_counts,
-        series=series,
-        recent=recent,
-        ketone_logs=ketone_logs,
-    )
+    return await dashboard_service.build_user_dashboard(db, user, days)
 
 
 # ─── Breath ↔ urine ketone agreement ──────────────────────────────────────────

@@ -47,16 +47,27 @@ interface Props {
   /** 2-3 contextual questions rendered as in-card chips; tapping one opens
    *  a deep-dive Sheet (api.ai.chat) instead of leaving the page. */
   questions?: string[];
+  /** When set, this card is a doctor viewing an assigned patient's reading
+   *  (not their own) — calls the doctor-scoped interpret endpoint instead
+   *  of the self-scoped one. Chat entry points are hidden in this mode:
+   *  /ai/chat is transport-scoped to the caller's own account context
+   *  (mcp_scope(user.id, ...)), so there's no way to point it at a
+   *  different patient — leaving it visible would silently answer using
+   *  the doctor's own (likely empty) data instead of the patient's. */
+  patientId?: string;
 }
 
-export function AiInterpretCard({ deviceId, refreshKey, time, className, hasReadingToday, questions }: Props) {
+export function AiInterpretCard({ deviceId, refreshKey, time, className, hasReadingToday, questions, patientId }: Props) {
   const { t } = useT();
   const noReadingYet = hasReadingToday === false;
   const [sheetQuestion, setSheetQuestion] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ["ai", "interpret", deviceId, time ?? "latest", refreshKey ?? 0],
-    queryFn: () => api.ai.interpret(deviceId!, time),
+    queryKey: ["ai", "interpret", patientId ?? "self", deviceId, time ?? "latest", refreshKey ?? 0],
+    queryFn: () =>
+      patientId
+        ? api.doctor.interpretPatientReading(patientId, deviceId!, time)
+        : api.ai.interpret(deviceId!, time),
     enabled: !!deviceId && !noReadingYet,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
@@ -113,24 +124,28 @@ export function AiInterpretCard({ deviceId, refreshKey, time, className, hasRead
               {!data.refusal && (
                 <p className="text-[11px] text-text-disabled mt-2">{t("aiInterpret.disclaimer")}</p>
               )}
-              {questions && questions.length > 0 && (
+              {!patientId && questions && questions.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2.5">
                   {questions.map((q) => (
                     <SuggestedQuestionChip key={q} question={q} onSelect={setSheetQuestion} />
                   ))}
                 </div>
               )}
-              <Link
-                href={deviceId ? `/chat?device=${deviceId}` : "/chat"}
-                className="inline-flex items-center rounded-full bg-bg-surface border border-border-soft px-3 py-1 text-xs font-medium text-mint-600 mt-2 hover:border-mint-500/40 transition-colors"
-              >
-                {t("aiInterpret.askMore")}
-              </Link>
+              {!patientId && (
+                <Link
+                  href={deviceId ? `/chat?device=${deviceId}` : "/chat"}
+                  className="inline-flex items-center rounded-full bg-bg-surface border border-border-soft px-3 py-1 text-xs font-medium text-mint-600 mt-2 hover:border-mint-500/40 transition-colors"
+                >
+                  {t("aiInterpret.askMore")}
+                </Link>
+              )}
             </>
           )}
         </div>
     </BentoTile>
-    <AiDeepDiveSheet question={sheetQuestion} deviceId={deviceId} onClose={() => setSheetQuestion(null)} />
+    {!patientId && (
+      <AiDeepDiveSheet question={sheetQuestion} deviceId={deviceId} onClose={() => setSheetQuestion(null)} />
+    )}
     </>
   );
 }
